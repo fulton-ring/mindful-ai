@@ -11,7 +11,10 @@
     "test:integration": "vitest run",
     "db:migrate": "wrangler d1 migrations apply DB --local",
     "dev:test": "wrangler dev --config wrangler.test.jsonc --env test --local --port 8788",
-    "db:migrate:test": "wrangler d1 migrations apply walden-local-test --config wrangler.test.jsonc --env test --local"
+    "db:migrate:test": "wrangler d1 migrations apply walden-local-test --config wrangler.test.jsonc --env test --local",
+    "db:generate": "drizzle-kit generate",
+    "db:check": "drizzle-kit check",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote --env-file /dev/null"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^2.0.75",
@@ -26,12 +29,14 @@
     "@mastra/s3": "0.6.3",
     "@walden/contracts": "workspace:*",
     "@walden/domain": "workspace:*",
+    "drizzle-orm": "^0.45.2",
     "hono": "^4.9.7",
     "workers-ai-provider": "^3.2.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260917.1",
+    "drizzle-kit": "^0.31.10",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",
     "wrangler": "^4.38.0"

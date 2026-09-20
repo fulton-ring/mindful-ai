@@ -15,7 +15,8 @@
       "!**/.turbo",
       "!**/routeTree.gen.ts",
       "!**/playwright-report",
-      "!**/test-results"
+      "!**/test-results",
+      "!**/migrations/meta"
     ]
   },
   "formatter": {

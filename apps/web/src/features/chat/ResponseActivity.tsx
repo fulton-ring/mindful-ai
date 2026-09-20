@@ -28,11 +28,15 @@ function safeSource(source: MessageSource): (MessageSource & { domain: string })
 export function ResponseActivity({
   tools = [],
   live = false,
+  sources = [],
 }: {
   tools?: ToolActivity[];
   live?: boolean;
+  sources?: MessageSource[];
 }) {
-  if (!tools.length) return null;
+  if (!tools.length && !sources.length) return null;
+  const assigned = new Set(tools.flatMap((tool) => tool.sources ?? []).map((source) => source.url));
+  const unassigned = sources.filter((source) => !assigned.has(source.url));
 
   // While the turn is still running this panel is the only progress the reader
   // gets, so it starts open. Collapsed, a multi-second tool call looks like the
@@ -61,7 +65,7 @@ export function ResponseActivity({
                 </span>
               </>
             }
-            description={tool.summary}
+            description={tool.query ? `“${tool.query}”` : tool.summary}
             status={tool.state === 'running' ? 'active' : 'complete'}
             icon={
               tool.state === 'running'
@@ -70,10 +74,41 @@ export function ResponseActivity({
                   ? XCircleIcon
                   : undefined
             }
-          />
+          >
+            {tool.query && tool.state === 'error' && <p>{tool.summary}</p>}
+            {tool.sources && <SearchResultLinks sources={tool.sources} />}
+          </ChainOfThoughtStep>
         ))}
+        {unassigned.length > 0 && (
+          <div>
+            <p className="text-xs text-[var(--muted)]">Retrieved sources</p>
+            <SearchResultLinks sources={unassigned} />
+          </div>
+        )}
       </ChainOfThoughtContent>
     </ChainOfThought>
+  );
+}
+
+function SearchResultLinks({ sources }: { sources: MessageSource[] }) {
+  const unique = new Map<string, MessageSource & { domain: string }>();
+  for (const source of sources) {
+    const result = safeSource(source);
+    if (result && !unique.has(result.url)) unique.set(result.url, result);
+  }
+  const safe = [...unique.values()];
+  if (!safe.length) return <p className="text-xs text-[var(--muted)]">No sources returned.</p>;
+  return (
+    <ul className="research-results">
+      {safe.map((source) => (
+        <li key={source.url}>
+          <a href={source.url} target="_blank" rel="noopener noreferrer">
+            {source.title || source.domain}
+          </a>
+          <span>{source.domain}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

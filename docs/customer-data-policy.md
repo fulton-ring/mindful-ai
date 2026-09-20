@@ -20,7 +20,7 @@ PostHog documents 30-day retention for these content fields. Metadata has separa
 
 ## Deployment requirements
 
-1. Apply migrations `0022_account_privacy.sql` and `0023_persona_icons.sql` to production D1 before deploying the app (already applied locally).
+1. Initialize fresh databases with the Drizzle-generated `0000_baseline.sql`, which includes privacy, persona icons, and web-search preferences. Use incremental generated migrations for future changes.
 2. Keep the existing POSTHOG_API_KEY and POSTHOG_HOST for ingest. Configure POSTHOG_PROJECT_ID (`619294` for the connected project) and POSTHOG_PERSONAL_API_KEY as a Worker secret scoped to that project's `person:write`. These management credentials are NOT the public ingest key. The current local environment has only ingest credentials.
 3. The existing hourly scheduled Worker retries `telemetry_deletions`. It waits at least ten minutes after an account deletion request, allowing request-owned generation/flushes to end, then calls PostHog bulk deletion by distinct ID with events and recordings included. Provider acceptance is asynchronous, not proof of physical erasure. Inspect provider deletion status for privacy requests. Failed/unconfigured requests stay in D1 for retry; Detailed conversation capture fails closed until the management key and project ID are configured. Configure and verify this path before enabling content collection.
 4. Verify deployed privacy notice, preference persistence, synthetic content delivery, opt-out, and provider deletion with a disposable test account. Never delete a real customer for testing.

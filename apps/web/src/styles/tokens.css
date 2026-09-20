@@ -1905,3 +1905,25 @@
   margin-top: 2rem;
   font-size: 1.15rem;
 }
+
+.research-results {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.research-results li {
+  display: grid;
+  gap: 0.1rem;
+}
+.research-results a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+.research-results span {
+  color: var(--muted);
+  font-size: 0.72rem;
+}

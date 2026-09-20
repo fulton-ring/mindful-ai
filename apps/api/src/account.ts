@@ -57,7 +57,7 @@ accountRoutes.get('/account/export', async (c) => {
       ),
       all<Record<string, unknown>>(
         c.env.DB.prepare(
-          "SELECT id,title,note_id,learning_checks_enabled,last_user_activity_at,expires_at,status,created_at FROM conversations WHERE owner_id=? AND expires_at>? AND status='active'",
+          "SELECT id,title,note_id,learning_checks_enabled,web_search_enabled,last_user_activity_at,expires_at,status,created_at FROM conversations WHERE owner_id=? AND expires_at>? AND status='active'",
         ).bind(ownerId, now),
       ),
       all<Record<string, unknown>>(

@@ -8,61 +8,9 @@ const migration = (name: string) =>
   readFileSync(new URL(`../../migrations/${name}`, import.meta.url), 'utf8');
 
 describe('durable note suggestion history', () => {
-  it('migrates decided history while allowing repeated attempts with only one pending', () => {
-    const db = join(mkdtempSync(join(tmpdir(), 'walden-repeat-suggestions-')), 'fixture.sqlite');
-    execFileSync('sqlite3', [db], {
-      input: `${migration('0001_core.sql')}
-        ${migration('0002_optional_conversation_note.sql')}
-        ${migration('0003_hidden_personas.sql')}
-        ${migration('0004_conversation_titles.sql')}
-        ${migration('0005_message_reasoning.sql')}
-        ${migration('0006_durable_note_suggestions.sql')}
-        INSERT INTO users VALUES ('owner','subject','now','now',0);
-        INSERT INTO notes (id,owner_id,markdown,revision,provenance_json,created_at,updated_at)
-          VALUES ('note','owner','Base',1,'[]','now','now');
-        INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,base_revision,base_markdown,old_text,new_text,reason,status,created_at,updated_at)
-          VALUES ('old','note','owner','conversation','message',0,'Base','Base','First','Useful','dismissed','1','1');
-        INSERT INTO note_edits (id,note_id,owner_id,operation_id,base_revision,result_revision,before_title,before_markdown,before_provenance_json,after_title,after_markdown,after_provenance_json,kind,suggestion_id,before_suggestion_status,after_suggestion_status,created_at)
-          VALUES ('edit','note','owner','reject',0,1,'Note','Base','[]','Note','Base','[]','suggestion_reject','old','pending','dismissed','1');
-        ${migration('0008_repeat_note_suggestions.sql')}
-        INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,base_revision,base_markdown,old_text,new_text,reason,status,created_at,updated_at)
-          VALUES ('new-decided','note','owner','conversation','message',1,'Base','Base','Second','Useful','accepted','2','2');
-        INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,base_revision,base_markdown,old_text,new_text,reason,status,created_at,updated_at)
-          VALUES ('pending','note','owner','conversation','message',1,'Base','Base','Third','Useful','pending','3','3');`,
-    });
-
-    const preserved = execFileSync(
-      'sqlite3',
-      [
-        db,
-        "SELECT e.suggestion_id||':'||s.status FROM note_edits e JOIN note_suggestions s ON s.id=e.suggestion_id WHERE e.id='edit';",
-      ],
-      { encoding: 'utf8' },
-    ).trim();
-    expect(preserved).toBe('old:dismissed');
-    expect(
-      execFileSync('sqlite3', [db, 'PRAGMA foreign_key_check;'], { encoding: 'utf8' }).trim(),
-    ).toBe('');
-    expect(() =>
-      execFileSync('sqlite3', [db], {
-        input: `INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,base_revision,base_markdown,old_text,new_text,reason,status,created_at,updated_at)
-          VALUES ('other-pending','note','owner','conversation','message',1,'Base','Base','Fourth','Useful','pending','4','4');`,
-      }),
-    ).toThrow();
-  });
-
   it('preserves a rejected suggestion through undo and redo without transcript ownership', () => {
     const db = join(mkdtempSync(join(tmpdir(), 'walden-note-history-')), 'fixture.sqlite');
-    const migrations = [
-      '0001_core.sql',
-      '0002_optional_conversation_note.sql',
-      '0003_hidden_personas.sql',
-      '0004_conversation_titles.sql',
-      '0005_message_reasoning.sql',
-      '0006_durable_note_suggestions.sql',
-    ]
-      .map(migration)
-      .join('\n');
+    const migrations = migration('0000_baseline.sql');
     execFileSync('sqlite3', [db], {
       input: `${migrations}
         INSERT INTO users VALUES ('owner','subject','now','now',0);
@@ -108,12 +56,7 @@ describe('durable note suggestion history', () => {
   it('keeps request idempotency after the opposite history action', () => {
     const db = join(mkdtempSync(join(tmpdir(), 'walden-note-idempotency-')), 'fixture.sqlite');
     execFileSync('sqlite3', [db], {
-      input: `${migration('0001_core.sql')}
-        ${migration('0002_optional_conversation_note.sql')}
-        ${migration('0003_hidden_personas.sql')}
-        ${migration('0004_conversation_titles.sql')}
-        ${migration('0005_message_reasoning.sql')}
-        ${migration('0006_durable_note_suggestions.sql')}
+      input: `${migration('0000_baseline.sql')}
         INSERT INTO users VALUES ('owner','subject','now','now',0);
         INSERT INTO notes (id,owner_id,markdown,revision,provenance_json,created_at,updated_at) VALUES ('note','owner','',0,'[]','now','now');
         INSERT INTO note_history_requests VALUES ('owner','note','undo-request','undo',1,'edit','now');

@@ -36,6 +36,7 @@ type ConversationRow = {
   note_id: string | null;
   expires_at: string;
   learning_checks_enabled: number;
+  web_search_enabled: number;
   status: string;
 };
 type BranchRow = {
@@ -90,7 +91,7 @@ export async function loadConversation(
     db
       .prepare(
         // Same ownership rule as the list: the note names the thread.
-        `SELECT c.id,COALESCE(NULLIF(TRIM(n.title),''),c.title) AS title,c.note_id,c.expires_at,c.learning_checks_enabled,c.status
+        `SELECT c.id,COALESCE(NULLIF(TRIM(n.title),''),c.title) AS title,c.note_id,c.expires_at,c.learning_checks_enabled,c.web_search_enabled,c.status
            FROM conversations c
            LEFT JOIN notes n ON n.id=c.note_id AND n.owner_id=c.owner_id
            WHERE c.id=? AND c.owner_id=?`,
@@ -123,6 +124,7 @@ export async function loadConversation(
         messages: [],
         expiresAt: branch.expires_at,
         learningChecksEnabled: Boolean(row.learning_checks_enabled),
+        webSearchEnabled: row.web_search_enabled !== 0,
         branchId: branch.id,
         branches: [],
       };
@@ -204,6 +206,7 @@ export async function loadConversation(
     messages,
     expiresAt: branch.expires_at,
     learningChecksEnabled: Boolean(row.learning_checks_enabled),
+    webSearchEnabled: row.web_search_enabled !== 0,
     branchId: branch.id,
     branches: branches
       .filter(({ status, expires_at }) => status === 'active' && expires_at > nowIso())
@@ -295,6 +298,7 @@ async function createConversation(
     messages: [],
     expiresAt,
     learningChecksEnabled: true,
+    webSearchEnabled: true,
     branchId,
     branches: [{ id: branchId, forkedFromMessageId: null, headMessageId: null, expiresAt }],
   };
@@ -502,6 +506,23 @@ conversationRoutes.patch('/conversations/:id/learning-checks', async (c) => {
       .bind(conversation.id, ownerId)
       .run();
   return c.json({ learningChecksEnabled: body.data.enabled });
+});
+conversationRoutes.patch('/conversations/:id/web-search', async (c) => {
+  const ownerId = c.get('userId');
+  const conversation = await loadConversation(c.env.DB, ownerId, c.req.param('id'));
+  const body = z
+    .object({ enabled: z.boolean() })
+    .strict()
+    .safeParse(await jsonBody<unknown>(c));
+  if (!body.success) throw new HttpError(400, 'Invalid web-search preference');
+  const result = await c.env.DB.prepare(
+    `UPDATE conversations SET web_search_enabled=? WHERE id=? AND owner_id=? AND NOT EXISTS (SELECT 1 FROM turns WHERE conversation_id=? AND owner_id=? AND status='streaming')`,
+  )
+    .bind(body.data.enabled ? 1 : 0, conversation.id, ownerId, conversation.id, ownerId)
+    .run();
+  if (result.meta.changes !== 1)
+    throw new HttpError(409, 'Wait for the current reply to finish before changing web search');
+  return c.json({ webSearchEnabled: body.data.enabled });
 });
 conversationRoutes.patch('/conversations/:id/note', async (c) => {
   const ownerId = c.get('userId');

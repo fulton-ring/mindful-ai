@@ -130,7 +130,9 @@ export function AnnotatedText({
   highlights = [],
   onHighlight,
   actionStatus,
+  active = true,
 }: {
+  active?: boolean;
   text: string;
   annotations?: Annotation[];
   animatedAnnotationIds?: ReadonlySet<string>;
@@ -161,6 +163,13 @@ export function AnnotatedText({
   const [menu, setMenu] = useState<Menu | null>(null);
   const [highlightError, setHighlightError] = useState('');
   const [highlightPending, setHighlightPending] = useState(false);
+  useEffect(() => {
+    if (!active) {
+      setMenu(null);
+      menuRef.current = null;
+      returnFocus.current = null;
+    }
+  }, [active]);
 
   function sourceRange(selection: Selection): { start: number; end: number } | null {
     const container = root.current;
@@ -401,7 +410,7 @@ export function AnnotatedText({
 
   return (
     <TooltipProvider delayDuration={150} skipDelayDuration={100}>
-      <AnnotationTooltipDisabled.Provider value={Boolean(menu)}>
+      <AnnotationTooltipDisabled.Provider value={!active || Boolean(menu)}>
         <div
           className="annotated"
           ref={root}
@@ -448,7 +457,7 @@ export function AnnotatedText({
               )}
             </p>
           )}
-          <Popover open={Boolean(menu)} onOpenChange={(open) => !open && dismiss()}>
+          <Popover open={active && Boolean(menu)} onOpenChange={(open) => !open && dismiss()}>
             <PopoverAnchor virtualRef={virtualAnchor} />
             <PopoverContent
               ref={toolbar}

@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChatPanel } from './ChatPanel';
 
 const transport = vi.hoisted(() => ({
+  setWebSearch: vi.fn(),
   setLearningChecks: vi.fn(),
   cancelTurn: vi.fn().mockResolvedValue({ cancelled: true }),
   cancelNoteProposal: vi.fn().mockResolvedValue({ cancelledSuggestionIds: [], noteState: null }),
@@ -25,6 +26,7 @@ const transport = vi.hoisted(() => ({
 
 vi.mock('../../lib/api', () => ({
   api: {
+    setWebSearch: transport.setWebSearch,
     setLearningChecks: transport.setLearningChecks,
     cancelTurn: transport.cancelTurn,
     cancelNoteProposal: transport.cancelNoteProposal,
@@ -1787,7 +1789,6 @@ describe('streamed response activity', () => {
     expect(screen.queryByText('Running')).toBeNull();
     expect(screen.getByText('Completed')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Activity' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '1 source' }));
     expect(screen.getByRole('link', { name: 'Example Domain' }).getAttribute('href')).toBe(
       'https://example.com/',
     );
@@ -1801,9 +1802,11 @@ describe('streamed response activity', () => {
     expect(activity?.compareDocumentPosition(responseText as Node) ?? 0).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
-    expect(responseText?.compareDocumentPosition(sources as Node) ?? 0).toBe(
+    expect(responseText?.compareDocumentPosition(sources as Node)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
+    expect(screen.getByRole('button', { name: '1 source' })).toBeTruthy();
+    expect(activity?.contains(screen.getByRole('link', { name: 'Example Domain' }))).toBe(true);
     view.rerender(<ChatPanel {...props(conversation('conversation-2'))} />);
     expect(screen.queryByLabelText('Context compacted')).toBeNull();
     expect(screen.queryByText('Completed')).toBeNull();
@@ -1849,5 +1852,28 @@ it('can enable and disable learning checks before any quiz without sending a mes
   await waitFor(() =>
     expect(transport.setLearningChecks).toHaveBeenLastCalledWith(value.id, false),
   );
+  expect(transport.streamChat).not.toHaveBeenCalled();
+});
+
+it('toggles web search without sending a message', async () => {
+  const value = conversation('search-toggle');
+  const callbacks = props(value);
+  transport.setWebSearch.mockImplementation(async (_id, enabled) => ({
+    webSearchEnabled: enabled,
+  }));
+  const view = render(<ChatPanel {...callbacks} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Chat tools' }));
+  expect((screen.getByRole('checkbox', { name: 'Web search' }) as HTMLInputElement).checked).toBe(
+    true,
+  );
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Web search' }));
+  await waitFor(() =>
+    expect(callbacks.onConversation).toHaveBeenCalledWith(
+      expect.objectContaining({ webSearchEnabled: false }),
+    ),
+  );
+  view.rerender(<ChatPanel {...callbacks} conversation={{ ...value, webSearchEnabled: false }} />);
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Web search' }));
+  await waitFor(() => expect(transport.setWebSearch).toHaveBeenLastCalledWith(value.id, true));
   expect(transport.streamChat).not.toHaveBeenCalled();
 });

@@ -1679,6 +1679,7 @@ export function App({
                 </section>
               ) : (
                 <ChatPanel
+                  visible={desktop || mobilePane === 'chat'}
                   conversation={conversation}
                   scopeId={activeConversationId}
                   personas={personas}

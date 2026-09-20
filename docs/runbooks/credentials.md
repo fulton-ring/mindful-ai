@@ -20,7 +20,7 @@ The model supports tool calling, but that does not replace application validatio
 
 ## Cloudflare
 
-The `mindful-ai` D1 database is provisioned and its ID is configured in `apps/api/wrangler.jsonc`. Migrations through `0019_learning_checks.sql` were applied remotely on September 20, 2026 after a schema rehearsal and recovery-bookmark check. Apply subsequent migrations only after checking the target environment. Configure secret values with `wrangler secret put`; do not place them in `vars`, source files, migrations, or CI logs.
+The `walden` D1 database is configured in `apps/api/wrangler.jsonc`. Its fresh schema comes from `src/db/schema.ts` and the generated `0000_baseline.sql`. See [database workflow](../database.md). Configure secret values with `wrangler secret put`; do not place them in vars, source files, migrations, or CI logs.
 
 Build the web app and API. Verify SPA routing, `/api/*` routing, streaming, auth origins, and scheduled expiration on a staging deployment before releasing it. No remote resources are created by the local setup steps.
 

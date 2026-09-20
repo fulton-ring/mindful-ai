@@ -81,6 +81,11 @@ export const api = {
     }),
   exportAccount: () => request<unknown>('/api/account/export'),
   deleteAccount: () => request<void>('/api/account', { method: 'DELETE' }),
+  setWebSearch: (conversationId: string, enabled: boolean) =>
+    request<{ webSearchEnabled: boolean }>(`/api/conversations/${conversationId}/web-search`, {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled }),
+    }),
   setLearningChecks: (conversationId: string, enabled: boolean) =>
     request<{ learningChecksEnabled: boolean }>(
       `/api/conversations/${conversationId}/learning-checks`,

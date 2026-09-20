@@ -145,6 +145,9 @@ export type ToolActivity = {
   name: string;
   state: 'running' | 'complete' | 'error';
   summary: string;
+  /** Public research query, never raw tool arguments. */
+  query?: string;
+  sources?: MessageSource[];
 };
 export type MessageSource = { id: string; url: string; title?: string };
 export type Message = {
@@ -176,6 +179,8 @@ export type Conversation = {
   expiresAt: string;
   /** False only when the user has turned learning checks off for this thread. */
   learningChecksEnabled: boolean;
+  /** Defaults to on for existing conversations. */
+  webSearchEnabled?: boolean;
   branchId: string;
   branches: ConversationBranch[];
 };

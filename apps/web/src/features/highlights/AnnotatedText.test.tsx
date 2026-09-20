@@ -662,3 +662,27 @@ describe('annotation actions', () => {
     );
   });
 });
+
+it('dismisses a portalled context menu when its chat pane becomes hidden', () => {
+  const props = {
+    text: 'A supported claim.',
+    annotations: [
+      {
+        id: 'a',
+        start: 0,
+        end: 18,
+        quote: 'A supported claim.',
+        kind: 'fact' as const,
+        whose: 'assistant' as const,
+      },
+    ],
+    onAction: vi.fn(),
+  };
+  const view = render(<AnnotatedText {...props} />);
+  fireEvent.click(view.getByRole('button', { name: /Fact annotation/ }));
+  expect(view.getByRole('toolbar')).toBeTruthy();
+  view.rerender(<AnnotatedText {...props} active={false} />);
+  expect(view.queryByRole('toolbar')).toBeNull();
+  view.rerender(<AnnotatedText {...props} active />);
+  expect(view.queryByRole('toolbar')).toBeNull();
+});

@@ -65,6 +65,9 @@ export function SettingsPanel({
                   {item}
                 </button>
               ))}
+              <button type="button" disabled title="Coming soon">
+                Connectors
+              </button>
             </nav>
             <main>
               {tab === 'personas' && (

@@ -30,6 +30,10 @@ browser and AI Search bindings. Neither has local emulation, so both are declare
 you do, the two tools are simply not registered, and the assistant is told it has
 no web access so it says so rather than offering to look things up.
 
+## Database schema
+
+Edit `apps/api/src/db/schema.ts`, run `pnpm db:generate`, review the SQL, then apply it with `pnpm db:migrate`. See the [database workflow](docs/database.md) for test and production commands.
+
 ## Workspace
 
 - `apps/web`: React/Vite interface, CodeMirror editor, TanStack Query state.

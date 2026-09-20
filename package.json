@@ -14,7 +14,9 @@
     "test:unit": "turbo run test",
     "test:e2e": "playwright test",
     "db:migrate": "pnpm --filter @walden/api db:migrate",
-    "verify": "pnpm typecheck && pnpm test && pnpm build"
+    "verify": "pnpm typecheck && pnpm test && pnpm build",
+    "db:generate": "pnpm --filter @walden/api db:generate",
+    "db:check": "pnpm --filter @walden/api db:check"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",

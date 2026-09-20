@@ -1207,6 +1207,10 @@ export async function* streamMastraTurn(
   trace?: AgentTraceContext,
   runtime: AgentRuntime = {},
 ): AsyncIterable<ChatEvent> {
+  if (input.conversation.webSearchEnabled === false) {
+    mcpTools = { ...mcpTools };
+    delete mcpTools.searchWeb;
+  }
   const proposals = new TurnProposals();
   const pendingContext =
     input.pendingIntervention?.kind === 'learning_check'
@@ -1263,6 +1267,11 @@ export async function* streamMastraTurn(
       // makes the model promise to look things up it has no way to fetch.
       ...('readWebPage' in mcpTools || 'searchSources' in mcpTools ? [RESEARCH_INSTRUCTIONS] : []),
       ...('searchWeb' in mcpTools ? [WEB_SEARCH_INSTRUCTIONS] : []),
+      ...(input.conversation.webSearchEnabled === false
+        ? [
+            'Web search is disabled for this conversation. Do not search the public web. If fresh evidence is needed, explain that the user can enable Web search in Chat tools or supply a source URL. Do not claim to have searched.',
+          ]
+        : []),
       ...(!('readWebPage' in mcpTools || 'searchSources' in mcpTools || 'searchWeb' in mcpTools)
         ? [NO_RESEARCH_INSTRUCTIONS]
         : []),
@@ -1360,7 +1369,7 @@ export async function* streamMastraTurn(
         return null;
       url.hash = '';
       const normalized = url.toString();
-      if (sources.has(normalized)) return null;
+
       return {
         id: id.slice(0, 200),
         url: normalized,
@@ -1371,7 +1380,7 @@ export async function* streamMastraTurn(
     }
   };
   const emitSource = function* (source: MessageSource | null) {
-    if (!source) return;
+    if (!source || sources.has(source.url)) return;
     sources.set(source.url, source);
     yield { type: 'source', source } as const;
   };
@@ -1393,7 +1402,17 @@ export async function* streamMastraTurn(
     if (chunk.type === 'tool-call') {
       const name = chunk.payload.toolName;
       if (activityTools.size < 20) {
-        const tool = {
+        const args = chunk.payload.args;
+        const query =
+          (name === 'searchWeb' || name === 'searchSources') &&
+          args &&
+          typeof args === 'object' &&
+          'query' in args &&
+          typeof args.query === 'string'
+            ? args.query.trim().slice(0, 500)
+            : undefined;
+        const tool: ToolActivity = {
+          ...(query ? { query } : {}),
           id: chunk.payload.toolCallId.slice(0, 200),
           name: safeToolName(name),
           state: 'running' as const,
@@ -1409,7 +1428,8 @@ export async function* streamMastraTurn(
     if (chunk.type === 'tool-result') {
       const { toolCallId, toolName, result, isError } = chunk.payload;
       const prior = activityTools.get(toolCallId);
-      const tool = {
+      const tool: ToolActivity = {
+        ...(prior?.query ? { query: prior.query } : {}),
         id: toolCallId.slice(0, 200),
         name: safeToolName(toolName),
         state: isError ? ('error' as const) : ('complete' as const),
@@ -1426,6 +1446,32 @@ export async function* streamMastraTurn(
             ? 'Read, but not saved to search'
             : toolSummary(toolName, isError ? 'error' : 'complete'),
       };
+
+      if (!isError && result && typeof result === 'object') {
+        const found: MessageSource[] = [];
+        if (toolName === 'readWebPage' && 'url' in result) {
+          const source = publicSource(`${toolCallId}:0`, result.url);
+          if (source) found.push(source);
+        }
+        if (
+          (toolName === 'searchSources' || toolName === 'searchWeb') &&
+          'results' in result &&
+          Array.isArray(result.results)
+        ) {
+          for (const [index, item] of result.results.slice(0, 20).entries()) {
+            if (!item || typeof item !== 'object' || !('url' in item)) continue;
+            const source = publicSource(
+              `${toolCallId}:${index}`,
+              item.url,
+              'title' in item ? item.title : undefined,
+            );
+            if (source && !found.some((previous) => previous.url === source.url))
+              found.push(source);
+          }
+        }
+        if (['searchWeb', 'searchSources', 'readWebPage'].includes(toolName)) tool.sources = found;
+        for (const source of found) yield* emitSource(source);
+      }
       if (prior || activityTools.size < 20) {
         activityTools.set(tool.id, tool);
         yield { type: 'tool', tool };
@@ -1434,30 +1480,13 @@ export async function* streamMastraTurn(
         throw new Error(
           'Web search failed. Please retry; this does not mean no matching reports exist.',
         );
-      if (!isError && result && typeof result === 'object') {
-        if (toolName === 'readWebPage' && 'url' in result)
-          yield* emitSource(publicSource(`${toolCallId}:0`, result.url));
-        if (
-          (toolName === 'searchSources' || toolName === 'searchWeb') &&
-          'results' in result &&
-          Array.isArray(result.results)
-        ) {
-          for (const [index, item] of result.results.entries()) {
-            if (!item || typeof item !== 'object' || !('url' in item)) continue;
-            yield* emitSource(
-              publicSource(
-                `${toolCallId}:${index}`,
-                item.url,
-                'title' in item ? item.title : undefined,
-              ),
-            );
-          }
-        }
-      }
     }
     if (chunk.type === 'tool-error') {
       const { toolCallId, toolName } = chunk.payload;
-      const tool = {
+      const tool: ToolActivity = {
+        ...(activityTools.get(toolCallId)?.query
+          ? { query: activityTools.get(toolCallId)!.query }
+          : {}),
         id: toolCallId.slice(0, 200),
         name: safeToolName(toolName),
         state: 'error' as const,

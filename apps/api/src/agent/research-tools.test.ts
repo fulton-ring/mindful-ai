@@ -229,6 +229,7 @@ describe('research tools in a Mastra turn', () => {
         name: 'readWebPage',
         state: 'complete',
         summary: 'Read, but not saved to search',
+        sources: [{ id: 'read-1:0', url: 'https://example.com/research' }],
       },
     });
     expect(events).toContainEqual({
@@ -252,6 +253,17 @@ describe('research tools in a Mastra turn', () => {
       events.push(event);
 
     expect(calls).toHaveLength(3);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: 'tool',
+        tool: expect.objectContaining({
+          name: 'searchSources',
+          query: 'deterministic research result',
+          state: 'complete',
+          sources: [expect.objectContaining({ url: 'https://example.com/research' })],
+        }),
+      }),
+    );
     expect(JSON.stringify(calls[1]?.prompt)).toContain(
       'Deterministic tests avoid external dependencies.',
     );
@@ -276,6 +288,7 @@ describe('research tools in a Mastra turn', () => {
             name: 'readWebPage',
             state: 'complete',
             summary: '',
+            sources: [{ id: 'read-1:0', url: 'https://example.com/research' }],
           },
         },
         {
@@ -433,4 +446,23 @@ it('ends the model loop once a learning check is ready for the user', async () =
     }),
   );
   expect(events.at(-1)?.type).toBe('done');
+});
+
+it('removes web search from the model tools when disabled for the conversation', async () => {
+  const calls: LanguageModelV3CallOptions[] = [];
+  const input = turnInput();
+  input.conversation.webSearchEnabled = false;
+  const execute = vi.fn();
+  for await (const _ of streamMastraTurn(input, silentModel(calls), new AbortController().signal, {
+    searchWeb: createTool({
+      id: 'search_web',
+      description: 'Search',
+      inputSchema: z.object({ query: z.string() }),
+      execute,
+    }),
+  })) {
+  }
+  expect(calls[0]?.tools?.some((tool) => tool.name === 'searchWeb')).toBe(false);
+  expect(JSON.stringify(calls[0]?.prompt)).toContain('Web search is disabled');
+  expect(execute).not.toHaveBeenCalled();
 });

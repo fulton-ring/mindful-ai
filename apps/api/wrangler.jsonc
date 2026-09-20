@@ -11,8 +11,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "mindful-ai",
-      "database_id": "5f1710a6-8db5-48a6-9b3e-ff046c03ffb9",
+      "database_name": "walden",
+      "database_id": "ee68e52c-d305-4ecb-8bd4-1eebc8ae0ecb",
       "migrations_dir": "migrations"
     }
   ],

@@ -19,6 +19,7 @@ import {
 const migration = (name: string) =>
   readFileSync(new URL(`../../migrations/${name}`, import.meta.url), 'utf8');
 const schema = () =>
+  'PRAGMA foreign_keys=ON;\n' +
   readdirSync(new URL('../../migrations/', import.meta.url))
     .filter((name) => name.endsWith('.sql'))
     .sort()
@@ -57,7 +58,7 @@ const sqliteD1 = (path: string) =>
     },
     async batch(statements: Array<{ sql(): string }>) {
       execFileSync('sqlite3', [path], {
-        input: `BEGIN;${statements.map((statement) => `${statement.sql()};`).join('\n')}COMMIT;`,
+        input: `PRAGMA foreign_keys=ON; BEGIN;${statements.map((statement) => `${statement.sql()};`).join('\n')}COMMIT;`,
       });
       return statements.map(() => ({ success: true, meta: { changes: 1 } }));
     },
@@ -127,31 +128,20 @@ describe('conversation aggregate deletion', () => {
     ).toBe('1,1,1,0,expired,expired');
   });
 
-  it('fails exclusive ownership migration without rewriting legacy shared-note rows', () => {
+  it('enforces exclusive note ownership in the baseline', () => {
     const db = join(mkdtempSync(join(tmpdir(), 'walden-shared-note-')), 'fixture.sqlite');
     execFileSync('sqlite3', [db], {
-      input: `${Array.from({ length: 6 }, (_, index) =>
-        migration(
-          `000${index + 1}_${
-            [
-              'core',
-              'optional_conversation_note',
-              'hidden_personas',
-              'conversation_titles',
-              'message_reasoning',
-              'durable_note_suggestions',
-            ][index]
-          }.sql`,
-        ),
-      ).join('\n')}
-        INSERT INTO users VALUES ('owner','subject','now','now',0);
-        INSERT INTO notes (id,owner_id,markdown,revision,provenance_json,created_at,updated_at) VALUES ('note','owner','',0,'[]','now','now');
-        INSERT INTO conversations (id,owner_id,note_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('one','owner','note','One','now','2999','active','now');
-        INSERT INTO conversations (id,owner_id,note_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('two','owner','note','Two','now','2999','active','now');`,
+      input: `${migration('0000_baseline.sql')}
+      INSERT INTO users VALUES ('owner','subject','now','now',0);
+      INSERT INTO notes (id,owner_id,markdown,revision,provenance_json,created_at,updated_at) VALUES ('note','owner','',0,'[]','now','now');
+      INSERT INTO conversations (id,owner_id,note_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('one','owner','note','One','now','2999','active','now');`,
     });
     expect(() =>
-      execFileSync('sqlite3', [db], { input: migration('0007_exclusive_conversation_notes.sql') }),
+      execFileSync('sqlite3', [db], {
+        input:
+          "INSERT INTO conversations (id,owner_id,note_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('two','owner','note','Two','now','2999','active','now');",
+      }),
     ).toThrow();
-    expect(query(db, "SELECT count(*) FROM conversations WHERE note_id='note'")).toBe('2');
+    expect(query(db, "SELECT count(*) FROM conversations WHERE note_id='note'")).toBe('1');
   });
 });

@@ -2,7 +2,7 @@
 
 import { cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, expect, it } from 'vitest';
-import { ResponseActivity, ResponseSources } from './ResponseActivity';
+import { ResponseActivity } from './ResponseActivity';
 
 afterEach(cleanup);
 
@@ -32,7 +32,7 @@ it('renders sanitized tool status and summary without arguments or results', () 
 
 it('deduplicates safe sources, labels domains, and rejects unsafe links', () => {
   const view = render(
-    <ResponseSources
+    <ResponseActivity
       sources={[
         { id: '1', url: 'https://www.example.com/report' },
         { id: '2', url: 'https://www.example.com/report', title: 'Duplicate' },
@@ -42,7 +42,7 @@ it('deduplicates safe sources, labels domains, and rejects unsafe links', () => 
     />,
   );
 
-  const trigger = view.getByRole('button', { name: '1 source' });
+  const trigger = view.getByRole('button', { name: 'Activity' });
   expect(trigger.getAttribute('aria-expanded')).toBe('false');
   fireEvent.click(trigger);
   const link = view.getByRole('link', { name: /example.com/i });
@@ -81,4 +81,46 @@ it('announces running and failed tool states accessibly', () => {
   fireEvent.click(view.getByRole('button', { name: 'Activity' }));
   expect(view.getByText('Running')).toBeTruthy();
   expect(view.getByText('Failed')).toBeTruthy();
+});
+
+it('shows each query with its results, including no-result searches', () => {
+  const view = render(
+    <ResponseActivity
+      tools={[
+        {
+          id: 'one',
+          name: 'searchWeb',
+          state: 'complete',
+          summary: '',
+          query: 'recent platform incident',
+          sources: [{ id: 's', url: 'https://example.org/report', title: 'Incident report' }],
+        },
+        {
+          id: 'two',
+          name: 'searchWeb',
+          state: 'complete',
+          summary: '',
+          query: 'follow up query',
+          sources: [],
+        },
+      ]}
+    />,
+  );
+  fireEvent.click(view.getByRole('button', { name: 'Activity' }));
+  expect(view.getByText('“recent platform incident”')).toBeTruthy();
+  expect(view.getByRole('link', { name: 'Incident report' }).getAttribute('href')).toBe(
+    'https://example.org/report',
+  );
+  expect(view.getByText('“follow up query”')).toBeTruthy();
+  expect(view.getByText('No sources returned.')).toBeTruthy();
+});
+it('keeps legacy sources available inside activity without inventing a query', () => {
+  const view = render(
+    <ResponseActivity
+      sources={[{ id: 'old', url: 'https://example.org/report', title: 'Old report' }]}
+    />,
+  );
+  fireEvent.click(view.getByRole('button', { name: 'Activity' }));
+  expect(view.getByText('Retrieved sources')).toBeTruthy();
+  expect(view.getByRole('link', { name: 'Old report' })).toBeTruthy();
 });

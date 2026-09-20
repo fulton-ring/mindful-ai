@@ -9,7 +9,10 @@ import { HttpError } from '../http';
 import type { Bindings, Variables } from '../types';
 import { conversationRoutes } from './conversations';
 
-it('persists both learning-check settings and rejects invalid or unowned updates', async () => {
+it.each([
+  ['learning-checks', 'learningChecksEnabled'],
+  ['web-search', 'webSearchEnabled'],
+])('persists %s and rejects invalid or unowned updates', async (route, field) => {
   const directory = mkdtempSync(join(tmpdir(), 'walden-learning-'));
   try {
     const file = join(directory, 'test.sqlite');
@@ -40,11 +43,11 @@ it('persists both learning-check settings and rejects invalid or unowned updates
       { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' },
       env,
     );
-    const conversation = (await created.json()) as { id: string; learningChecksEnabled: boolean };
-    expect(conversation.learningChecksEnabled).toBe(true);
+    const conversation = (await created.json()) as { id: string } & Record<string, unknown>;
+    expect(conversation[field]).toBe(true);
     const update = (enabled: unknown) =>
       app.request(
-        `/api/conversations/${conversation.id}/learning-checks`,
+        `/api/conversations/${conversation.id}/${route}`,
         {
           method: 'PATCH',
           headers: { 'content-type': 'application/json' },
@@ -55,9 +58,7 @@ it('persists both learning-check settings and rejects invalid or unowned updates
     for (const enabled of [false, true]) {
       expect((await update(enabled)).status).toBe(200);
       const response = await app.request(`/api/conversations/${conversation.id}`, {}, env);
-      expect(
-        ((await response.json()) as { learningChecksEnabled: boolean }).learningChecksEnabled,
-      ).toBe(enabled);
+      expect(((await response.json()) as Record<string, unknown>)[field]).toBe(enabled);
     }
     expect((await update('false')).status).toBe(400);
     await DB.prepare('UPDATE conversations SET owner_id=? WHERE id=?')

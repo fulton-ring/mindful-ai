@@ -20,6 +20,7 @@ import {
   FileText,
   Highlighter,
   NotebookPen,
+  Paperclip,
   Pencil,
   RefreshCw,
   SlidersHorizontal,
@@ -62,6 +63,7 @@ type Props = {
   personas: Persona[];
   personaId: string;
   noteOpen: boolean;
+  visible?: boolean;
   onPersona(id: string): void;
   onOpenNote(): void;
   onBranch?(id: string): void;
@@ -181,7 +183,7 @@ export function ChatPanel(props: Props) {
   const [intervention, setIntervention] = useState<Exclude<Intervention, { kind: 'ghost' }> | null>(
     null,
   );
-  const [savingLearningChecks, setSavingLearningChecks] = useState(false);
+  const [savingChatPreference, setSavingChatPreference] = useState(false);
   const [liveAnnotations, setLiveAnnotations] = useState<Annotation[]>([]);
   const [recentAnimation, setRecentAnimation] = useState<{
     messageId: string;
@@ -1145,28 +1147,29 @@ export function ChatPanel(props: Props) {
       if (mainAbort.current === requestController) mainAbort.current = undefined;
     }
   }
-  async function changeLearningChecks(enabled: boolean) {
-    if (sendingRef.current || savingLearningChecks) return;
-    setSavingLearningChecks(true);
+  async function changeChatPreference(setting: 'learningChecks' | 'webSearch', enabled: boolean) {
+    if (sendingRef.current || savingChatPreference) return;
+    setSavingChatPreference(true);
     const originalScope = activeConversationId.current;
     try {
       const conversation = props.conversation ?? (await props.onEnsureConversation());
-      const result = await api.setLearningChecks(conversation.id, enabled);
+      const result = await (setting === 'webSearch' ? api.setWebSearch : api.setLearningChecks)(
+        conversation.id,
+        enabled,
+      );
       if (
         activeConversationId.current !== conversation.id &&
         activeConversationId.current !== originalScope
       )
         return;
       await props.onConversation({ ...conversation, ...result });
-      if (!enabled)
+      if (setting === 'learningChecks' && !enabled)
         setIntervention((current) => (current?.kind === 'learning_check' ? null : current));
     } catch (cause) {
       if (activeConversationId.current === originalScope)
-        setError(
-          cause instanceof Error ? cause.message : 'Could not save learning-check preference.',
-        );
+        setError(cause instanceof Error ? cause.message : 'Could not save chat preference.');
     } finally {
-      setSavingLearningChecks(false);
+      setSavingChatPreference(false);
     }
   }
   async function send(
@@ -1175,7 +1178,7 @@ export function ChatPanel(props: Props) {
     editMessageId?: string,
   ) {
     const clean = message.trim();
-    if (!clean || sendingRef.current || savingLearningChecks) return;
+    if (!clean || sendingRef.current || savingChatPreference) return;
     followingResponse.current = true;
     let preparation = ++preparationGeneration.current;
     const lifecycle = lifecycleCancellation.current;
@@ -1711,7 +1714,11 @@ export function ChatPanel(props: Props) {
                       <p className="message-sender">
                         {message.personaName ?? selectedPersona?.name ?? 'Assistant'}
                       </p>
-                      <ResponseActivity tools={message.tools} live={isLive && sending} />
+                      <ResponseActivity
+                        tools={message.tools}
+                        sources={message.sources}
+                        live={isLive && sending}
+                      />
                       {message.reasoning && (
                         <Reasoning
                           className="message-reasoning"
@@ -1722,6 +1729,7 @@ export function ChatPanel(props: Props) {
                         </Reasoning>
                       )}
                       <AnnotatedText
+                        active={props.visible !== false}
                         actionStatus={captureStatus(message.id)}
                         text={message.content}
                         annotations={message.annotations}
@@ -1913,6 +1921,28 @@ export function ChatPanel(props: Props) {
                 side="top"
                 align="start"
               >
+                <button
+                  type="button"
+                  disabled
+                  title="Coming soon"
+                  className="flex w-full items-center justify-between gap-3 rounded-sm px-2 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Add files
+                  <Paperclip size={16} aria-hidden />
+                </button>
+                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-sm px-2 py-2 text-sm hover:bg-accent">
+                  <span>Web search</span>
+                  <input
+                    type="checkbox"
+                    className="accent-[var(--accent)]"
+                    aria-label="Web search"
+                    checked={props.conversation?.webSearchEnabled ?? true}
+                    disabled={sending || savingChatPreference}
+                    onChange={(event) =>
+                      void changeChatPreference('webSearch', event.target.checked)
+                    }
+                  />
+                </label>
                 <label className="flex cursor-pointer items-center justify-between gap-3 rounded-sm px-2 py-2 text-sm hover:bg-accent">
                   <span>Learning checks</span>
                   <input
@@ -1920,8 +1950,10 @@ export function ChatPanel(props: Props) {
                     className="accent-[var(--accent)]"
                     aria-label="Learning checks"
                     checked={props.conversation?.learningChecksEnabled ?? true}
-                    disabled={sending || savingLearningChecks}
-                    onChange={(event) => void changeLearningChecks(event.target.checked)}
+                    disabled={sending || savingChatPreference}
+                    onChange={(event) =>
+                      void changeChatPreference('learningChecks', event.target.checked)
+                    }
                   />
                 </label>
                 <label className="flex cursor-pointer items-center justify-between gap-3 rounded-sm px-2 py-2 text-sm hover:bg-accent">
@@ -1948,7 +1980,7 @@ export function ChatPanel(props: Props) {
             className="send-button"
             type={sending ? 'button' : 'submit'}
             aria-label={sending ? 'Stop response' : 'Send message'}
-            disabled={savingLearningChecks || (!sending && !input.trim())}
+            disabled={savingChatPreference || (!sending && !input.trim())}
             onClick={sending ? stopMainTurn : undefined}
           >
             {sending ? <Square /> : <ArrowUp />}
