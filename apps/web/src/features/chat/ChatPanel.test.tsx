@@ -180,6 +180,26 @@ afterEach(() => {
 });
 
 describe('ChatPanel cancellation', () => {
+  it('clears the response deadline on unmount even when the transport does not settle', async () => {
+    const schedule = vi.spyOn(window, 'setTimeout');
+    const clear = vi.spyOn(window, 'clearTimeout');
+    transport.streamChat.mockImplementation(() => new Promise(() => {}));
+    try {
+      const rendered = render(<ChatPanel {...props()} />);
+      fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+      fireEvent.click(screen.getByLabelText('Send message'));
+      await waitFor(() => expect(transport.streamChat).toHaveBeenCalled());
+      const index = schedule.mock.calls.findIndex((call) => call[1] === 90_000);
+      expect(index).toBeGreaterThanOrEqual(0);
+      const deadline = schedule.mock.results[index]?.value;
+      rendered.unmount();
+      expect(clear).toHaveBeenCalledWith(deadline);
+    } finally {
+      schedule.mockRestore();
+      clear.mockRestore();
+    }
+  });
+
   it('preserves a saved removal when a late classifier result updates the message', async () => {
     const message = {
       id: 'highlight-source',

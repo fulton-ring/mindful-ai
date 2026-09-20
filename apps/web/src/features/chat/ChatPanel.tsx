@@ -1270,6 +1270,8 @@ export function ChatPanel(props: Props) {
       if (activeConversationId.current === conversation.id)
         setError('The response timed out. Please try again.');
     }, 90_000);
+    const clearDeadline = () => window.clearTimeout(deadline);
+    requestController.signal.addEventListener('abort', clearDeadline, { once: true });
     const startedAt = performance.now();
     track('chat_submitted', {
       conversation_id: conversation.id,
@@ -1421,7 +1423,8 @@ export function ChatPanel(props: Props) {
         setError(cause instanceof Error ? cause.message : 'The response was interrupted.');
       setPendingEdit(null);
     } finally {
-      window.clearTimeout(deadline);
+      clearDeadline();
+      requestController.signal.removeEventListener('abort', clearDeadline);
       if (
         activeConversationId.current === conversation.id &&
         activeRequestId.current === requestId
