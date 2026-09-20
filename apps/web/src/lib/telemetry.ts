@@ -59,6 +59,8 @@ export function initializeTelemetry(config?: { key: string; host: string }): Pro
               if (!properties || typeof properties !== 'object') continue;
               for (const key of Object.keys(properties)) {
                 if (key.includes('referrer') || key.startsWith('$initial_')) delete properties[key];
+                else if (key.endsWith('pathname') && typeof properties[key] === 'string')
+                  properties[key] = analyticsPath(properties[key]);
               }
             }
           }

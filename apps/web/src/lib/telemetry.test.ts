@@ -26,6 +26,7 @@ it('strips query strings and private thread identifiers from automatic SDK URL p
   const event = sanitize({
     properties: {
       $current_url: 'private',
+      $prev_pageview_pathname: '/conversations/private-id',
       $referrer: 'private',
       $set_once: { $initial_current_url: 'private' },
     },
