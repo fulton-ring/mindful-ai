@@ -4,6 +4,22 @@ import { createResearchTools, type ResearchEnv } from './research';
 
 type ExecutableTool = { execute: (input: Record<string, string>) => Promise<unknown> };
 
+it('blocks a model from appending private content to an otherwise allowed URL', async () => {
+  const { env, quickAction } = fixture();
+  const tools = createResearchTools(
+    env,
+    'user',
+    new AbortController().signal,
+    new Set(['https://example.com/']),
+  );
+  const read = tools.readWebPage as unknown as ExecutableTool;
+  await expect(read.execute({ url: 'https://example.com/?secret=private-note' })).rejects.toThrow(
+    'supplied by the user',
+  );
+  expect(quickAction).not.toHaveBeenCalled();
+  await expect(read.execute({ url: 'https://example.com/' })).resolves.toHaveProperty('markdown');
+});
+
 function fixture() {
   const upload = vi.fn().mockResolvedValue({ id: 'item-1', status: 'queued' });
   const search = vi.fn().mockResolvedValue({ search_query: 'workers', chunks: [] });

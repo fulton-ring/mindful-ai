@@ -14,8 +14,9 @@ import { createApiTelemetry } from '../observability';
 import { ServiceUnavailableError } from './billing';
 import { streamWithEarlyAnnotations } from './early-annotations';
 import { createMcpService } from './mcp';
-import { createResearchTools } from './research';
+import { createResearchTools, publicUrl } from './research';
 import type { AgentService, AgentTurnInput, ServiceEnv } from './types';
+import { createWebSearchTools } from './web-search';
 
 export const DEFAULT_AI_MODEL = '@cf/google/gemma-4-26b-a4b-it';
 export const OPENROUTER_DEFAULT_MODEL = 'google/gemma-4-26b-a4b-it';
@@ -174,11 +175,29 @@ export function createAgentService(
             : undefined;
           const workspace = filesystem ? new Workspace({ filesystem }) : undefined;
           const mcpTools = await createMcpService(env).tools();
+          const allowedUrls = new Set<string>();
+          const userText = [
+            input.message,
+            ...input.conversation.messages
+              .filter((message) => message.role === 'user')
+              .map((message) => message.content),
+          ].join('\n');
+          for (const match of userText.matchAll(/https?:\/\/[^\s<>"`]+/g)) {
+            try {
+              allowedUrls.add(publicUrl(match[0].replace(/[),.;!?]+$/, '')).toString());
+            } catch {
+              /* Not a public URL. */
+            }
+          }
           const stream = streamMastraTurn(
             input,
             model,
             controller.signal,
-            { ...mcpTools, ...createResearchTools(env, ownerId, controller.signal) },
+            {
+              ...mcpTools,
+              ...createResearchTools(env, ownerId, controller.signal, allowedUrls),
+              ...createWebSearchTools(env, controller.signal, allowedUrls),
+            },
             telemetry && input.telemetryUserId
               ? { telemetry, userId: input.telemetryUserId, model: modelName }
               : undefined,

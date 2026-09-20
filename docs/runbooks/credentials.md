@@ -20,7 +20,7 @@ The model supports tool calling, but that does not replace application validatio
 
 ## Cloudflare
 
-The `mindful-ai` D1 database is provisioned and its ID is configured in `apps/api/wrangler.jsonc`. The initial migration has been applied remotely. Apply subsequent migrations only after checking the target environment. Configure secret values with `wrangler secret put`; do not place them in `vars`, source files, migrations, or CI logs.
+The `mindful-ai` D1 database is provisioned and its ID is configured in `apps/api/wrangler.jsonc`. Migrations through `0019_learning_checks.sql` were applied remotely on September 20, 2026 after a schema rehearsal and recovery-bookmark check. Apply subsequent migrations only after checking the target environment. Configure secret values with `wrangler secret put`; do not place them in `vars`, source files, migrations, or CI logs.
 
 Build the web app and API. Verify SPA routing, `/api/*` routing, streaming, auth origins, and scheduled expiration on a staging deployment before releasing it. No remote resources are created by the local setup steps.
 
@@ -54,11 +54,11 @@ VITE_POSTHOG_KEY=<same PostHog project key>
 VITE_POSTHOG_HOST=https://us.i.posthog.com
 ```
 
-The frontend key is the public project ingestion key, never a PostHog personal API key. Vite reads the project root environment but only exposes variables prefixed `VITE_`. No key was configured as part of this implementation.
+The frontend key is the public project ingestion key, never a PostHog personal API key. Vite reads the project root environment but only exposes variables prefixed `VITE_`. The active project and runtime configuration are documented below.
 
 Browser analytics use explicit events for navigation, chat lifecycle, note capture and proposal decisions, note-panel controls, persona selection, conversation deletion, and theme changes. Automatic DOM capture and session recordings are disabled. Authentication uses only the opaque Clerk user ID for analytics identity and resets it on logout. Neither interaction events nor Mastra traces include message, note, or reasoning content.
 
-Mastra registers both the main chat agent and the semantic annotator with PostHog observability. Export cleanup runs with Worker `waitUntil`, bounded to 1.5 seconds, and disposes per-turn exporters. Analytics errors must not affect conversation output. Validate receipt in the US PostHog project after supplying the key; local tests use mocked exporters and do not contact PostHog.
+Mastra registers both the main chat agent and the semantic annotator with PostHog observability. Export cleanup runs with Worker `waitUntil`, bounded to 1.5 seconds, and disposes per-turn exporters. Analytics errors must not affect conversation output. Unit tests use mocked exporters; live ingestion verification is documented below.
 
 ## Separate application and provisioning credentials
 
@@ -106,3 +106,16 @@ MCP deployment used a Cloudflare-issued, short-lived assets upload session for l
 - `BILLING_ENABLED=false` hides billing navigation and rejects checkout, portal, and webhook requests. No Stripe setup was performed.
 - Clerk doctor passed. Local and deployed browser checks covered sign-up controls, Google availability, password absence, and billing disabled. Application data requires a valid signed-in session.
 - This is Clerk's development instance; production domain/OAuth setup is a separate launch task.
+
+## Search and PostHog configuration — September 20, 2026
+
+The dedicated US PostHog project is **Walden**, project `619294`:
+https://us.posthog.com/project/619294
+
+Set `POSTHOG_API_KEY` to the public `phc_` project ingestion token and `POSTHOG_HOST=https://us.i.posthog.com` in the Worker and local `.dev.vars`. The public `/api/config` endpoint exposes only a `phc_` project token for the browser; personal API tokens are never exposed there. Browser configuration is runtime configuration, so a separate Vite analytics key is no longer required.
+
+The browser emits standard `$pageview` events, including signed-out visits, with thread paths normalized and query strings removed. Existing explicit chat/note events require an authenticated identity. Autocapture, session recordings, and surveys remain disabled. Server traces preserve model, token, duration, tool, and opaque correlation metadata, with prompt/answer/tool contents removed.
+
+Live local verification confirmed pageviews, chat submission/completion, and `$ai_generation`, `$ai_span`, and `$ai_trace` ingestion. An aggregate check of 389 trace events found no populated input, output, output-choice, state, or tool-content fields. Search subrequests incur separate OpenRouter usage; main generation token counts do not include those subrequests.
+
+`OPENROUTER_API_KEY` is also required in the deployed Worker for public web search. This does not change `AI_PROVIDER=cloudflare` for the main model. Keep the secret out of source and logs.

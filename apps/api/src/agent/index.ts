@@ -32,6 +32,8 @@ import {
   NO_RESEARCH_INSTRUCTIONS,
   personaInstructions,
   RESEARCH_INSTRUCTIONS,
+  SAFETY_INSTRUCTIONS,
+  WEB_SEARCH_INSTRUCTIONS,
 } from './prompts';
 
 export const annotationKindSchema = z.enum(ACTIVE_ANNOTATION_KINDS);
@@ -1242,11 +1244,15 @@ export async function* streamMastraTurn(
     name: 'Walden thinking partner',
     instructions: [
       CORE_INSTRUCTIONS,
+      SAFETY_INSTRUCTIONS,
+      `Current date: ${new Date().toISOString().slice(0, 10)}.`,
       // Describing readWebPage/searchSources when they are not registered is what
       // makes the model promise to look things up it has no way to fetch.
-      'readWebPage' in mcpTools || 'searchSources' in mcpTools
-        ? RESEARCH_INSTRUCTIONS
-        : NO_RESEARCH_INSTRUCTIONS,
+      ...('readWebPage' in mcpTools || 'searchSources' in mcpTools ? [RESEARCH_INSTRUCTIONS] : []),
+      ...('searchWeb' in mcpTools ? [WEB_SEARCH_INSTRUCTIONS] : []),
+      ...(!('readWebPage' in mcpTools || 'searchSources' in mcpTools || 'searchWeb' in mcpTools)
+        ? [NO_RESEARCH_INSTRUCTIONS]
+        : []),
       personaInstructions(input.persona),
     ],
     model,
@@ -1291,6 +1297,12 @@ export async function* streamMastraTurn(
   const safeToolName = (name: string) =>
     name.replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 100) || 'tool';
   const toolSummary = (name: string, state: ToolActivity['state']) => {
+    if (name === 'searchWeb')
+      return state === 'running'
+        ? 'Searching the web…'
+        : state === 'error'
+          ? 'Web search failed'
+          : '';
     const action =
       name === 'readWebPage' ? 'source' : name === 'searchSources' ? 'sources' : 'tool';
     if (state === 'running')
@@ -1377,6 +1389,7 @@ export async function* streamMastraTurn(
       }
       if (name === 'readWebPage') yield { type: 'status', text: 'Reading source…' };
       if (name === 'searchSources') yield { type: 'status', text: 'Searching sources…' };
+      if (name === 'searchWeb') yield { type: 'status', text: 'Searching the web…' };
     }
     if (chunk.type === 'tool-result') {
       const { toolCallId, toolName, result, isError } = chunk.payload;
@@ -1402,10 +1415,18 @@ export async function* streamMastraTurn(
         activityTools.set(tool.id, tool);
         yield { type: 'tool', tool };
       }
+      if (toolName === 'searchWeb' && isError)
+        throw new Error(
+          'Web search failed. Please retry; this does not mean no matching reports exist.',
+        );
       if (!isError && result && typeof result === 'object') {
         if (toolName === 'readWebPage' && 'url' in result)
           yield* emitSource(publicSource(`${toolCallId}:0`, result.url));
-        if (toolName === 'searchSources' && 'results' in result && Array.isArray(result.results)) {
+        if (
+          (toolName === 'searchSources' || toolName === 'searchWeb') &&
+          'results' in result &&
+          Array.isArray(result.results)
+        ) {
           for (const [index, item] of result.results.entries()) {
             if (!item || typeof item !== 'object' || !('url' in item)) continue;
             yield* emitSource(
@@ -1431,6 +1452,10 @@ export async function* streamMastraTurn(
         activityTools.set(tool.id, tool);
         yield { type: 'tool', tool };
       }
+      if (toolName === 'searchWeb')
+        throw new Error(
+          'Web search failed. Please retry; this does not mean no matching reports exist.',
+        );
     }
     if (chunk.type === 'source' && chunk.payload.sourceType === 'url')
       yield* emitSource(publicSource(chunk.payload.id, chunk.payload.url, chunk.payload.title));

@@ -231,6 +231,7 @@ export type AppConfig = {
   billingConfigured: boolean;
   modelConfigured: boolean;
   clerkPublishableKey?: string;
+  telemetry?: { key: string; host: string };
 };
 /**
  * Product analytics events. The server validates `kind` against this list, and

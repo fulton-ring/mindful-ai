@@ -28,14 +28,18 @@ let client: PostHog | undefined;
 let identity: string | null = null;
 let loading: Promise<void> | undefined;
 
-export function initializeTelemetry(): Promise<void> {
+function analyticsPath(path: string): string {
+  return path.split(/[?#]/)[0].replace(/\/conversations\/[^/]+/, '/conversations/:id');
+}
+
+export function initializeTelemetry(config?: { key: string; host: string }): Promise<void> {
   if (loading) return loading;
-  const key = import.meta.env.VITE_POSTHOG_KEY;
+  const key = config?.key || import.meta.env.VITE_POSTHOG_KEY;
   if (!key) return Promise.resolve();
   loading = import('posthog-js')
     .then(({ default: posthog }) => {
       posthog.init(key, {
-        api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
+        api_host: config?.host || import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
         autocapture: false,
         capture_pageview: false,
         capture_pageleave: false,
@@ -44,9 +48,19 @@ export function initializeTelemetry(): Promise<void> {
         person_profiles: 'identified_only',
         before_send: (event) => {
           if (event) {
-            event.properties.$current_url = `${location.origin}${location.pathname}`;
-            delete event.properties.$referrer;
-            delete event.properties.$initial_referrer;
+            const path = analyticsPath(location.pathname);
+            event.properties.$current_url = `${location.origin}${path}`;
+            event.properties.$pathname = path;
+            for (const properties of [
+              event.properties,
+              event.properties.$set,
+              event.properties.$set_once,
+            ]) {
+              if (!properties || typeof properties !== 'object') continue;
+              for (const key of Object.keys(properties)) {
+                if (key.includes('referrer') || key.startsWith('$initial_')) delete properties[key];
+              }
+            }
           }
           return event;
         },
@@ -68,9 +82,12 @@ export function identifyTelemetry(userId: string | null) {
 }
 
 export function track(event: Interaction, properties: Properties = {}) {
-  if (!identity) return;
+  if (!identity && event !== 'page_viewed') return;
   try {
-    client?.capture(event, properties);
+    client?.capture(event === 'page_viewed' ? '$pageview' : event, {
+      ...properties,
+      ...(properties.route ? { route: analyticsPath(properties.route) } : {}),
+    });
   } catch {
     /* Analytics is best effort. */
   }

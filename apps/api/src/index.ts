@@ -25,6 +25,14 @@ app.get('/api/config', (c) =>
       c.env.AI || (c.env.CLOUDFLARE_ACCOUNT_ID && c.env.CLOUDFLARE_API_TOKEN),
     ),
     ...(c.env.CLERK_PUBLISHABLE_KEY ? { clerkPublishableKey: c.env.CLERK_PUBLISHABLE_KEY } : {}),
+    ...(c.env.POSTHOG_API_KEY?.startsWith('phc_')
+      ? {
+          telemetry: {
+            key: c.env.POSTHOG_API_KEY,
+            host: c.env.POSTHOG_HOST || 'https://us.i.posthog.com',
+          },
+        }
+      : {}),
   }),
 );
 app.route('/api/billing/webhook', billingWebhookRoutes);

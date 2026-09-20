@@ -25,7 +25,7 @@ function assertActive(signal: AbortSignal): void {
   if (signal.aborted) throw abortError();
 }
 
-function publicUrl(input: string): URL {
+export function publicUrl(input: string): URL {
   let url: URL;
   try {
     url = new URL(input);
@@ -77,7 +77,9 @@ async function within<T>(promise: Promise<T>, signal: AbortSignal, timeoutMs: nu
   }
 }
 
-async function boundedJson(response: Response): Promise<{ success?: boolean; result?: unknown }> {
+export async function boundedJson<T = { success?: boolean; result?: unknown }>(
+  response: Response,
+): Promise<T> {
   const reader = response.body?.getReader();
   if (!reader) throw new Error('Browser Run returned an empty response.');
   const chunks: Uint8Array[] = [];
@@ -98,7 +100,7 @@ async function boundedJson(response: Response): Promise<{ success?: boolean; res
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return JSON.parse(new TextDecoder().decode(bytes)) as { success?: boolean; result?: unknown };
+  return JSON.parse(new TextDecoder().decode(bytes)) as T;
 }
 
 class ResearchApiError extends Error {
@@ -135,6 +137,7 @@ export function createResearchTools(
   env: ResearchEnv,
   ownerId: string | undefined,
   signal: AbortSignal,
+  allowedUrls?: Set<string>,
 ): McpTools {
   const restConfigured = Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN);
   if (
@@ -218,6 +221,10 @@ export function createResearchTools(
     execute: async ({ url }) => {
       assertActive(signal);
       const sourceUrl = publicUrl(url).toString();
+      if (allowedUrls && !allowedUrls.has(sourceUrl))
+        throw new Error(
+          'Read only a URL supplied by the user or returned by search. Do not invent URLs or append private data.',
+        );
       try {
         const originPattern = `^${escapeRegex(new URL(sourceUrl).origin)}(?:/|$)`;
         const response = await within(
@@ -304,6 +311,7 @@ export function createResearchTools(
             .flatMap((chunk) => {
               try {
                 const url = publicUrl(String(chunk.item.metadata?.source_url)).toString();
+                allowedUrls?.add(url);
                 return [{ text: chunk.text.slice(0, MAX_CHUNK_CHARS), score: chunk.score, url }];
               } catch {
                 return [];

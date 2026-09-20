@@ -1,40 +1,30 @@
-# Browser Run and AI Search
+# Web research
 
-The app uses direct Mastra tools. No Code Mode, QuickJS, sandbox, or Worker Loader is installed or enabled.
+The main Mastra agent uses direct tools, with no separate research-agent framework.
 
-## Local startup
+## Configuration
 
-The normal `dev` command remains usable without research credentials. To enable research locally, provide `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, and `AI_SEARCH_INSTANCE=mindful-ai-sources` through the existing local environment-loading path, then run:
+- `OPENROUTER_API_KEY` enables `searchWeb`. The tool uses Gemma through OpenRouter's managed Exa search, independently of the main chat provider. Production chat remains on Workers AI.
+- `BROWSER`, `AI_SEARCH`, and `AI_SEARCH_INSTANCE` enable page reading and the saved-source index. Local development can use the existing Cloudflare application token and account ID for REST transport.
+- Run `pnpm dev`. Web runs on 5173; the API runs on 8787 with local D1 storage. Local config reads the root `.env` and `apps/api/.dev.vars`.
+- Deployment credentials remain separate from the application's Cloudflare token. Do not load the root `.env` into Wrangler deployment commands.
 
-```sh
-pnpm --filter @walden/api dev:research
-```
+## Tool behavior
 
-Stop the existing API process on port 8787 before starting `dev:research`; leave the web process on 8788 running. The command continues to use local workerd (`--local`) and does not deploy the application. When both REST credentials are present, the service calls Browser Run and AI Search through their authenticated Cloudflare REST endpoints. Wrangler login and remote-binding proxy authentication are not required for this path. Do not print the credential values.
+`searchWeb` searches the public web and returns provider-supplied citation URLs and excerpts, not the search model's generated explanation. Each turn permits two calls, each bounded to one provider search, five sources, 2,000 characters per source, a 25-second timeout, and a bounded response body. Search incurs OpenRouter model and search usage.
 
-The private `mindful-ai-sources` instance is in the `default` namespace. It has built-in storage, a disabled public endpoint, and text metadata fields `owner_scope` and `source_url`. The REST transport scopes upload and search URLs to that namespace and instance. The `research` Wrangler environment also declares native `BROWSER` and `AI_SEARCH` bindings as a deployment-compatible fallback when REST credentials are absent. Browser quick actions require a modern compatibility date; the config uses 2026-09-18.
+`readWebPage` reads a public URL supplied by a user or returned by a search. Exact URLs are checked before fetching, so the model cannot invent an exfiltration URL or append private note data to a permitted URL. The browser is restricted to the requested origin. Local addresses, IP literals, credential-bearing URLs, and non-HTTP protocols are rejected. This is a basic boundary, not a guarantee against every DNS or upstream browser vulnerability.
 
-## Behavior
+`searchSources` searches only previously retrieved, owner-scoped public pages. It is not general web search. Retrieved public pages may outlive the conversation. Notes and chats are not uploaded to this index.
 
-- `readWebPage({url})` reads rendered Markdown and queues it for indexing. It returns content immediately after upload acknowledgement, without waiting for embedding/index completion. If indexing fails, the successfully read content remains usable and the tool reports the indexing failure.
-- `searchSources({query})` searches pages already indexed for the signed-in user. It is not general web search. The server supplies the owner filter; the model cannot choose another owner.
-- Retrieved pages retain source URLs for citations. Page content and queries do not enter PostHog payloads. Chats and notes are not uploaded to the search index.
-- Indexed public pages persist independently of thread expiry/deletion and can be reused across that user's threads. Source-library management is not yet exposed in the UI.
-- Browser requests are restricted to the requested origin. Sites requiring cross-origin assets or redirects may fail or render incompletely. There is no authenticated browsing, cookies, form submission, or arbitrary script tool.
-- A main turn allows up to five steps, one tool call at a time, within the existing 75-second deadline. Tool outputs and timeouts are bounded; Mastra's existing context processors still apply.
+All sources are treated as untrusted data. Core instructions require current-event lookup, grounded citations, and explicit uncertainty. A failed web lookup terminates the answer with a retryable error rather than letting the model claim that no reports exist. Placeholder URLs are not evidence. Source reading remains useful if indexing fails; the UI distinguishes those states.
 
-## Verification
+## Verification — September 20, 2026
 
-Focused tests cover URL restrictions, REST endpoint and instance scoping, multipart upload metadata, owner separation, output limits, cancellation, safe indexing failure, and multi-step Mastra tool execution with citations/status events. API typecheck and the research-profile Worker dry run passed.
+- Chrome reproduced and then verified the Hugging Face/OpenAI search regression: successful web-search activity, a cited answer, and five sources.
+- A Worker-only failure was found: `redirect: "error"` is unsupported. Fetch now uses `manual` and rejects non-success responses.
+- Unit/integration checks cover failed lookup termination, source normalization, cancellation, response bounds, per-turn limits, credential-like query rejection, and appended-data URL rejection.
+- Safety instructions cover harmful assistance, self-harm support, high-stakes uncertainty, prompt injection, and private-data handling. Chrome verified refusal of a request for cookie-stealing code while ordinary incident analysis remained available.
+- These are basic guardrails, not a comprehensive safety certification or a separate moderation service. Query filtering catches recognizable identifiers and credentials; it cannot identify every form of private information. Main-model prompt injection and harmful-content behavior still need ongoing adversarial evaluation.
 
-Chrome verified a real page read, compact tool activity, source disclosure, Markdown citation, and persistence after reload. A fresh-thread native search call completed but returned no results. Direct API investigation found the application token can search (200) but item upload/list return 403; the instance contains no indexed items. Earlier assistant prose claiming a queued acknowledgement was not reliable evidence and is superseded by these direct checks. After the user updated permissions and propagation completed, direct checks with the application token uploaded a synthetic document and retrieved its text with an owner-scoped query (both 200). The synthetic document was then removed. Chrome subsequently verified read→index→search on a fresh branch: readWebPage produced a cited answer, then searchSources retrieved the page and produced a cited answer with compact activity and a source disclosure.
-
-Index upload failure now returns a safe reason (`permission_denied` or `indexing_unavailable`) while preserving readable page content. The tool summary exposes “Source read · not saved to search.” Agent instructions prohibit describing failed uploads as queued or previous assistant prose as a current tool result. Uploads require AI Search Edit for the same account; search alone can work without item-write access.
-
-A real Gemma run through Mastra also passed: it called both research tools against synthetic bindings and returned a supported answer with a source link. That test is opt-in (`RUN_LIVE_RESEARCH=1`) and does not substitute for a real local binding check.
-
-References: [fetch and index pages](https://developers.cloudflare.com/ai-search/how-to/fetch-and-index-web-pages/), [Browser Run](https://developers.cloudflare.com/browser-run/), [AI Search retrieval](https://developers.cloudflare.com/ai-search/api/search/workers-binding/).
-
-## Local transport compatibility
-
-Live testing found two remote-preview problems: the Browser binding proxy did not implement `quickAction`, and Cloudflare edge preview failed with code `10023` because the account feature was unavailable. The local profile therefore stays on `--local`. When account ID and application token are present, **both** page reading and AI Search upload/search use REST, avoiding the preview proxy entirely. Requests use `redirect: manual`, forward cancellation, validate Cloudflare response envelopes, and reject non-2xx responses. Without complete REST credentials, the same tools use the native bindings when those bindings are available, which is the deployment fallback.
+References: [OpenRouter web search](https://openrouter.ai/docs/guides/features/server-tools/web-search), [Cloudflare page indexing](https://developers.cloudflare.com/ai-search/how-to/fetch-and-index-web-pages/).

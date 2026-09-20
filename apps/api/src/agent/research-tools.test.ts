@@ -4,8 +4,10 @@ import type {
   LanguageModelV3StreamPart,
   LanguageModelV3Usage,
 } from '@ai-sdk/provider';
-import { DEFAULT_PERSONAS } from '@walden/contracts';
+import { createTool } from '@mastra/core/tools';
+import { type ChatEvent, DEFAULT_PERSONAS } from '@walden/contracts';
 import { describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 
 import { createCloudflareModel, DEFAULT_AI_MODEL } from '../services/agent';
 import { createResearchTools, type ResearchEnv } from '../services/research';
@@ -17,7 +19,7 @@ const usage: LanguageModelV3Usage = {
   outputTokens: { total: 10, text: 10, reasoning: 0 },
 };
 
-function researchModel(calls: LanguageModelV3CallOptions[]): LanguageModelV3 {
+function researchModel(calls: LanguageModelV3CallOptions[], searchWeb = false): LanguageModelV3 {
   let step = 0;
   const stream = (parts: LanguageModelV3StreamPart[]) =>
     new ReadableStream<LanguageModelV3StreamPart>({
@@ -44,8 +46,12 @@ function researchModel(calls: LanguageModelV3CallOptions[]): LanguageModelV3 {
             {
               type: 'tool-call',
               toolCallId: 'read-1',
-              toolName: 'readWebPage',
-              input: JSON.stringify({ url: 'https://example.com/research' }),
+              toolName: searchWeb ? 'searchWeb' : 'readWebPage',
+              input: JSON.stringify(
+                searchWeb
+                  ? { query: 'OpenAI Hugging Face incident' }
+                  : { url: 'https://example.com/research' },
+              ),
             },
             { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'tool-calls' }, usage },
           ]),
@@ -163,6 +169,35 @@ const turnInput = (): AgentTurnInput => ({
 });
 
 describe('research tools in a Mastra turn', () => {
+  it('stops a failed web lookup before the model can turn it into an unsupported answer', async () => {
+    const events: ChatEvent[] = [];
+    const run = async () => {
+      for await (const event of streamMastraTurn(
+        turnInput(),
+        researchModel([], true),
+        new AbortController().signal,
+        {
+          searchWeb: createTool({
+            id: 'search_web',
+            description: 'Search',
+            inputSchema: z.object({ query: z.string() }),
+            execute: async () => {
+              throw new Error('Provider unavailable');
+            },
+          }),
+        },
+      ))
+        events.push(event);
+    };
+    await expect(run()).rejects.toThrow('Web search failed');
+    expect(events.some((event) => event.type === 'text')).toBe(false);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: 'tool',
+        tool: expect.objectContaining({ name: 'searchWeb', state: 'error' }),
+      }),
+    );
+  });
   it('keeps the source usable but exposes failed search indexing', async () => {
     const controller = new AbortController();
     const fixture = researchTools(controller.signal);

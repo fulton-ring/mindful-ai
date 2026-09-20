@@ -8,9 +8,39 @@ const sdk = vi.hoisted(() => ({
 }));
 vi.mock('posthog-js', () => ({ default: sdk }));
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.unstubAllEnvs();
   vi.resetModules();
   vi.clearAllMocks();
+});
+
+it('strips query strings and private thread identifiers from automatic SDK URL properties', async () => {
+  vi.stubGlobal('location', {
+    origin: 'https://walden.test',
+    pathname: '/conversations/private-id',
+    search: '?secret=private',
+  });
+  const telemetry = await import('./telemetry');
+  await telemetry.initializeTelemetry({ key: 'phc_runtime', host: 'https://us.i.posthog.com' });
+  const sanitize = sdk.init.mock.calls[0]?.[1].before_send;
+  const event = sanitize({
+    properties: {
+      $current_url: 'private',
+      $referrer: 'private',
+      $set_once: { $initial_current_url: 'private' },
+    },
+  });
+  expect(event.properties.$current_url).toBe('https://walden.test/conversations/:id');
+  expect(JSON.stringify(event)).not.toContain('private');
+});
+
+it('captures standard anonymous pageviews with normalized paths from runtime configuration', async () => {
+  const telemetry = await import('./telemetry');
+  await telemetry.initializeTelemetry({ key: 'phc_runtime', host: 'https://us.i.posthog.com' });
+  telemetry.track('page_viewed', { route: '/conversations/private-thread?branch=private' });
+  expect(sdk.capture).toHaveBeenCalledWith('$pageview', { route: '/conversations/:id' });
+  telemetry.track('chat_submitted');
+  expect(sdk.capture).toHaveBeenCalledTimes(1);
 });
 
 it('does not initialize or send events without a project key', async () => {

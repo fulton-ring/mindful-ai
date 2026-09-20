@@ -98,13 +98,13 @@ function ClerkWorkspace({ config }: { config: AppConfig }) {
   );
 }
 async function boot() {
-  void initializeTelemetry().then(() => {
-    track('page_viewed', { route: router.state.location.pathname });
-  });
   try {
     const response = await fetch('/api/config');
     if (!response.ok) throw new Error(`Configuration request failed (${response.status})`);
     const config = (await response.json()) as AppConfig;
+    void initializeTelemetry(config.telemetry).then(() => {
+      track('page_viewed', { route: location.pathname });
+    });
     if (!config.authConfigured || !config.clerkPublishableKey) {
       root.render(
         <main className="empty-state">

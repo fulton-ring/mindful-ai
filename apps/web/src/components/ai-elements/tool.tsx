@@ -13,6 +13,7 @@ const status = {
 export function toolLabel(name: string) {
   if (name === 'readWebPage') return 'Read page';
   if (name === 'searchSources') return 'Search sources';
+  if (name === 'searchWeb') return 'Search web';
   const words = name
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/[_-]+/g, ' ')
