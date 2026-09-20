@@ -71,10 +71,21 @@ export const noteHistoryActionSchema = z.object({
   baseRevision: z.number().int().nonnegative(),
   operationId: z.string().min(1),
 });
+export const personaIconSchema = z.enum([
+  'compass',
+  'swords',
+  'graduation-cap',
+  'lightbulb',
+  'book',
+  'flask',
+  'pencil',
+  'user',
+]);
 export const personaSchema = z.object({
   id: z.string(),
   name: z.string().min(1).max(80),
   prompt: z.string().max(4000),
+  icon: personaIconSchema.optional(),
   brevity: z.enum(['brief', 'balanced', 'detailed']),
   challenge: z.enum(['gentle', 'balanced', 'direct']),
   tone: z.enum(['warm', 'neutral', 'direct']),
@@ -273,6 +284,7 @@ export const DEFAULT_PERSONAS: Persona[] = [
   {
     id: 'thinking-partner',
     name: 'Mentor',
+    icon: 'compass',
     prompt:
       'Help me think clearly. Be concise, specific, and willing to disagree. Let my own articulation lead.',
     brevity: 'brief',
@@ -282,12 +294,24 @@ export const DEFAULT_PERSONAS: Persona[] = [
   },
   {
     id: 'critical-reader',
-    name: 'Critical reader',
+    name: 'Challenger',
+    icon: 'swords',
     prompt:
-      'Look for weak assumptions, missing evidence, and alternatives. Be direct without being condescending.',
+      'Stress-test my reasoning. Identify weak assumptions, missing evidence, and strong counterarguments. Offer alternative explanations and say what evidence would change the conclusion. Be direct and adversarial toward ideas, not hostile toward me. Acknowledge sound arguments; do not disagree just to be contrarian.',
     brevity: 'balanced',
     challenge: 'direct',
     tone: 'direct',
+    revision: 0,
+  },
+  {
+    id: 'study-partner',
+    name: 'Study partner',
+    icon: 'graduation-cap',
+    prompt:
+      'Act as my study partner using active recall. When learning checks are enabled, regularly use proposeLearningCheck as part of teaching, without waiting for me to ask for a quiz. For a new concept, give a short explanation if needed, then ask one concrete recall or understanding question. Test the material itself, not which topic I want to be tested on; optional choices must be possible answers. Offer hints before revealing answers, adapt difficulty, and revisit mistakes. After I answer, explain what was right and what needs correction before moving on; do not immediately issue another check in that feedback turn. Honor requests for a direct answer or to stop quizzing. When learning checks are disabled, do not quiz; teach with concise explanations and worked examples.',
+    brevity: 'balanced',
+    challenge: 'balanced',
+    tone: 'neutral',
     revision: 0,
   },
 ];

@@ -72,6 +72,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  accountPrivacy: () =>
+    request<{ enabled: boolean; acknowledged: boolean; version: string }>('/api/account/privacy'),
+  setAccountPrivacy: (enabled: boolean, version: string) =>
+    request<{ enabled: boolean; acknowledged: boolean; version: string }>('/api/account/privacy', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled, version }),
+    }),
+  exportAccount: () => request<unknown>('/api/account/export'),
+  deleteAccount: () => request<void>('/api/account', { method: 'DELETE' }),
+  setLearningChecks: (conversationId: string, enabled: boolean) =>
+    request<{ learningChecksEnabled: boolean }>(
+      `/api/conversations/${conversationId}/learning-checks`,
+      { method: 'PATCH', body: JSON.stringify({ enabled }) },
+    ),
   config: () => request<AppConfig>('/api/config'),
   notes: () => request<Note[]>('/api/notes'),
   createNote: () => request<Note>('/api/notes', { method: 'POST', body: '{}' }),

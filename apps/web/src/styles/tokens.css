@@ -1328,12 +1328,38 @@
     background: var(--ground);
     color: var(--ink);
   }
+  .persona-icon-picker {
+    border: 0;
+    padding: 0;
+    margin: 1rem 0 0;
+  }
+  .persona-icon-picker legend {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-bottom: 0.35rem;
+  }
+  .persona-icon-picker > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .persona-icon-picker button {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+  }
+  .persona-icon-picker button[aria-pressed="true"] {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--card);
+  }
   .field-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 0.6rem;
   }
-  .field-grid [role="combobox"] {
+  .modal [role="combobox"] {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1348,9 +1374,13 @@
   }
   .settings-modal {
     width: min(860px, calc(100% - 2rem));
-    min-height: min(580px, calc(100dvh - 2rem));
+    height: min(640px, calc(100dvh - 2rem));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
   .settings-header {
+    flex-shrink: 0;
     display: flex;
     justify-content: space-between;
     align-items: start;
@@ -1366,8 +1396,11 @@
     margin: 0;
   }
   .settings-layout {
+    flex: 1;
+    min-height: 0;
     display: grid;
-    grid-template-columns: 190px 1fr;
+    grid-template-columns: 190px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     gap: clamp(2rem, 8vw, 7rem);
     padding-top: 2rem;
   }
@@ -1387,7 +1420,12 @@
     border: 1px solid var(--line);
   }
   .settings-layout main {
+    min-height: 0;
+    min-width: 0;
     max-width: 610px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
   }
   .settings-layout main h2 {
     font: 500 1.65rem "Source Serif 4";
@@ -1624,11 +1662,14 @@
     .settings-modal {
       width: calc(100% - 1rem);
       max-height: calc(100dvh - 1rem);
-      min-height: 0;
+      height: min(640px, calc(100dvh - 1rem));
       padding: 1rem;
     }
     .settings-layout {
-      display: block;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 0.75rem;
+      padding-top: 1rem;
     }
     .settings-layout nav {
       flex-direction: row;
@@ -1744,13 +1785,6 @@
     top: 1rem;
     right: 1rem;
   }
-  .learning-control {
-    color: var(--accent);
-    border-color: var(--accent);
-    background: transparent;
-    font-size: 0.72rem;
-    padding: 0.35rem 0.5rem;
-  }
   @media (prefers-reduced-motion: reduce) {
     .wash-reveal,
     .note-resizable-panel.is-opening .note-surface {
@@ -1818,4 +1852,56 @@
   .persona-actions {
     flex-shrink: 0;
   }
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.settings-row h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.settings-row p {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.settings-row button {
+  flex-shrink: 0;
+}
+.settings-row input[type="checkbox"] {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+}
+.legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  font-size: 0.85rem;
+  margin-top: 1.5rem;
+}
+@media (max-width: 600px) {
+  .settings-row {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+}
+.legal-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem;
+  line-height: 1.7;
+}
+.legal-page h1 {
+  font: 500 2.5rem "Source Serif 4";
+}
+.legal-page h2 {
+  margin-top: 2rem;
+  font-size: 1.15rem;
 }

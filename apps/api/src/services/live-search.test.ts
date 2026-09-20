@@ -27,7 +27,7 @@ it.skipIf(!CLOUDFLARE_API_TOKEN || !CLOUDFLARE_ACCOUNT_ID || !OPENROUTER_API_KEY
         branches: [],
       },
       note: null,
-      persona: DEFAULT_PERSONAS.find(({ id }) => id === 'mentor')!,
+      persona: DEFAULT_PERSONAS.find(({ id }) => id === 'thinking-partner')!,
       message: 'Can you explain the huggingface attack to me?',
     });
     const events: ChatEvent[] = [];
@@ -38,5 +38,5 @@ it.skipIf(!CLOUDFLARE_API_TOKEN || !CLOUDFLARE_ACCOUNT_ID || !OPENROUTER_API_KEY
     expect(events.some((event) => event.type === 'source')).toBe(true);
     expect(events.at(-1)?.type).toBe('done');
   },
-  90_000,
+  300_000,
 );

@@ -85,8 +85,8 @@ References: https://developers.cloudflare.com/fundamentals/api/reference/permiss
 
 Deployed through the Cloudflare MCP on September 17, 2026:
 
-- URL: https://mindful-ai-api.jeremy-herzog.workers.dev
-- Worker: `mindful-ai-api`, serving the React frontend with Workers Static Assets.
+- URL: https://walden.jeremy-herzog.workers.dev
+- Worker: `walden`, serving the React frontend with Workers Static Assets.
 - Bindings: `DB` (D1), `AI` (Workers AI), and `ASSETS`.
 - Model: `@cf/google/gemma-4-26b-a4b-it` through Mastra and the native binding.
 - Scheduled transcript cleanup: `17 * * * *` (UTC).

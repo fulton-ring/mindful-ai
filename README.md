@@ -53,7 +53,7 @@ See [the implementation plan](docs/superpowers/plans/2026-09-17-walden-v1.md), [
 
 ## Hosted environment
 
-https://mindful-ai-api.jeremy-herzog.workers.dev
+https://walden.jeremy-herzog.workers.dev
 
 The Worker, frontend assets, D1 schema, AI binding, and cleanup schedule are deployed. Clerk sign-in is required and supports email verification codes and Google using the linked development instance. Billing is disabled behind `BILLING_ENABLED=false`; Stripe is not configured. See the credential runbook for the remaining setup and keep application credentials separate from provisioning credentials.
 

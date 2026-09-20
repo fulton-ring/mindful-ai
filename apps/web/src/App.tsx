@@ -43,6 +43,7 @@ import { filterThreads, groupThreads } from './features/chat/thread-list';
 import { additionQueue } from './features/notes/pending-projection';
 import { proposalStillApplies } from './features/notes/proposal-scope';
 import { PersonaEditor } from './features/personas/PersonaEditor';
+import { ConversationPrivacy } from './features/settings/ConversationPrivacy';
 import { SettingsPanel } from './features/settings/SettingsPanel';
 import { ApiError, api } from './lib/api';
 import { id } from './lib/ids';
@@ -1459,6 +1460,7 @@ export function App({
   }
   return (
     <ResizablePanelGroup className="app-shell" orientation="horizontal" disabled={!desktop}>
+      <ConversationPrivacy notice />
       <ResizablePanel
         className="sidebar-panel"
         defaultSize={`${Number(localStorage.getItem(SIDEBAR_WIDTH)) || 250}px`}
@@ -1973,6 +1975,7 @@ export function App({
                   !value.id || replacesBuiltIn
                     ? await api.createPersona({
                         name: value.name,
+                        icon: value.icon,
                         prompt: value.prompt,
                         brevity: value.brevity,
                         challenge: value.challenge,
@@ -1992,15 +1995,19 @@ export function App({
                 setPersonaId(saved.id);
                 setPersonaEditing(null);
               }}
-              onDelete={async () => {
-                if (!personaEditing.id) return;
-                await api.deletePersona(personaEditing.id);
-                queryClient.setQueryData<Persona[]>(['personas'], (all = []) =>
-                  all.filter((p) => p.id !== personaEditing.id),
-                );
-                if (personaId === personaEditing.id) setPersonaId('');
-                setPersonaEditing(null);
-              }}
+              onDelete={
+                personas.length <= 1
+                  ? undefined
+                  : async () => {
+                      if (!personaEditing.id) return;
+                      await api.deletePersona(personaEditing.id);
+                      queryClient.setQueryData<Persona[]>(['personas'], (all = []) =>
+                        all.filter((p) => p.id !== personaEditing.id),
+                      );
+                      if (personaId === personaEditing.id) setPersonaId('');
+                      setPersonaEditing(null);
+                    }
+              }
               onClose={() => setPersonaEditing(null)}
             />
           )}
@@ -2025,14 +2032,19 @@ export function App({
           )}
           {settingsOpen && (
             <SettingsPanel
+              open={!personaEditing}
               config={config}
-              theme={theme}
-              onTheme={changeTheme}
               personas={personas}
               onEditPersona={(persona) => setPersonaEditing(persona)}
               onCreatePersona={() => {
                 const template = DEFAULT_PERSONAS[0]!;
-                setPersonaEditing({ ...template, id: '', revision: 0, name: 'New persona' });
+                setPersonaEditing({
+                  ...template,
+                  id: '',
+                  revision: 0,
+                  name: 'New persona',
+                  icon: 'user',
+                });
               }}
               onDeletePersona={async (persona) => {
                 await api.deletePersona(persona.id);

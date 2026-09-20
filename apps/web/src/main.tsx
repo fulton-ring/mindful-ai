@@ -4,6 +4,7 @@ import { RouterProvider } from '@tanstack/react-router';
 import type { AppConfig } from '@walden/contracts';
 import { type ReactNode, StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { LegalLinks, LegalPage } from './features/legal/LegalPage';
 import { setTokenProvider } from './lib/api';
 import { identifyTelemetry, initializeTelemetry, track } from './lib/telemetry';
 import { router } from './router';
@@ -85,6 +86,7 @@ function ClerkWorkspace({ config }: { config: AppConfig }) {
         <h1>Walden</h1>
         <p>Sign in to continue.</p>
         {controls}
+        <LegalLinks />
       </main>
     );
   return (
@@ -98,6 +100,10 @@ function ClerkWorkspace({ config }: { config: AppConfig }) {
   );
 }
 async function boot() {
+  if (location.pathname === '/privacy' || location.pathname === '/terms') {
+    root.render(<LegalPage kind={location.pathname === '/privacy' ? 'privacy' : 'terms'} />);
+    return;
+  }
   try {
     const response = await fetch('/api/config');
     if (!response.ok) throw new Error(`Configuration request failed (${response.status})`);

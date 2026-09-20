@@ -477,6 +477,32 @@ conversationRoutes.patch('/conversations/:id', async (c) => {
   if (result.meta.changes !== 1) throw new HttpError(404, 'Conversation not found');
   return c.json(await loadConversation(c.env.DB, ownerId, id));
 });
+conversationRoutes.patch('/conversations/:id/learning-checks', async (c) => {
+  const ownerId = c.get('userId');
+  const conversation = await loadConversation(c.env.DB, ownerId, c.req.param('id'));
+  const body = z
+    .object({ enabled: z.boolean() })
+    .strict()
+    .safeParse(await jsonBody<unknown>(c));
+  if (!body.success) throw new HttpError(400, 'Invalid learning-check preference');
+  const result = await c.env.DB.prepare(
+    `UPDATE conversations SET learning_checks_enabled=? WHERE id=? AND owner_id=? AND NOT EXISTS (SELECT 1 FROM turns WHERE conversation_id=? AND owner_id=? AND status='streaming')`,
+  )
+    .bind(body.data.enabled ? 1 : 0, conversation.id, ownerId, conversation.id, ownerId)
+    .run();
+  if (result.meta.changes !== 1)
+    throw new HttpError(
+      409,
+      'Wait for the current reply to finish before changing learning checks',
+    );
+  if (!body.data.enabled)
+    await c.env.DB.prepare(
+      "UPDATE interventions SET status='invalidated' WHERE conversation_id=? AND owner_id=? AND kind='learning_check' AND status='pending'",
+    )
+      .bind(conversation.id, ownerId)
+      .run();
+  return c.json({ learningChecksEnabled: body.data.enabled });
+});
 conversationRoutes.patch('/conversations/:id/note', async (c) => {
   const ownerId = c.get('userId');
   const conversation = await loadConversation(c.env.DB, ownerId, c.req.param('id'));

@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { conversationStreamingDisposition, turnReplayDisposition } from './routes';
 
 describe('turn replay recovery', () => {
-  it('keeps a recent persisted turn active even when another isolate owns it', () => {
+  it('keeps a four-minute turn active even when another isolate owns it', () => {
     expect(
       turnReplayDisposition(
         'streaming',
         '2026-09-18T12:00:00.000Z',
-        Date.parse('2026-09-18T12:01:00.000Z'),
+        Date.parse('2026-09-18T12:04:00.000Z'),
       ),
     ).toBe('active');
   });
@@ -17,7 +17,7 @@ describe('turn replay recovery', () => {
       turnReplayDisposition(
         'streaming',
         '2026-09-18T12:00:00.000Z',
-        Date.parse('2026-09-18T12:01:31.000Z'),
+        Date.parse('2026-09-18T12:05:16.000Z'),
       ),
     ).toBe('recover');
   });
@@ -26,7 +26,7 @@ describe('turn replay recovery', () => {
     expect(
       conversationStreamingDisposition(
         '2026-09-18T12:00:00.000Z',
-        Date.parse('2026-09-18T12:02:00.000Z'),
+        Date.parse('2026-09-18T12:06:00.000Z'),
       ),
     ).toBe('recover');
   });
@@ -36,7 +36,7 @@ describe('turn replay recovery', () => {
       turnReplayDisposition(
         'streaming',
         '2026-09-18T12:00:00.000Z',
-        Date.parse('2026-09-18T12:03:00.000Z'),
+        Date.parse('2026-09-18T12:06:00.000Z'),
       ),
     ).toBe('recover');
   });
@@ -46,7 +46,7 @@ describe('turn replay recovery', () => {
       turnReplayDisposition(
         'completed',
         '2026-09-18T12:00:00.000Z',
-        Date.parse('2026-09-18T12:03:00.000Z'),
+        Date.parse('2026-09-18T12:06:00.000Z'),
       ),
     ).toBe('replay');
   });

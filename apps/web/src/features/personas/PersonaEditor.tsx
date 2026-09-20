@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../components/ui/select';
+import { PERSONA_ICONS, personaIconKey } from './PersonaIcon';
 
 export function PersonaEditor({
   persona,
@@ -83,6 +84,24 @@ export function PersonaEditor({
               </button>
             </Dialog.Close>
           </header>
+          <fieldset className="persona-icon-picker" disabled={busy}>
+            <legend>Icon</legend>
+            <div>
+              {Object.entries(PERSONA_ICONS).map(([key, { label, component: Icon }]) => (
+                <button
+                  key={key}
+                  type="button"
+                  className="icon-button"
+                  aria-label={`${label} icon`}
+                  title={label}
+                  aria-pressed={personaIconKey(draft) === key}
+                  onClick={() => setDraft({ ...draft, icon: key as Persona['icon'] })}
+                >
+                  <Icon size={20} aria-hidden />
+                </button>
+              ))}
+            </div>
+          </fieldset>
           <label htmlFor="persona-name">
             Name
             <input
@@ -101,6 +120,18 @@ export function PersonaEditor({
               disabled={busy}
               onChange={(event) => setDraft({ ...draft, prompt: event.target.value })}
             />
+          </label>
+          <label htmlFor="persona-model">
+            Model
+            <Select value="gemma-4" disabled>
+              <SelectTrigger id="persona-model" aria-label="Model">
+                <SelectValue />
+                <ChevronDown size={14} aria-hidden />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="gemma-4">Gemma 4</SelectItem>
+              </SelectContent>
+            </Select>
           </label>
           <div className="field-grid">
             <label>

@@ -7,6 +7,7 @@ import { conversationRoutes, purgeExpiredConversations } from './chat/conversati
 import { followupRoutes } from './chat/followups';
 import { highlightRoutes } from './chat/highlights';
 import { chatRoutes } from './chat/routes';
+import { purgeTelemetry } from './content-telemetry';
 import { HttpError } from './http';
 import { metricsRoutes } from './metrics/routes';
 import { notesRoutes } from './notes/routes';
@@ -62,5 +63,6 @@ export default {
   fetch: app.fetch,
   async scheduled(_controller: ScheduledController, env: Bindings, ctx: ExecutionContext) {
     ctx.waitUntil(purgeExpiredConversations(env.DB));
+    ctx.waitUntil(purgeTelemetry(env));
   },
 };

@@ -28,6 +28,20 @@ let client: PostHog | undefined;
 let identity: string | null = null;
 let loading: Promise<void> | undefined;
 
+const ANALYTICS_PREFERENCE = 'walden:browser-analytics';
+export function browserAnalyticsEnabled(): boolean {
+  try {
+    return localStorage.getItem(ANALYTICS_PREFERENCE) !== 'false';
+  } catch {
+    return true;
+  }
+}
+export function setBrowserAnalyticsEnabled(enabled: boolean) {
+  localStorage.setItem(ANALYTICS_PREFERENCE, String(enabled));
+  if (enabled) client?.opt_in_capturing();
+  else client?.opt_out_capturing();
+}
+
 function analyticsPath(path: string): string {
   return path.split(/[?#]/)[0].replace(/\/conversations\/[^/]+/, '/conversations/:id');
 }
@@ -40,6 +54,7 @@ export function initializeTelemetry(config?: { key: string; host: string }): Pro
     .then(({ default: posthog }) => {
       posthog.init(key, {
         api_host: config?.host || import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
+        opt_out_capturing_by_default: !browserAnalyticsEnabled(),
         autocapture: false,
         capture_pageview: false,
         capture_pageleave: false,
@@ -47,6 +62,7 @@ export function initializeTelemetry(config?: { key: string; host: string }): Pro
         disable_surveys: true,
         person_profiles: 'identified_only',
         before_send: (event) => {
+          if (!browserAnalyticsEnabled()) return null;
           if (event) {
             const path = analyticsPath(location.pathname);
             event.properties.$current_url = `${location.origin}${path}`;
@@ -68,7 +84,7 @@ export function initializeTelemetry(config?: { key: string; host: string }): Pro
         },
       });
       client = posthog;
-      if (identity) client.identify(identity);
+      if (identity && browserAnalyticsEnabled()) client.identify(identity);
     })
     .catch(() => {
       // Optional analytics must never prevent sign-in, chat, or note saves.
@@ -80,11 +96,11 @@ export function identifyTelemetry(userId: string | null) {
   if (identity === userId) return;
   if (identity) client?.reset();
   identity = userId;
-  if (userId) client?.identify(userId);
+  if (userId && browserAnalyticsEnabled()) client?.identify(userId);
 }
 
 export function track(event: Interaction, properties: Properties = {}) {
-  if (!identity && event !== 'page_viewed') return;
+  if (!browserAnalyticsEnabled() || (!identity && event !== 'page_viewed')) return;
   try {
     client?.capture(event === 'page_viewed' ? '$pageview' : event, {
       ...properties,

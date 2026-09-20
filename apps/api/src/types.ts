@@ -32,6 +32,8 @@ export type Bindings = {
   BILLING_ENABLED?: string;
   POSTHOG_API_KEY?: string;
   POSTHOG_HOST?: string;
+  POSTHOG_PERSONAL_API_KEY?: string;
+  POSTHOG_PROJECT_ID?: string;
 };
 
 export type Variables = {

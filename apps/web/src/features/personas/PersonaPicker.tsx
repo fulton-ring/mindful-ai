@@ -1,6 +1,7 @@
 import type { Persona } from '@walden/contracts';
-import { ChevronDown, Compass, Search, UserRound } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '../../components/ui/select';
+import { PersonaIcon } from './PersonaIcon';
 
 export function effectivePersona(personas: Persona[], value: string) {
   return (
@@ -8,13 +9,6 @@ export function effectivePersona(personas: Persona[], value: string) {
     personas.find((persona) => persona.id === 'thinking-partner') ??
     personas[0]
   );
-}
-
-function PersonaIcon({ id }: { id: string }) {
-  const props = { size: 15, 'aria-hidden': true, 'data-persona-icon': id } as const;
-  if (id === 'thinking-partner') return <Compass {...props} />;
-  if (id === 'critical-reader') return <Search {...props} />;
-  return <UserRound {...props} />;
 }
 
 export function PersonaPicker({
@@ -36,7 +30,7 @@ export function PersonaPicker({
           aria-label="Change persona"
           title="Change persona"
         >
-          <PersonaIcon id={selected.id} />
+          <PersonaIcon persona={selected} />
           <span>{selected.name}</span>
           <ChevronDown size={14} aria-hidden />
         </SelectTrigger>
@@ -44,7 +38,7 @@ export function PersonaPicker({
           {personas.map((persona) => (
             <SelectItem key={persona.id} value={persona.id}>
               <span className="persona-option">
-                <PersonaIcon id={persona.id} />
+                <PersonaIcon persona={persona} />
                 <span>{persona.name}</span>
               </span>
             </SelectItem>

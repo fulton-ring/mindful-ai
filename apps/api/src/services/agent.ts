@@ -10,6 +10,7 @@ import {
 } from '../agent';
 import { createR2Filesystem } from '../agent/filesystem';
 import { type MemoryLifecycleEvent, prepareAgentMemory } from '../agent/memory';
+import { captureConversation, contentPreference } from '../content-telemetry';
 import { createApiTelemetry } from '../observability';
 import { ServiceUnavailableError } from './billing';
 import { streamWithEarlyAnnotations } from './early-annotations';
@@ -131,9 +132,13 @@ export function createAgentService(
       const abort = () => controller.abort(signal?.reason);
       if (signal?.aborted) abort();
       else signal?.addEventListener('abort', abort, { once: true });
-      const deadline = setTimeout(() => controller.abort('generation deadline exceeded'), 75_000);
+      const deadline = setTimeout(() => controller.abort('generation deadline exceeded'), 300_000);
       return (async function* () {
         const telemetry = input.telemetryUserId ? createApiTelemetry(env) : null;
+        const startedAt = Date.now();
+        const preference = await contentPreference(env.DB, input.ownerId);
+        let visibleResponse = '';
+        let completed = false;
         try {
           const ownerId = input.ownerId;
           let memory;
@@ -204,7 +209,7 @@ export function createAgentService(
             { memory, workspace },
           );
           controller.signal.throwIfAborted();
-          yield* streamWithEarlyAnnotations(
+          const annotatedStream = streamWithEarlyAnnotations(
             stream,
             async (text, annotationSignal) =>
               streamAnnotationResponse(
@@ -220,7 +225,33 @@ export function createAgentService(
               ),
             controller.signal,
           );
+          for await (const event of annotatedStream) {
+            if (event.type === 'text')
+              visibleResponse = (visibleResponse + event.text).slice(0, 24_000);
+            if (event.type === 'intervention' && 'question' in event.intervention)
+              visibleResponse = (visibleResponse + '\n' + event.intervention.question).slice(
+                0,
+                24_000,
+              );
+            yield event;
+          }
+          completed = true;
         } finally {
+          if (preference?.enabled && input.ownerId && input.telemetryUserId) {
+            const delivery = captureConversation(env, {
+              ownerId: input.ownerId,
+              userId: input.telemetryUserId,
+              turnId: input.turnId,
+              conversationId: input.conversation.id,
+              message: input.message,
+              response: visibleResponse,
+              startedAt,
+              preferenceVersion: preference.revision,
+              incomplete: !completed,
+            });
+            if (background) background(delivery);
+            else await delivery;
+          }
           clearTimeout(deadline);
           signal?.removeEventListener('abort', abort);
           if (telemetry) {

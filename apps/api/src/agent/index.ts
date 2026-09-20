@@ -76,8 +76,21 @@ const askInputSchema = z.object({
   options: z.array(z.string().min(1).max(240)).min(2).max(4),
 });
 const learningCheckInputSchema = z.object({
-  question: z.string().min(1).max(500),
-  options: z.array(z.string().min(1).max(240)).min(2).max(4).optional(),
+  question: z
+    .string()
+    .min(1)
+    .max(500)
+    .describe(
+      'One concrete recall or understanding question. Ask about the material itself, never which topic the user wants to be tested on.',
+    ),
+  options: z
+    .array(z.string().min(1).max(240))
+    .min(2)
+    .max(4)
+    .optional()
+    .describe(
+      'Optional possible answers to the question, including distractors. These are answers, not topics or questions to choose from. Omit for free-response questions.',
+    ),
 });
 type NoteProposalCandidate = z.infer<typeof noteProposalOutputSchema>;
 type NoteProposalPolicy = {
@@ -1285,6 +1298,8 @@ export async function* streamMastraTurn(
         }
       : {}),
     context: turnContext.context,
+    // The next action belongs to the user, not another model generation.
+    stopWhen: () => proposals.drain().intervention?.kind === 'learning_check',
     maxSteps: 5,
     toolCallConcurrency: 1,
     modelSettings: { maxOutputTokens: 4_096 },

@@ -1,10 +1,13 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "mindful-ai-api",
+  "name": "walden",
   "preview_urls": false,
   "main": "src/index.ts",
   "compatibility_date": "2026-09-18",
   "compatibility_flags": ["nodejs_compat"],
+  "limits": {
+    "cpu_ms": 30000
+  },
   "d1_databases": [
     {
       "binding": "DB",
@@ -41,8 +44,9 @@
     "AI_MODEL": "@cf/google/gemma-4-26b-a4b-it",
     "CLOUDFLARE_ACCOUNT_ID": "e9be35217a75f5d2148e572d8853b3bf",
     "BILLING_ENABLED": "false",
+    "POSTHOG_PROJECT_ID": "619294",
     "CLERK_PUBLISHABLE_KEY": "pk_test_bW9yYWwtbGVtdXItNjI4Mi5jbGVyay5hY2NvdW50cy5kZXYk",
-    "CLERK_AUTHORIZED_PARTIES": "http://localhost:5173,http://localhost:8788,http://localhost:8787,http://127.0.0.1:5173,http://127.0.0.1:8788,http://127.0.0.1:8787,https://mindful-ai-api.jeremy-herzog.workers.dev",
+    "CLERK_AUTHORIZED_PARTIES": "http://localhost:5173,http://localhost:8788,http://localhost:8787,http://127.0.0.1:5173,http://127.0.0.1:8788,http://127.0.0.1:8787,https://walden.jeremy-herzog.workers.dev",
     "AI_SEARCH_INSTANCE": "mindful-ai-sources"
   },
   "assets": {

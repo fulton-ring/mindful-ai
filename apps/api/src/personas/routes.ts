@@ -13,9 +13,13 @@ type PersonaRow = {
   challenge: Persona['challenge'];
   tone: Persona['tone'];
   revision: number;
+  icon?: Persona['icon'] | null;
   replaces_persona_id?: string | null;
 };
-const map = ({ replaces_persona_id: _replaces, ...row }: PersonaRow): Persona => row;
+const map = ({ replaces_persona_id: replaces, icon, ...row }: PersonaRow): Persona => ({
+  ...row,
+  icon: icon ?? DEFAULT_PERSONAS.find((p) => p.id === replaces)?.icon ?? 'user',
+});
 const inputSchema = personaSchema
   .omit({ id: true, revision: true })
   .extend({ replacesPersonaId: z.string().min(1).optional() });
@@ -29,7 +33,7 @@ personaRoutes.get('/', async (c) => {
     ),
     all<PersonaRow>(
       c.env.DB.prepare(
-        'SELECT id,name,prompt,brevity,challenge,tone,revision,replaces_persona_id FROM personas WHERE owner_id=? ORDER BY updated_at DESC',
+        'SELECT id,name,prompt,brevity,challenge,tone,revision,icon,replaces_persona_id FROM personas WHERE owner_id=? ORDER BY updated_at DESC',
       ).bind(ownerId),
     ),
   ]);
@@ -59,7 +63,7 @@ personaRoutes.post('/', async (c) => {
   const persona: Persona = { id: newId(), revision: 0, ...values };
   const now = nowIso();
   await c.env.DB.prepare(
-    'INSERT INTO personas (id,owner_id,name,prompt,brevity,challenge,tone,revision,created_at,updated_at,replaces_persona_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+    'INSERT INTO personas (id,owner_id,name,prompt,brevity,challenge,tone,revision,icon,created_at,updated_at,replaces_persona_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
   )
     .bind(
       persona.id,
@@ -70,6 +74,7 @@ personaRoutes.post('/', async (c) => {
       persona.challenge,
       persona.tone,
       0,
+      persona.icon ?? null,
       now,
       now,
       replaces,
@@ -82,13 +87,13 @@ personaRoutes.patch('/:id', async (c) => {
   if (!parsed.success) throw new HttpError(400, 'Invalid persona', parsed.error.flatten());
   const current = await first<PersonaRow>(
     c.env.DB.prepare(
-      'SELECT id,name,prompt,brevity,challenge,tone,revision FROM personas WHERE id=? AND owner_id=?',
+      'SELECT id,name,prompt,brevity,challenge,tone,revision,icon FROM personas WHERE id=? AND owner_id=?',
     ).bind(c.req.param('id'), c.get('userId')),
   );
   if (!current) throw new HttpError(404, 'Persona not found');
   const next = { ...current, ...parsed.data, revision: current.revision + 1 };
   await c.env.DB.prepare(
-    'UPDATE personas SET name=?,prompt=?,brevity=?,challenge=?,tone=?,revision=?,updated_at=? WHERE id=? AND owner_id=?',
+    'UPDATE personas SET name=?,prompt=?,brevity=?,challenge=?,tone=?,revision=?,icon=?,updated_at=? WHERE id=? AND owner_id=?',
   )
     .bind(
       next.name,
@@ -97,6 +102,7 @@ personaRoutes.patch('/:id', async (c) => {
       next.challenge,
       next.tone,
       next.revision,
+      next.icon ?? null,
       nowIso(),
       current.id,
       c.get('userId'),
@@ -104,18 +110,51 @@ personaRoutes.patch('/:id', async (c) => {
     .run();
   return c.json(map(next));
 });
-personaRoutes.delete('/:id', async (c) => {
-  if (DEFAULT_PERSONAS.some((persona) => persona.id === c.req.param('id'))) {
-    await c.env.DB.prepare(
-      'INSERT INTO hidden_personas (owner_id,persona_id,created_at) VALUES (?,?,?) ON CONFLICT(owner_id,persona_id) DO NOTHING',
+// Check remaining choices in the mutation itself so concurrent deletes cannot
+// both succeed after observing the same list. Built-ins live outside the DB.
+const remainingPersona = `(
+  EXISTS (SELECT 1 FROM personas WHERE owner_id=? AND id<>?)
+  OR EXISTS (
+    SELECT value FROM json_each(?) AS defaults
+    WHERE value<>? AND NOT EXISTS (
+      SELECT 1 FROM hidden_personas WHERE owner_id=? AND persona_id=defaults.value
     )
-      .bind(c.get('userId'), c.req.param('id'), nowIso())
+  )
+)`;
+const defaultIds = JSON.stringify(DEFAULT_PERSONAS.map((p) => p.id));
+
+personaRoutes.delete('/:id', async (c) => {
+  const owner = c.get('userId');
+  const id = c.req.param('id');
+  if (DEFAULT_PERSONAS.some((persona) => persona.id === id)) {
+    const result = await c.env.DB.prepare(
+      `INSERT INTO hidden_personas (owner_id,persona_id,created_at)
+       SELECT ?,?,? WHERE ${remainingPersona}
+       ON CONFLICT(owner_id,persona_id) DO NOTHING`,
+    )
+      .bind(owner, id, nowIso(), owner, id, defaultIds, id, owner)
       .run();
+    if (!result.meta.changes) {
+      const hidden = await first(
+        c.env.DB.prepare(
+          'SELECT persona_id FROM hidden_personas WHERE owner_id=? AND persona_id=?',
+        ).bind(owner, id),
+      );
+      if (!hidden) throw new HttpError(409, 'Keep at least one persona.');
+    }
     return c.body(null, 204);
   }
-  const result = await c.env.DB.prepare('DELETE FROM personas WHERE id=? AND owner_id=?')
-    .bind(c.req.param('id'), c.get('userId'))
+  const result = await c.env.DB.prepare(
+    `DELETE FROM personas WHERE id=? AND owner_id=? AND ${remainingPersona}`,
+  )
+    .bind(id, owner, owner, id, defaultIds, id, owner)
     .run();
-  if (result.meta.changes !== 1) throw new HttpError(404, 'Persona not found');
+  if (result.meta.changes !== 1) {
+    const existing = await first(
+      c.env.DB.prepare('SELECT id FROM personas WHERE id=? AND owner_id=?').bind(id, owner),
+    );
+    if (existing) throw new HttpError(409, 'Keep at least one persona.');
+    throw new HttpError(404, 'Persona not found');
+  }
   return c.body(null, 204);
 });

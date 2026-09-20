@@ -22,7 +22,8 @@ import { abortActiveTurn, registerActiveTurn, removeActiveTurn } from './active-
 import { agentHighlightStatements } from './agent-highlights';
 import { loadConversation, RETENTION_MS } from './conversations';
 
-const ORPHANED_TURN_AFTER_MS = 90_000;
+// Five-minute generation budget plus 15 seconds for terminal cleanup.
+const ORPHANED_TURN_AFTER_MS = 315_000;
 const encoder = new TextEncoder();
 const sse = (event: ChatEvent) => encoder.encode(`data: ${JSON.stringify(event)}\n\n`);
 export const NEXT_USER_SEQUENCE_SQL =

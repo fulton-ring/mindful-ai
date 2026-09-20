@@ -19,7 +19,11 @@ const usage: LanguageModelV3Usage = {
   outputTokens: { total: 10, text: 10, reasoning: 0 },
 };
 
-function researchModel(calls: LanguageModelV3CallOptions[], searchWeb = false): LanguageModelV3 {
+function researchModel(
+  calls: LanguageModelV3CallOptions[],
+  searchWeb = false,
+  learningCheck = false,
+): LanguageModelV3 {
   let step = 0;
   const stream = (parts: LanguageModelV3StreamPart[]) =>
     new ReadableStream<LanguageModelV3StreamPart>({
@@ -46,11 +50,17 @@ function researchModel(calls: LanguageModelV3CallOptions[], searchWeb = false): 
             {
               type: 'tool-call',
               toolCallId: 'read-1',
-              toolName: searchWeb ? 'searchWeb' : 'readWebPage',
+              toolName: learningCheck
+                ? 'proposeLearningCheck'
+                : searchWeb
+                  ? 'searchWeb'
+                  : 'readWebPage',
               input: JSON.stringify(
-                searchWeb
-                  ? { query: 'OpenAI Hugging Face incident' }
-                  : { url: 'https://example.com/research' },
+                learningCheck
+                  ? { question: 'What does chlorophyll absorb?' }
+                  : searchWeb
+                    ? { query: 'OpenAI Hugging Face incident' }
+                    : { url: 'https://example.com/research' },
               ),
             },
             { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'tool-calls' }, usage },
@@ -171,10 +181,11 @@ const turnInput = (): AgentTurnInput => ({
 describe('research tools in a Mastra turn', () => {
   it('stops a failed web lookup before the model can turn it into an unsupported answer', async () => {
     const events: ChatEvent[] = [];
+    const calls: LanguageModelV3CallOptions[] = [];
     const run = async () => {
       for await (const event of streamMastraTurn(
-        turnInput(),
-        researchModel([], true),
+        { ...turnInput(), message: 'Explain the huggingface attack to me' },
+        researchModel(calls, true),
         new AbortController().signal,
         {
           searchWeb: createTool({
@@ -190,6 +201,7 @@ describe('research tools in a Mastra turn', () => {
         events.push(event);
     };
     await expect(run()).rejects.toThrow('Web search failed');
+    expect(calls[0]?.toolChoice).not.toEqual({ type: 'tool', toolName: 'searchWeb' });
     expect(events.some((event) => event.type === 'text')).toBe(false);
     expect(events).toContainEqual(
       expect.objectContaining({
@@ -395,4 +407,30 @@ describe.skipIf(!runLive)('live Gemma research tool calling', () => {
       'https://example.com/research',
     );
   }, 90_000);
+});
+
+it('ends the model loop once a learning check is ready for the user', async () => {
+  const input = turnInput();
+  input.conversation.learningChecksEnabled = true;
+  input.persona = DEFAULT_PERSONAS.find((p) => p.id === 'study-partner')!;
+  input.message = 'Help me study photosynthesis';
+  const calls: LanguageModelV3CallOptions[] = [];
+  const events: ChatEvent[] = [];
+  for await (const event of streamMastraTurn(
+    input,
+    researchModel(calls, false, true),
+    new AbortController().signal,
+  ))
+    events.push(event);
+  expect(calls).toHaveLength(1);
+  expect(events).toContainEqual(
+    expect.objectContaining({
+      type: 'intervention',
+      intervention: expect.objectContaining({
+        kind: 'learning_check',
+        question: 'What does chlorophyll absorb?',
+      }),
+    }),
+  );
+  expect(events.at(-1)?.type).toBe('done');
 });

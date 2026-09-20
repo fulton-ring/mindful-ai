@@ -79,3 +79,15 @@ it('uses explicit metrics, disables content collection, and resets identity on l
   expect(sdk.reset).toHaveBeenCalledTimes(1);
   expect(sdk.capture).toHaveBeenCalledTimes(1);
 });
+
+it('does not capture or identify when browser analytics is disabled', async () => {
+  vi.stubGlobal('localStorage', { getItem: () => 'false' });
+  const telemetry = await import('./telemetry');
+  await telemetry.initializeTelemetry({ key: 'phc_test', host: 'https://us.i.posthog.com' });
+  telemetry.identifyTelemetry('user-private');
+  telemetry.track('page_viewed');
+  telemetry.track('chat_submitted');
+  expect(sdk.identify).not.toHaveBeenCalled();
+  expect(sdk.capture).not.toHaveBeenCalled();
+  expect(sdk.init.mock.calls[0]?.[1].before_send({ properties: {} })).toBeNull();
+});

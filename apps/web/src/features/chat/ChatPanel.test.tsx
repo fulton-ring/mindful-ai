@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChatPanel } from './ChatPanel';
 
 const transport = vi.hoisted(() => ({
+  setLearningChecks: vi.fn(),
   cancelTurn: vi.fn().mockResolvedValue({ cancelled: true }),
   cancelNoteProposal: vi.fn().mockResolvedValue({ cancelledSuggestionIds: [], noteState: null }),
   messageAnnotations: vi.fn(),
@@ -24,6 +25,7 @@ const transport = vi.hoisted(() => ({
 
 vi.mock('../../lib/api', () => ({
   api: {
+    setLearningChecks: transport.setLearningChecks,
     cancelTurn: transport.cancelTurn,
     cancelNoteProposal: transport.cancelNoteProposal,
     messageAnnotations: transport.messageAnnotations,
@@ -189,7 +191,7 @@ describe('ChatPanel cancellation', () => {
       fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
       fireEvent.click(screen.getByLabelText('Send message'));
       await waitFor(() => expect(transport.streamChat).toHaveBeenCalled());
-      const index = schedule.mock.calls.findIndex((call) => call[1] === 90_000);
+      const index = schedule.mock.calls.findIndex((call) => call[1] === 315_000);
       expect(index).toBeGreaterThanOrEqual(0);
       const deadline = schedule.mock.results[index]?.value;
       rendered.unmount();
@@ -1822,4 +1824,30 @@ describe('prompt tools', () => {
     // nothing automatic to switch off.
     expect(screen.queryByRole('checkbox', { name: 'Auto note suggestions' })).toBeNull();
   });
+});
+
+it('can enable and disable learning checks before any quiz without sending a message', async () => {
+  const value = conversation('quiz-toggle');
+  const callbacks = props(value);
+  transport.setLearningChecks.mockImplementation(async (_id, enabled) => ({
+    learningChecksEnabled: enabled,
+  }));
+  const view = render(<ChatPanel {...callbacks} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Chat tools' }));
+  const toggle = screen.getByRole('checkbox', { name: 'Learning checks' });
+  expect((toggle as HTMLInputElement).checked).toBe(false);
+  fireEvent.click(toggle);
+  await waitFor(() =>
+    expect(callbacks.onConversation).toHaveBeenCalledWith(
+      expect.objectContaining({ learningChecksEnabled: true }),
+    ),
+  );
+  view.rerender(
+    <ChatPanel {...callbacks} conversation={{ ...value, learningChecksEnabled: true }} />,
+  );
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Learning checks' }));
+  await waitFor(() =>
+    expect(transport.setLearningChecks).toHaveBeenLastCalledWith(value.id, false),
+  );
+  expect(transport.streamChat).not.toHaveBeenCalled();
 });

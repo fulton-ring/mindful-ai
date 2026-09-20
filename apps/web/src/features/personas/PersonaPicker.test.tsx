@@ -32,7 +32,7 @@ describe('PersonaPicker', () => {
       />,
     );
     expect(screen.getByRole('combobox', { name: 'Change persona' }).textContent).toContain(
-      'Critical reader',
+      'Challenger',
     );
   });
 
