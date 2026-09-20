@@ -1,0 +1,55 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mindful-ai-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-18",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mindful-ai",
+      "database_id": "5f1710a6-8db5-48a6-9b3e-ff046c03ffb9",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "ai": {
+    "binding": "AI",
+    // Workers AI has no local emulation. Declaring the remote binding up front
+    // keeps wrangler from restarting the dev server to negotiate the proxy,
+    // which otherwise kills in-flight SSE streams mid-response.
+    "remote": true
+  },
+  // Web reading and source search. Both have no local emulation, so they are
+  // declared remote up front for the same reason as the AI binding above.
+  "browser": {
+    "binding": "BROWSER",
+    "remote": true
+  },
+  "ai_search_namespaces": [
+    {
+      "binding": "AI_SEARCH",
+      "namespace": "default",
+      "remote": true
+    }
+  ],
+  "triggers": {
+    "crons": ["17 * * * *"]
+  },
+  "vars": {
+    "AI_PROVIDER": "cloudflare",
+    "AI_MODEL": "@cf/google/gemma-4-26b-a4b-it",
+    "CLOUDFLARE_ACCOUNT_ID": "e9be35217a75f5d2148e572d8853b3bf",
+    "BILLING_ENABLED": "false",
+    "CLERK_PUBLISHABLE_KEY": "pk_test_bW9yYWwtbGVtdXItNjI4Mi5jbGVyay5hY2NvdW50cy5kZXYk",
+    "CLERK_AUTHORIZED_PARTIES": "http://localhost:5173,http://localhost:8788,http://localhost:8787,http://127.0.0.1:5173,http://127.0.0.1:8788,http://127.0.0.1:8787,https://mindful-ai-api.jeremy-herzog.workers.dev",
+    "AI_SEARCH_INSTANCE": "mindful-ai-sources"
+  },
+  "assets": {
+    "directory": "../web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "account_id": "e9be35217a75f5d2148e572d8853b3bf",
+  "minify": true
+}

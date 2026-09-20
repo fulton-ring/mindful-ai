@@ -1,0 +1,27 @@
+{
+  "name": "walden",
+  "private": true,
+  "packageManager": "pnpm@10.30.0",
+  "scripts": {
+    "dev": "turbo run build --filter=@walden/web && turbo run dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "check:ci": "biome ci .",
+    "test": "turbo run test",
+    "test:unit": "turbo run test",
+    "test:e2e": "playwright test",
+    "db:migrate": "pnpm --filter @walden/api db:migrate",
+    "verify": "pnpm typecheck && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "@playwright/test": "^1.58.0",
+    "turbo": "2.10.13",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "@types/node": "^22.19.0"
+  }
+}

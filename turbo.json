@@ -1,0 +1,55 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "globalDependencies": ["tsconfig.base.json"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true,
+      "passThroughEnv": [
+        "CLERK_*",
+        "AI_*",
+        "OPENAI_*",
+        "ANTHROPIC_*",
+        "STRIPE_*",
+        "MCP_*",
+        "WRANGLER_*"
+      ]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "test:integration": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
+    "test:e2e": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
+    "test:evals": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
+    "deploy": {
+      "dependsOn": ["build"],
+      "cache": false
+    },
+    "db:migrate": {
+      "cache": false
+    },
+    "@walden/api#build": {
+      "dependsOn": ["^build", "@walden/web#build"],
+      "outputs": ["dist/**"]
+    }
+  }
+}

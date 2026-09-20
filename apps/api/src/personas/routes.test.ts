@@ -1,0 +1,85 @@
+import { Hono } from 'hono';
+import { describe, expect, it } from 'vitest';
+import { HttpError } from '../http';
+import type { Bindings, Variables } from '../types';
+import { personaRoutes } from './routes';
+
+function database() {
+  const hidden = new Set<string>();
+  const custom = new Map([
+    [
+      'custom',
+      {
+        id: 'custom',
+        name: 'Custom',
+        prompt: 'Prompt',
+        brevity: 'brief',
+        challenge: 'gentle',
+        tone: 'warm',
+        revision: 0,
+      },
+    ],
+  ]);
+  return {
+    hidden,
+    custom,
+    prepare(sql: string) {
+      let args: unknown[] = [];
+      const statement = {
+        bind(...values: unknown[]) {
+          args = values;
+          return statement;
+        },
+        async all<T>() {
+          if (sql.includes('FROM hidden_personas'))
+            return { results: [...hidden].map((persona_id) => ({ persona_id })) as T[] };
+          return { results: [...custom.values()] as T[] };
+        },
+        async run() {
+          if (sql.startsWith('INSERT INTO hidden_personas')) hidden.add(args[1] as string);
+          if (sql.startsWith('DELETE FROM personas')) {
+            const removed = custom.delete(args[0] as string);
+            return { success: true, meta: { changes: removed ? 1 : 0 } };
+          }
+          return { success: true, meta: { changes: 1 } };
+        },
+      };
+      return statement;
+    },
+  } as unknown as D1Database & { hidden: Set<string>; custom: Map<string, unknown> };
+}
+
+function request(db: D1Database, path: string, init?: RequestInit) {
+  const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+  app.use('*', async (c, next) => {
+    c.set('userId', 'owner');
+    await next();
+  });
+  app.route('/api/personas', personaRoutes);
+  app.onError((error, c) =>
+    error instanceof HttpError ? c.json({ error: error.message }, error.status) : c.json({}, 500),
+  );
+  return app.fetch(new Request(`https://walden.test${path}`, init), { DB: db });
+}
+
+describe('persona deletion', () => {
+  it('hides a built-in persona for its owner and omits it from subsequent lists', async () => {
+    const db = database();
+    const deleted = await request(db, '/api/personas/critical-reader', { method: 'DELETE' });
+    expect(deleted.status).toBe(204);
+
+    const listed = await request(db, '/api/personas');
+    const ids = (await listed.json<Array<{ id: string }>>()).map(({ id }) => id);
+    expect(ids).not.toContain('critical-reader');
+    expect(ids).toContain('thinking-partner');
+    expect(db.hidden).toContain('critical-reader');
+  });
+
+  it('deletes an owner-created persona', async () => {
+    const db = database();
+    const deleted = await request(db, '/api/personas/custom', { method: 'DELETE' });
+
+    expect(deleted.status).toBe(204);
+    expect(db.custom.has('custom')).toBe(false);
+  });
+});
