@@ -303,6 +303,42 @@ describe('ChatPanel cancellation', () => {
     );
   });
 
+  it('finalizes buffered response text before allowing the next message', async () => {
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false }));
+    vi.stubGlobal('requestAnimationFrame', vi.fn().mockReturnValue(1));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const text = 'A completed answer. '.repeat(100);
+    transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
+      onEvent({ type: 'text', text });
+      onEvent({
+        type: 'done',
+        message: {
+          id: 'buffered-answer',
+          role: 'assistant',
+          content: text,
+          createdAt: new Date().toISOString(),
+        },
+        title: 'Conversation',
+        conversationId: 'conversation-1',
+        branchId: 'branch-1',
+        expiresAt: '2026-09-25T00:00:00.000Z',
+        annotationsHandled: true,
+      });
+    });
+    const values = props();
+    render(<ChatPanel {...values} />);
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+    fireEvent.click(screen.getByLabelText('Send message'));
+    await waitFor(() => expect(screen.queryByLabelText('Stop response')).toBeNull());
+    expect(values.onConversation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: expect.arrayContaining([
+          expect.objectContaining({ id: 'buffered-answer', content: text }),
+        ]),
+      }),
+    );
+  });
+
   it('uses the first available persona when the built-in default is unavailable', async () => {
     transport.streamChat.mockReturnValue(new Promise(() => undefined));
     const values = props();
@@ -417,6 +453,27 @@ describe('ChatPanel cancellation', () => {
     expect(screen.getByText('Incomplete response')).toBeTruthy();
     finishFirst?.();
     await waitFor(() => expect(screen.getByLabelText('Stop response')).toBeTruthy());
+  });
+
+  it('waits for stop acknowledgement before starting another turn', async () => {
+    let acknowledge: (() => void) | undefined;
+    transport.cancelTurn.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          acknowledge = () => resolve({ cancelled: true });
+        }),
+    );
+    transport.streamChat.mockImplementation(() => new Promise(() => {}));
+    render(<ChatPanel {...props()} />);
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'First' } });
+    fireEvent.click(screen.getByLabelText('Send message'));
+    await waitFor(() => expect(transport.streamChat).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByLabelText('Stop response'));
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Second' } });
+    await act(async () => fireEvent.click(screen.getByLabelText('Send message')));
+    expect(transport.streamChat).toHaveBeenCalledTimes(1);
+    await act(async () => acknowledge?.());
+    await waitFor(() => expect(transport.streamChat).toHaveBeenCalledTimes(2));
   });
 
   it('offers recovery immediately when stopped before the first token', async () => {

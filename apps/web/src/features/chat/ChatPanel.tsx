@@ -177,6 +177,7 @@ export function ChatPanel(props: Props) {
   const [pendingEdit, setPendingEdit] = useState<{ id: string; content: string } | null>(null);
   const optimisticMessageRef = useRef<Message | null>(null);
   const sendingRef = useRef(false);
+  const pendingTurnCancellation = useRef<Promise<unknown>>(Promise.resolve());
   const [intervention, setIntervention] = useState<Exclude<Intervention, { kind: 'ghost' }> | null>(
     null,
   );
@@ -245,7 +246,7 @@ export function ChatPanel(props: Props) {
       sendingRef.current = false;
     }
     if (requestId && requestRunning)
-      void api.cancelTurn(requestId, keepalive).catch(() => undefined);
+      pendingTurnCancellation.current = api.cancelTurn(requestId, keepalive).catch(() => undefined);
   }
   function stopMainTurn() {
     if (regeneratingMessageId) {
@@ -1024,6 +1025,7 @@ export function ChatPanel(props: Props) {
     const lifecycle = lifecycleCancellation.current;
     const preparationController = new AbortController();
     mainAbort.current = preparationController;
+    await pendingTurnCancellation.current;
     const noteRevision = await props.onFlush();
     if (
       noteRevision === false ||
@@ -1128,6 +1130,7 @@ export function ChatPanel(props: Props) {
         setError(cause instanceof Error ? cause.message : 'The response could not be regenerated.');
     } finally {
       if (activeRequestId.current === requestId) {
+        if (onStreamDrained.current) flushStream();
         setSending(false);
         sendingRef.current = false;
         setStatus('');
@@ -1174,6 +1177,7 @@ export function ChatPanel(props: Props) {
     setStatus('Preparing…');
     setError('');
     setInterrupted(false);
+    await pendingTurnCancellation.current;
     const noteRevision = await props.onFlush();
     if (
       !mounted.current ||
@@ -1429,6 +1433,7 @@ export function ChatPanel(props: Props) {
         activeConversationId.current === conversation.id &&
         activeRequestId.current === requestId
       ) {
+        if (onStreamDrained.current) flushStream();
         setSending(false);
         sendingRef.current = false;
         setStatus('');

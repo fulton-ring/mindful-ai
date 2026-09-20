@@ -13,8 +13,6 @@ export function registerActiveTurn(
   activeTurns.set(turnId, { conversationId, controller });
 }
 
-export const hasActiveTurn = (turnId: string) => activeTurns.has(turnId);
-
 export const removeActiveTurn = (turnId: string) => activeTurns.delete(turnId);
 
 export function abortActiveTurn(turnId: string, reason: string) {

@@ -15,10 +15,12 @@ pnpm dev
 
 The frontend runs on Vite and proxies `/api` to the local Cloudflare Worker. Local use requires Clerk authentication and either Cloudflare Workers AI credentials or an AI binding. Authentication fails closed when it is not configured.
 
+`pnpm dev` respects `AI_PROVIDER` and `AI_MODEL` from the environment files; it does not override the configured provider. Use Cloudflare inference when validating production behavior.
+
 `pnpm dev` builds the shared contracts and domain packages before starting the app, then keeps their `dist/` output updated with native TypeScript watch tasks. Vite and Wrangler consume those emitted files during development.
 
 Use **http://localhost:5173** while developing the web app. Wrangler serves the
-worker and a *prebuilt* copy of `apps/web/dist` on :8788, so front-end edits do
+worker and a *prebuilt* copy of `apps/web/dist` on :8787, so front-end edits do
 not appear there until the next `pnpm build`; :5173 is the Vite server with hot
 reload and proxies `/api` to the worker.
 
@@ -54,6 +56,10 @@ See [the implementation plan](docs/superpowers/plans/2026-09-17-walden-v1.md), [
 https://mindful-ai-api.jeremy-herzog.workers.dev
 
 The Worker, frontend assets, D1 schema, AI binding, and cleanup schedule are deployed. Clerk sign-in is required and supports email verification codes and Google using the linked development instance. Billing is disabled behind `BILLING_ENABLED=false`; Stripe is not configured. See the credential runbook for the remaining setup and keep application credentials separate from provisioning credentials.
+
+Chat requires **Workers Paid**. Workers Free can terminate Mastra chat and annotation requests for exceeding CPU time, leaving an interrupted response. On 2026-09-20 this was reproduced in production; a request was killed at about 2 seconds of CPU. Local Wrangler does not reproduce that production limit. Upgrade the account's Workers plan before treating signed-in chat as ready for use.
+
+Interrupted transports attempt to cancel their own turn before unlocking the composer. A persisted streaming turn older than 90 seconds is recoverable even when a terminated request left an in-memory controller behind. This is recovery from failure, not a substitute for sufficient runtime capacity.
 
 ## Local-first evaluation
 

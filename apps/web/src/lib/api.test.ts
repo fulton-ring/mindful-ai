@@ -341,6 +341,71 @@ describe('authenticated API transport', () => {
       ),
     ).rejects.toThrow('A response is still in progress.');
   });
+  it('cancels its turn when the Worker dies before sending stream headers', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('Worker exceeded resource limits', { status: 500 }))
+      .mockResolvedValueOnce(Response.json({ cancelled: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(
+      streamChat(
+        {
+          requestId: 'worker-killed',
+          conversationId: 'conversation-1',
+          branchId: 'branch-1',
+          noteRevision: null,
+          message: 'Synthetic test',
+          personaId: 'thinking-partner',
+          action: 'message',
+        },
+        () => undefined,
+        new AbortController().signal,
+      ),
+    ).rejects.toThrow();
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/chat/turns/worker-killed/cancel',
+      expect.any(Object),
+    );
+  });
+
+  it('waits for server cancellation before releasing an interrupted turn', async () => {
+    let finishCancel: (() => void) | undefined;
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('data: {"type":"text","text":"Partial"}\n\n'))
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            finishCancel = () => resolve(Response.json({ cancelled: true }));
+          }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    let settled = false;
+    const result = streamChat(
+      {
+        requestId: 'interrupted',
+        conversationId: 'conversation-1',
+        branchId: 'branch-1',
+        noteRevision: null,
+        message: 'Synthetic test',
+        personaId: 'thinking-partner',
+        action: 'message',
+      },
+      () => undefined,
+      new AbortController().signal,
+    ).catch((error) => {
+      settled = true;
+      return error;
+    });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/chat/turns/interrupted/cancel');
+    expect(settled).toBe(false);
+    finishCancel?.();
+    expect(await result).toBeInstanceOf(Error);
+    expect(settled).toBe(true);
+  });
+
   it('reports a stream that closes without completion instead of silently succeeding', async () => {
     vi.stubGlobal(
       'fetch',

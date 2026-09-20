@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "wrangler deploy --dry-run --outdir dist",
-    "dev": "wrangler dev --env-file ../../.env --env-file .dev.vars --var AI_PROVIDER:openrouter --var AI_MODEL:google/gemma-4-26b-a4b-it --var CLERK_AUTHORIZED_PARTIES:http://localhost:5173,http://localhost:8787,http://localhost:8788,http://127.0.0.1:5173,http://127.0.0.1:8787,http://127.0.0.1:8788",
+    "dev": "wrangler dev --env-file ../../.env --env-file .dev.vars --var CLERK_AUTHORIZED_PARTIES:http://localhost:5173,http://localhost:8787,http://localhost:8788,http://127.0.0.1:5173,http://127.0.0.1:8787,http://127.0.0.1:8788",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run",

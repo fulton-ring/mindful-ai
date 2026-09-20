@@ -208,47 +208,58 @@ export async function streamChat(
   onEvent: (event: ChatEvent) => void,
   signal: AbortSignal,
 ) {
-  const response = await fetchWithFreshAuth('/api/chat/turns', {
-    method: 'POST',
-    signal,
-    headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
-    body: JSON.stringify(input),
-  });
-  if (!response.ok || !response.body) {
-    const body = await response.json().catch(() => undefined);
-    throw new ApiError(
-      response.status,
-      typeof body?.error === 'string'
-        ? body.error
-        : 'The thread could not start. Please try again.',
-      body,
-    );
-  }
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
   let receivedTerminalEvent = false;
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const frames = buffer.split(/\n\n/);
-    buffer = frames.pop() ?? '';
-    for (const frame of frames) {
-      for (const line of frame.split('\n')) {
-        if (!line.startsWith('data:')) continue;
-        const data = line.slice(5).trim();
-        if (data === '[DONE]') receivedTerminalEvent = true;
-        else if (data) {
-          const event = JSON.parse(data) as ChatEvent;
-          if (event.type === 'done' || event.type === 'error') receivedTerminalEvent = true;
-          onEvent(event);
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  try {
+    const response = await fetchWithFreshAuth('/api/chat/turns', {
+      method: 'POST',
+      signal,
+      headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok || !response.body) {
+      if (response.status < 500) receivedTerminalEvent = true;
+      const body = await response.json().catch(() => undefined);
+      throw new ApiError(
+        response.status,
+        typeof body?.error === 'string'
+          ? body.error
+          : 'The thread could not start. Please try again.',
+        body,
+      );
+    }
+    reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const frames = buffer.split(/\n\n/);
+      buffer = frames.pop() ?? '';
+      for (const frame of frames) {
+        for (const line of frame.split('\n')) {
+          if (!line.startsWith('data:')) continue;
+          const data = line.slice(5).trim();
+          if (data === '[DONE]') receivedTerminalEvent = true;
+          else if (data) {
+            const event = JSON.parse(data) as ChatEvent;
+            if (event.type === 'done' || event.type === 'error') receivedTerminalEvent = true;
+            onEvent(event);
+          }
         }
       }
     }
+    if (!receivedTerminalEvent && !signal.aborted)
+      throw new Error('The response was interrupted. Please try again.');
+  } finally {
+    reader?.releaseLock();
+    // The Worker may outlive a broken connection. Release its database turn
+    // before the caller unlocks the composer, including failed regeneration.
+    if (!receivedTerminalEvent && !signal.aborted) {
+      await api.cancelTurn(input.requestId).catch(() => undefined);
+    }
   }
-  if (!receivedTerminalEvent && !signal.aborted)
-    throw new Error('The response was interrupted. Please try again.');
 }
 
 export async function streamNoteProposal(

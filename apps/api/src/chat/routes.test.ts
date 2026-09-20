@@ -6,7 +6,6 @@ describe('turn replay recovery', () => {
     expect(
       turnReplayDisposition(
         'streaming',
-        false,
         '2026-09-18T12:00:00.000Z',
         Date.parse('2026-09-18T12:01:00.000Z'),
       ),
@@ -17,7 +16,6 @@ describe('turn replay recovery', () => {
     expect(
       turnReplayDisposition(
         'streaming',
-        false,
         '2026-09-18T12:00:00.000Z',
         Date.parse('2026-09-18T12:01:31.000Z'),
       ),
@@ -27,29 +25,26 @@ describe('turn replay recovery', () => {
   it('allows a new request to recover a stale conversation-level streaming lock', () => {
     expect(
       conversationStreamingDisposition(
-        false,
         '2026-09-18T12:00:00.000Z',
         Date.parse('2026-09-18T12:02:00.000Z'),
       ),
     ).toBe('recover');
   });
 
-  it('keeps a streaming turn active when its controller exists locally', () => {
+  it('recovers an expired turn even when hard termination left its local controller behind', () => {
     expect(
       turnReplayDisposition(
         'streaming',
-        true,
         '2026-09-18T12:00:00.000Z',
         Date.parse('2026-09-18T12:03:00.000Z'),
       ),
-    ).toBe('active');
+    ).toBe('recover');
   });
 
   it('replays terminal turns', () => {
     expect(
       turnReplayDisposition(
         'completed',
-        false,
         '2026-09-18T12:00:00.000Z',
         Date.parse('2026-09-18T12:03:00.000Z'),
       ),

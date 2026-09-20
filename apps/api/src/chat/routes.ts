@@ -18,12 +18,7 @@ import { HttpError, jsonBody, newId, nowIso } from '../http';
 import { createAgentService } from '../services/agent';
 import { aiProviderErrorMessage } from '../services/ai-errors';
 import type { Bindings, Variables } from '../types';
-import {
-  abortActiveTurn,
-  hasActiveTurn,
-  registerActiveTurn,
-  removeActiveTurn,
-} from './active-turns';
+import { abortActiveTurn, registerActiveTurn, removeActiveTurn } from './active-turns';
 import { agentHighlightStatements } from './agent-highlights';
 import { loadConversation, RETENTION_MS } from './conversations';
 
@@ -65,12 +60,10 @@ export function editContext(messages: Conversation['messages'], userId: string) 
 
 export function turnReplayDisposition(
   status: string,
-  locallyActive: boolean,
   createdAt: string,
   now = Date.now(),
 ): 'active' | 'recover' | 'replay' | 'blocked' {
   if (status === 'streaming') {
-    if (locallyActive) return 'active';
     const age = now - Date.parse(createdAt);
     return Number.isFinite(age) && age > ORPHANED_TURN_AFTER_MS ? 'recover' : 'active';
   }
@@ -79,11 +72,10 @@ export function turnReplayDisposition(
 }
 
 export function conversationStreamingDisposition(
-  locallyActive: boolean,
   createdAt: string,
   now = Date.now(),
 ): 'active' | 'recover' {
-  const disposition = turnReplayDisposition('streaming', locallyActive, createdAt, now);
+  const disposition = turnReplayDisposition('streaming', createdAt, now);
   return disposition === 'recover' ? 'recover' : 'active';
 }
 
@@ -178,14 +170,11 @@ chatRoutes.post('/turns', async (c) => {
   }
   let recoveredUserMessage: { id: string; sequence: number } | null = null;
   if (previous) {
-    const disposition = turnReplayDisposition(
-      previous.status,
-      hasActiveTurn(previous.id),
-      previous.created_at,
-    );
+    const disposition = turnReplayDisposition(previous.status, previous.created_at);
     if (disposition === 'active' || disposition === 'blocked')
       throw new HttpError(409, 'Turn already in progress');
     if (disposition === 'recover') {
+      abortActiveTurn(previous.id, 'generation deadline exceeded');
       const recoveredAt = nowIso();
       const userMessage = await first<{
         id: string;
@@ -269,12 +258,10 @@ chatRoutes.post('/turns', async (c) => {
     ).bind(conversation.branchId, ownerId),
   );
   if (conversationStreaming) {
-    const disposition = conversationStreamingDisposition(
-      hasActiveTurn(conversationStreaming.id),
-      conversationStreaming.created_at,
-    );
+    const disposition = conversationStreamingDisposition(conversationStreaming.created_at);
     if (disposition === 'active')
       throw new HttpError(409, 'A turn is already in progress for this conversation');
+    abortActiveTurn(conversationStreaming.id, 'generation deadline exceeded');
     const recoveredAt = nowIso();
     const recovered = await c.env.DB.prepare(
       "UPDATE turns SET status='failed',completed_at=? WHERE id=? AND owner_id=? AND status='streaming' AND created_at=?",
