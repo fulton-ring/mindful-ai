@@ -34,6 +34,57 @@ export const toNoteSuggestion = (row: SuggestionRow): NoteSuggestion => ({
 const SELECT_SUGGESTION =
   'SELECT id,note_id,conversation_id,source_message_id,base_revision,base_markdown,old_text,new_text,reason,status,created_at,updated_at FROM note_suggestions';
 
+type PersistNoteSuggestionInput = {
+  ownerId: string;
+  conversationId: string;
+  branchId: string;
+  sourceMessageId: string;
+  generationKey?: string;
+  expectedNoteId: string | null;
+  expectedRevision: number | null;
+  proposal: EditProposal;
+  attemptId?: string;
+  allowAfterDecision?: boolean;
+};
+
+type SuggestionBaseline = {
+  note_id: string | null;
+  markdown: string | null;
+  revision: number | null;
+};
+
+const INSERT_SUGGESTION = `INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,base_revision,base_markdown,old_text,new_text,reason,status,created_at,updated_at,branch_id,generation_key)
+     SELECT ?,?,?,?,?,?,?,?,?,?,'pending',?,?,?,? WHERE NOT EXISTS (
+       SELECT 1 FROM note_suggestion_cancellations WHERE owner_id=? AND attempt_id=?
+     ) AND EXISTS (
+       SELECT 1 FROM notes n JOIN conversations c ON c.note_id=n.id AND c.owner_id=n.owner_id
+       JOIN conversation_branches b ON b.conversation_id=c.id AND b.owner_id=c.owner_id
+       WHERE n.id=? AND n.owner_id=? AND n.revision=? AND n.markdown=? AND c.id=?
+       AND b.id=? AND b.status='active' AND b.expires_at>?
+       AND EXISTS (SELECT 1 FROM messages m WHERE m.id=? AND m.conversation_id=c.id
+         AND m.owner_id=c.owner_id AND m.role='assistant' AND m.incomplete=0)
+     )`;
+
+const INSERT_NOTE = `INSERT INTO notes (id,owner_id,markdown,revision,provenance_json,created_at,updated_at,title)
+         SELECT ?,?,'',0,'[]',?,?,
+           COALESCE((SELECT c.title FROM conversations c WHERE c.id=? AND c.owner_id=?),'')
+         WHERE NOT EXISTS (
+           SELECT 1 FROM note_suggestion_cancellations WHERE owner_id=? AND attempt_id=?
+         ) AND EXISTS (
+           SELECT 1 FROM conversations c JOIN conversation_branches b ON b.conversation_id=c.id AND b.owner_id=c.owner_id
+           WHERE c.id=? AND c.owner_id=? AND c.note_id IS NULL AND b.id=?
+           AND b.status='active' AND b.expires_at>?
+           AND EXISTS (SELECT 1 FROM messages m WHERE m.id=? AND m.conversation_id=c.id
+             AND m.owner_id=c.owner_id AND m.role='assistant' AND m.incomplete=0)
+         )`;
+
+type SuggestionInsertContext = {
+  input: PersistNoteSuggestionInput;
+  baseline: SuggestionBaseline;
+  noteId: string;
+  now: string;
+};
+
 export async function loadNoteSuggestionBySource(
   db: D1Database,
   input: {
@@ -87,29 +138,11 @@ export async function loadNoteSuggestionBatch(
   return rows.results.map(toNoteSuggestion);
 }
 
-export async function persistNoteSuggestion(
+async function loadSuggestionBaseline(
   db: D1Database,
-  input: {
-    ownerId: string;
-    conversationId: string;
-    branchId: string;
-    sourceMessageId: string;
-    generationKey?: string;
-    expectedNoteId: string | null;
-    expectedRevision: number | null;
-    proposal: EditProposal;
-    attemptId?: string;
-    allowAfterDecision?: boolean;
-  },
-): Promise<{ noteId: string; suggestion: NoteSuggestion; created: boolean }> {
-  const replay = await loadNoteSuggestionBySource(db, input);
-  if (replay && (!input.allowAfterDecision || replay.status === 'pending'))
-    return { noteId: replay.noteId, suggestion: replay, created: false };
-  const baseline = await first<{
-    note_id: string | null;
-    markdown: string | null;
-    revision: number | null;
-  }>(
+  input: PersistNoteSuggestionInput,
+): Promise<SuggestionBaseline | null> {
+  return first<SuggestionBaseline>(
     db
       .prepare(
         `SELECT c.note_id,n.markdown,n.revision FROM conversations c
@@ -121,29 +154,27 @@ export async function persistNoteSuggestion(
       )
       .bind(input.conversationId, input.ownerId, input.branchId, nowIso(), input.sourceMessageId),
   );
+}
+
+function assertSuggestionBaseline(
+  baseline: SuggestionBaseline | null,
+  input: PersistNoteSuggestionInput,
+): asserts baseline is SuggestionBaseline {
   if (
     !baseline ||
     baseline.note_id !== input.expectedNoteId ||
     (baseline.revision ?? null) !== input.expectedRevision
   )
     throw new HttpError(409, 'Conversation or note changed');
-  const noteId = baseline.note_id ?? newId();
-  const now = nowIso();
-  const baseMarkdown = baseline.markdown ?? '';
-  const suggestionInsert = db
-    .prepare(
-      `INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,base_revision,base_markdown,old_text,new_text,reason,status,created_at,updated_at,branch_id,generation_key)
-     SELECT ?,?,?,?,?,?,?,?,?,?,'pending',?,?,?,? WHERE NOT EXISTS (
-       SELECT 1 FROM note_suggestion_cancellations WHERE owner_id=? AND attempt_id=?
-     ) AND EXISTS (
-       SELECT 1 FROM notes n JOIN conversations c ON c.note_id=n.id AND c.owner_id=n.owner_id
-       JOIN conversation_branches b ON b.conversation_id=c.id AND b.owner_id=c.owner_id
-       WHERE n.id=? AND n.owner_id=? AND n.revision=? AND n.markdown=? AND c.id=?
-       AND b.id=? AND b.status='active' AND b.expires_at>?
-       AND EXISTS (SELECT 1 FROM messages m WHERE m.id=? AND m.conversation_id=c.id
-         AND m.owner_id=c.owner_id AND m.role='assistant' AND m.incomplete=0)
-     )`,
-    )
+}
+
+function prepareSuggestionInsert(
+  db: D1Database,
+  context: SuggestionInsertContext,
+): D1PreparedStatement {
+  const { input, baseline, noteId, now } = context;
+  return db
+    .prepare(INSERT_SUGGESTION)
     .bind(
       input.proposal.id,
       noteId,
@@ -151,7 +182,7 @@ export async function persistNoteSuggestion(
       input.conversationId,
       input.sourceMessageId,
       baseline.revision ?? 0,
-      baseMarkdown,
+      baseline.markdown ?? '',
       input.proposal.oldText,
       input.proposal.newText,
       input.proposal.reason,
@@ -164,88 +195,119 @@ export async function persistNoteSuggestion(
       noteId,
       input.ownerId,
       baseline.revision ?? 0,
-      baseMarkdown,
+      baseline.markdown ?? '',
       input.conversationId,
       input.branchId,
       now,
       input.sourceMessageId,
     );
-  if (!baseline.note_id) {
-    let results: D1Result[];
-    try {
-      results = await db.batch([
-        db
-          .prepare(
-            `INSERT INTO notes (id,owner_id,markdown,revision,provenance_json,created_at,updated_at,title)
-         SELECT ?,?,'',0,'[]',?,?,
-           COALESCE((SELECT c.title FROM conversations c WHERE c.id=? AND c.owner_id=?),'')
-         WHERE NOT EXISTS (
-           SELECT 1 FROM note_suggestion_cancellations WHERE owner_id=? AND attempt_id=?
-         ) AND EXISTS (
-           SELECT 1 FROM conversations c JOIN conversation_branches b ON b.conversation_id=c.id AND b.owner_id=c.owner_id
-           WHERE c.id=? AND c.owner_id=? AND c.note_id IS NULL AND b.id=?
-           AND b.status='active' AND b.expires_at>?
-           AND EXISTS (SELECT 1 FROM messages m WHERE m.id=? AND m.conversation_id=c.id
-             AND m.owner_id=c.owner_id AND m.role='assistant' AND m.incomplete=0)
-         )`,
-          )
-          .bind(
-            noteId,
-            input.ownerId,
-            now,
-            now,
-            input.conversationId,
-            input.ownerId,
-            input.ownerId,
-            input.attemptId ?? input.proposal.id,
-            input.conversationId,
-            input.ownerId,
-            input.branchId,
-            now,
-            input.sourceMessageId,
-          ),
-        db
-          .prepare(
-            'UPDATE conversations SET note_id=? WHERE id=? AND owner_id=? AND note_id IS NULL AND EXISTS (SELECT 1 FROM notes WHERE id=? AND owner_id=?)',
-          )
-          .bind(noteId, input.conversationId, input.ownerId, noteId, input.ownerId),
-        suggestionInsert,
-      ]);
-    } catch {
-      const raced = await loadNoteSuggestionBySource(db, input);
-      if (raced) return { noteId: raced.noteId, suggestion: raced, created: false };
-      throw new HttpError(409, 'Conversation or note changed');
-    }
-    if (results.some((result) => result.meta.changes !== 1))
-      throw new HttpError(409, 'Conversation or note changed');
-  } else {
-    let inserted: D1Result;
-    try {
-      inserted = await suggestionInsert.run();
-    } catch {
-      const raced = await loadNoteSuggestionBySource(db, input);
-      if (raced) return { noteId: raced.noteId, suggestion: raced, created: false };
-      throw new HttpError(409, 'Conversation or note changed');
-    }
-    if (inserted.meta.changes === 1) {
-      // Persisted below.
-    } else {
-      const raced = await loadNoteSuggestionBySource(db, input);
-      if (raced) return { noteId: raced.noteId, suggestion: raced, created: false };
-      throw new HttpError(409, 'Conversation or note changed');
-    }
+}
+
+async function replayAfterSuggestionInsertFailure(
+  db: D1Database,
+  input: PersistNoteSuggestionInput,
+): Promise<NoteSuggestion | null> {
+  return loadNoteSuggestionBySource(db, input);
+}
+
+async function insertSuggestionWithNote(
+  db: D1Database,
+  context: SuggestionInsertContext,
+  suggestionInsert: D1PreparedStatement,
+): Promise<NoteSuggestion | null> {
+  const { input, noteId, now } = context;
+  let results: D1Result[];
+  try {
+    results = await db.batch([
+      db
+        .prepare(INSERT_NOTE)
+        .bind(
+          noteId,
+          input.ownerId,
+          now,
+          now,
+          input.conversationId,
+          input.ownerId,
+          input.ownerId,
+          input.attemptId ?? input.proposal.id,
+          input.conversationId,
+          input.ownerId,
+          input.branchId,
+          now,
+          input.sourceMessageId,
+        ),
+      db
+        .prepare(
+          'UPDATE conversations SET note_id=? WHERE id=? AND owner_id=? AND note_id IS NULL AND EXISTS (SELECT 1 FROM notes WHERE id=? AND owner_id=?)',
+        )
+        .bind(noteId, input.conversationId, input.ownerId, noteId, input.ownerId),
+      suggestionInsert,
+    ]);
+  } catch {
+    const raced = await replayAfterSuggestionInsertFailure(db, input);
+    if (raced) return raced;
+    throw new HttpError(409, 'Conversation or note changed');
   }
-  // Supersede the proposal this one revises, once the new row is safely stored.
-  // Deliberately after the insert rather than inside its all-or-nothing batch:
-  // if the reader has already accepted or rejected the old suggestion this
-  // changes nothing, and that benign no-op must not fail the new proposal.
-  if (input.proposal.replaces)
-    await db
-      .prepare(
-        "UPDATE note_suggestions SET status='invalidated',updated_at=? WHERE id=? AND owner_id=? AND note_id=? AND status='pending'",
-      )
-      .bind(now, input.proposal.replaces, input.ownerId, noteId)
-      .run();
+  if (results.some((result) => result.meta.changes !== 1)) {
+    const raced = await replayAfterSuggestionInsertFailure(db, input);
+    if (raced) return raced;
+    throw new HttpError(409, 'Conversation or note changed');
+  }
+  return null;
+}
+
+async function insertSuggestionOnNote(
+  db: D1Database,
+  input: PersistNoteSuggestionInput,
+  suggestionInsert: D1PreparedStatement,
+): Promise<NoteSuggestion | null> {
+  let inserted: D1Result;
+  try {
+    inserted = await suggestionInsert.run();
+  } catch {
+    const raced = await replayAfterSuggestionInsertFailure(db, input);
+    if (raced) return raced;
+    throw new HttpError(409, 'Conversation or note changed');
+  }
+  if (inserted.meta.changes === 1) return null;
+  const raced = await replayAfterSuggestionInsertFailure(db, input);
+  if (raced) return raced;
+  throw new HttpError(409, 'Conversation or note changed');
+}
+
+async function invalidateReplacedSuggestion(
+  db: D1Database,
+  input: PersistNoteSuggestionInput,
+  noteId: string,
+  now: string,
+): Promise<void> {
+  if (!input.proposal.replaces) return;
+  await db
+    .prepare(
+      "UPDATE note_suggestions SET status='invalidated',updated_at=? WHERE id=? AND owner_id=? AND note_id=? AND status='pending'",
+    )
+    .bind(now, input.proposal.replaces, input.ownerId, noteId)
+    .run();
+}
+
+export async function persistNoteSuggestion(
+  db: D1Database,
+  input: PersistNoteSuggestionInput,
+): Promise<{ noteId: string; suggestion: NoteSuggestion; created: boolean }> {
+  const replay = await loadNoteSuggestionBySource(db, input);
+  if (replay && (!input.allowAfterDecision || replay.status === 'pending'))
+    return { noteId: replay.noteId, suggestion: replay, created: false };
+  const baseline = await loadSuggestionBaseline(db, input);
+  assertSuggestionBaseline(baseline, input);
+  const noteId = baseline.note_id ?? newId();
+  const now = nowIso();
+  const context = { input, baseline, noteId, now };
+  const suggestionInsert = prepareSuggestionInsert(db, context);
+  const raced = baseline.note_id
+    ? await insertSuggestionOnNote(db, input, suggestionInsert)
+    : await insertSuggestionWithNote(db, context, suggestionInsert);
+  if (raced) return { noteId: raced.noteId, suggestion: raced, created: false };
+  await invalidateReplacedSuggestion(db, input, noteId, now);
   return {
     noteId,
     created: true,
@@ -261,17 +323,21 @@ export async function persistNoteSuggestion(
   };
 }
 
-export async function cancelNoteSuggestionAttempt(
+type CancelSuggestionInput = {
+  ownerId: string;
+  conversationId: string;
+  branchId: string;
+  sourceMessageId: string;
+  attemptId: string;
+};
+
+type PendingSuggestion = { id: string; note_id: string };
+
+async function markSuggestionAttemptCancelled(
   db: D1Database,
-  input: {
-    ownerId: string;
-    conversationId: string;
-    branchId: string;
-    sourceMessageId: string;
-    attemptId: string;
-  },
-): Promise<{ noteId: string | null; cancelledSuggestionIds: string[] }> {
-  const now = nowIso();
+  input: CancelSuggestionInput,
+  now: string,
+): Promise<void> {
   const marker = await db
     .prepare(
       `INSERT OR IGNORE INTO note_suggestion_cancellations
@@ -297,22 +363,27 @@ export async function cancelNoteSuggestionAttempt(
       input.sourceMessageId,
     )
     .run();
-  if (marker.meta.changes !== 1) {
-    const existing = await first<{ attempt_id: string }>(
-      db
-        .prepare(
-          'SELECT attempt_id FROM note_suggestion_cancellations WHERE owner_id=? AND attempt_id=? AND conversation_id=? AND branch_id=? AND source_message_id=?',
-        )
-        .bind(
-          input.ownerId,
-          input.attemptId,
-          input.conversationId,
-          input.branchId,
-          input.sourceMessageId,
-        ),
-    );
-    if (!existing) throw new HttpError(404, 'Completed response not found');
-  }
+  if (marker.meta.changes === 1) return;
+  const existing = await first<{ attempt_id: string }>(
+    db
+      .prepare(
+        'SELECT attempt_id FROM note_suggestion_cancellations WHERE owner_id=? AND attempt_id=? AND conversation_id=? AND branch_id=? AND source_message_id=?',
+      )
+      .bind(
+        input.ownerId,
+        input.attemptId,
+        input.conversationId,
+        input.branchId,
+        input.sourceMessageId,
+      ),
+  );
+  if (!existing) throw new HttpError(404, 'Completed response not found');
+}
+
+async function loadPendingSuggestions(
+  db: D1Database,
+  input: CancelSuggestionInput,
+): Promise<PendingSuggestion[]> {
   const pending = await db
     .prepare(
       `SELECT id,note_id FROM note_suggestions
@@ -329,30 +400,29 @@ export async function cancelNoteSuggestionAttempt(
       input.attemptId,
       input.attemptId,
     )
-    .all<{ id: string; note_id: string }>();
-  if (!pending.results.length) return { noteId: null, cancelledSuggestionIds: [] };
-  const noteId = pending.results[0]!.note_id;
-  if (pending.results.some((suggestion) => suggestion.note_id !== noteId))
-    throw new HttpError(409, 'Suggestion batch changed');
-  const operationId = `cancel:${input.attemptId}`;
-  const priorCancellation = await first<{ id: string }>(
-    db
-      .prepare('SELECT id FROM note_edits WHERE note_id=? AND owner_id=? AND operation_id=?')
-      .bind(noteId, input.ownerId, operationId),
-  );
-  if (priorCancellation) return { noteId, cancelledSuggestionIds: [] };
-  const ids = pending.results.map(({ id }) => id);
-  const editId = newId();
-  const changes = ids.map((id) => ({ id, beforeStatus: 'pending', afterStatus: 'dismissed' }));
-  const edit = db
-    .prepare(
-      `INSERT INTO note_edits
+    .all<PendingSuggestion>();
+  return pending.results;
+}
+
+const INSERT_CANCELLATION_EDIT = (ids: string[]) => `INSERT INTO note_edits
        (id,note_id,owner_id,operation_id,base_revision,result_revision,before_title,before_markdown,before_provenance_json,after_title,after_markdown,after_provenance_json,kind,suggestion_id,before_suggestion_status,after_suggestion_status,created_at,suggestion_changes_json)
        SELECT ?,n.id,n.owner_id,?,n.revision,n.revision+1,c.title,n.markdown,n.provenance_json,c.title,n.markdown,n.provenance_json,'user_edit',NULL,NULL,NULL,?,?
        FROM notes n JOIN conversations c ON c.note_id=n.id AND c.owner_id=n.owner_id
        WHERE n.id=? AND n.owner_id=? AND c.id=?
-         AND (SELECT COUNT(*) FROM note_suggestions WHERE note_id=n.id AND owner_id=n.owner_id AND status='pending' AND id IN (${ids.map(() => '?').join(',')}))=?`,
-    )
+         AND (SELECT COUNT(*) FROM note_suggestions WHERE note_id=n.id AND owner_id=n.owner_id AND status='pending' AND id IN (${ids.map(() => '?').join(',')}))=?`;
+
+async function applySuggestionCancellation(
+  db: D1Database,
+  input: CancelSuggestionInput,
+  now: string,
+  noteId: string,
+  ids: string[],
+): Promise<void> {
+  const operationId = `cancel:${input.attemptId}`;
+  const editId = newId();
+  const changes = ids.map((id) => ({ id, beforeStatus: 'pending', afterStatus: 'dismissed' }));
+  const edit = db
+    .prepare(INSERT_CANCELLATION_EDIT(ids))
     .bind(
       editId,
       operationId,
@@ -386,6 +456,28 @@ export async function cancelNoteSuggestionAttempt(
   ]);
   if (results.slice(0, 2 + ids.length).some((result) => result.meta.changes !== 1))
     throw new HttpError(409, 'Suggestion batch changed');
+}
+
+export async function cancelNoteSuggestionAttempt(
+  db: D1Database,
+  input: CancelSuggestionInput,
+): Promise<{ noteId: string | null; cancelledSuggestionIds: string[] }> {
+  const now = nowIso();
+  await markSuggestionAttemptCancelled(db, input, now);
+  const pending = await loadPendingSuggestions(db, input);
+  if (!pending.length) return { noteId: null, cancelledSuggestionIds: [] };
+  const noteId = pending[0]!.note_id;
+  if (pending.some((suggestion) => suggestion.note_id !== noteId))
+    throw new HttpError(409, 'Suggestion batch changed');
+  const operationId = `cancel:${input.attemptId}`;
+  const priorCancellation = await first<{ id: string }>(
+    db
+      .prepare('SELECT id FROM note_edits WHERE note_id=? AND owner_id=? AND operation_id=?')
+      .bind(noteId, input.ownerId, operationId),
+  );
+  if (priorCancellation) return { noteId, cancelledSuggestionIds: [] };
+  const ids = pending.map(({ id }) => id);
+  await applySuggestionCancellation(db, input, now, noteId, ids);
   return { noteId, cancelledSuggestionIds: ids };
 }
 
