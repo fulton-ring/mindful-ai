@@ -14,7 +14,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-it('strips query strings and private thread identifiers from automatic SDK URL properties', async () => {
+it('strips query strings and private thread or note identifiers from automatic SDK URL properties', async () => {
   vi.stubGlobal('location', {
     origin: 'https://walden.test',
     pathname: '/conversations/private-id',
@@ -33,6 +33,15 @@ it('strips query strings and private thread identifiers from automatic SDK URL p
   });
   expect(event.properties.$current_url).toBe('https://walden.test/conversations/:id');
   expect(JSON.stringify(event)).not.toContain('private');
+
+  vi.stubGlobal('location', {
+    origin: 'https://walden.test',
+    pathname: '/notes/private-note',
+    search: '',
+  });
+  const noteEvent = sanitize({ properties: { $current_url: 'private' } });
+  expect(noteEvent.properties.$current_url).toBe('https://walden.test/notes/:id');
+  expect(JSON.stringify(noteEvent)).not.toContain('private');
 });
 
 it('captures standard anonymous pageviews with normalized paths from runtime configuration', async () => {

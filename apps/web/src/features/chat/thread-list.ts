@@ -62,3 +62,54 @@ export function groupThreads(
   }
   return buckets.filter((bucket) => bucket.threads.length > 0);
 }
+
+/** Expiry follows user activity, independently of the latest assistant message. */
+export function threadRetention(thread: ConversationSummary, now: Date = new Date()) {
+  const remaining = Date.parse(thread.expiresAt) - now.getTime();
+  if (!Number.isFinite(remaining)) return 'Expiry unavailable';
+  if (remaining <= 0) return thread.noteId ? 'History expired · Note kept' : 'Expired';
+  if (remaining > 3 * 86_400_000) return null;
+  if (thread.noteId) return null;
+  const minutes = Math.ceil(remaining / 60_000);
+  const amount =
+    minutes < 60 ? minutes : minutes < 1440 ? Math.ceil(minutes / 60) : Math.ceil(minutes / 1440);
+  const unit = minutes < 60 ? 'minute' : minutes < 1440 ? 'hour' : 'day';
+  return `Expires in ${amount} ${unit}${amount === 1 ? '' : 's'}`;
+}
+
+export function threadTimestamp(thread: ConversationSummary) {
+  const value = thread.lastMessageAt ?? thread.updatedAt;
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  return {
+    value,
+    label: thread.lastMessageAt ? 'Last message' : 'Last active',
+    text: date.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    }),
+    full: date.toLocaleString(),
+  };
+}
+
+export function isRetainedNote(thread: ConversationSummary, now: Date) {
+  return Boolean(thread.noteId) && Date.parse(thread.expiresAt) <= now.getTime();
+}
+
+export function sidebarGroups(threads: readonly ConversationSummary[], now: Date): ThreadGroup[] {
+  const notes = threads
+    .filter((thread) => isRetainedNote(thread, now))
+    .sort(
+      (a, b) =>
+        Date.parse(b.noteUpdatedAt ?? b.updatedAt) - Date.parse(a.noteUpdatedAt ?? a.updatedAt),
+    );
+  return [
+    ...groupThreads(
+      threads.filter((thread) => !isRetainedNote(thread, now)),
+      now,
+    ),
+    ...(notes.length ? [{ label: 'Notes', threads: notes }] : []),
+  ];
+}

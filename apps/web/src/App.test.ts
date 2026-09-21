@@ -5,6 +5,7 @@ import {
   cacheConversationTitle,
   cacheConversationUpdate,
   cachedDismissedSuggestionIds,
+  isExpiredNoteConversation,
   isLazyConversationAdoption,
   mergeConversationAggregate,
   noteMutationBelongsToRoute,
@@ -17,6 +18,29 @@ import {
   waitForPendingCapture,
   writeDismissedNotePanels,
 } from './App';
+
+describe('retained note workspace', () => {
+  it('opens an expired note-backed conversation in note-only mode', () => {
+    expect(
+      isExpiredNoteConversation(
+        { noteId: 'note', expiresAt: '2026-09-20T12:00:00.000Z' },
+        new Date('2026-09-20T12:00:00.001Z'),
+      ),
+    ).toBe(true);
+    expect(
+      isExpiredNoteConversation(
+        { noteId: 'note', expiresAt: '2026-09-20T12:00:00.000Z' },
+        new Date('2026-09-20T12:00:00.000Z'),
+      ),
+    ).toBe(true);
+    expect(
+      isExpiredNoteConversation(
+        { noteId: null, expiresAt: '2026-09-20T12:00:00.000Z' },
+        new Date('2026-09-20T12:01:00.000Z'),
+      ),
+    ).toBe(false);
+  });
+});
 
 describe('note panel dismissal across reloads', () => {
   it('restores closed threads per account and clears an explicitly reopened thread', () => {

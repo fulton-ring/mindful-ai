@@ -180,6 +180,8 @@ export const api = {
     }),
   deleteConversation: (id: string) =>
     request<void>(`/api/conversations/${id}`, { method: 'DELETE' }),
+  archiveConversation: (id: string) =>
+    request<void>(`/api/conversations/${id}?keepNote=1`, { method: 'DELETE' }),
   messageAnnotations: (messageId: string, input: MessageFollowupRequest, signal?: AbortSignal) =>
     request<{ annotations: Annotation[] }>(`/api/chat/messages/${messageId}/annotations`, {
       method: 'POST',

@@ -1579,6 +1579,20 @@ export function ChatPanel(props: Props) {
                 <button
                   type="button"
                   className="icon-button"
+                  aria-label="Propose note edit"
+                  disabled={sending || proposalMessageId === message.id}
+                  onClick={() => void proposeNote(message.id)}
+                >
+                  <NotebookPen aria-hidden />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="annotation-tooltip">Propose note edit</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="icon-button"
                   aria-label="Highlight response"
                   disabled={highlighting}
                   onClick={() => highlightMessage(message.id)}

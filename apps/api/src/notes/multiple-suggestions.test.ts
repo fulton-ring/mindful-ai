@@ -235,20 +235,16 @@ describe('independent note suggestions', () => {
     });
   });
 
-  it('accepts a suggestion even when the submitted note does not check out', async () => {
-    // The rendered note the client sends is an optimization. Refusing it left
-    // the reader stuck with a suggestion they could neither accept nor clear by
-    // regenerating, so the edit is computed here instead.
+  it('rejects a suggestion when the submitted preview does not check out', async () => {
     const { db, decide } = await fixture();
     const response = await decide('suggestion-a', 'accept', 2, 'Something else entirely.');
 
-    expect(response.status).toBe(200);
-    // The suggestion's own edit is applied, not the text that was sent.
+    expect(response.status).toBe(409);
     expect(await db.prepare("SELECT markdown FROM notes WHERE id='note'").first()).toEqual({
-      markdown: 'Keep cash. Save three months.\\n\\nPlan.',
+      markdown: 'Keep cash.\\n\\nPlan.',
     });
     expect(
       await db.prepare("SELECT status FROM note_suggestions WHERE id='suggestion-a'").first(),
-    ).toEqual({ status: 'accepted' });
+    ).toEqual({ status: 'pending' });
   });
 });

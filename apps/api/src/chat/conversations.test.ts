@@ -25,6 +25,7 @@ function database(
       expires_at: string;
       title: string | null;
       last_user_activity_at: string;
+      last_message_at?: string | null;
     }>;
     messages?: Array<Record<string, unknown>>;
   } = {},
@@ -260,6 +261,7 @@ describe('conversation note attachment', () => {
           expires_at: '2999-01-01T00:00:00.000Z',
           title: 'New conversation',
           last_user_activity_at: '2026-01-02T00:00:00.000Z',
+          last_message_at: '2026-01-02T00:02:00.000Z',
         },
       ],
     });
@@ -273,6 +275,8 @@ describe('conversation note attachment', () => {
         expiresAt: '2999-01-01T00:00:00.000Z',
         title: 'New conversation',
         updatedAt: '2026-01-02T00:00:00.000Z',
+        lastMessageAt: '2026-01-02T00:02:00.000Z',
+        noteUpdatedAt: null,
       },
     ]);
     const listQuery = db.queries.find((query) => query.includes('FROM conversations c')) ?? '';
@@ -299,6 +303,29 @@ describe('conversation note attachment', () => {
 
     expect(response.status).toBe(204);
     expect(db.conversations).toHaveLength(0);
+  });
+
+  it('archives an owned note-backed conversation without deleting its note', async () => {
+    const db = database({
+      notes: [{ id: 'note', ownerId: 'owner' }],
+      conversations: [
+        {
+          id: 'conversation',
+          ownerId: 'owner',
+          noteId: 'note',
+          expiresAt: '2999-01-01T00:00:00.000Z',
+          status: 'active',
+        },
+      ],
+    });
+
+    const response = await testApp(db)('/api/conversations/conversation?keepNote=1', {
+      method: 'DELETE',
+    });
+
+    expect(response.status).toBe(204);
+    expect(db.conversations).toHaveLength(0);
+    expect(db.queries.some((query) => query.startsWith('DELETE FROM notes'))).toBe(false);
   });
 
   it('deletes an owned streaming conversation and aborts its local turn', async () => {

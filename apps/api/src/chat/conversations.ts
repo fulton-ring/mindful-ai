@@ -19,6 +19,9 @@ import { abortActiveTurnsForConversation } from './active-turns';
 export const RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 export const EXPLICIT_DELETE_CONVERSATION_SQL = `DELETE FROM conversations
   WHERE id=? AND owner_id=? AND note_id IS NULL`;
+/** Archive removes the transcript container while leaving its durable note intact. */
+export const EXPLICIT_ARCHIVE_CONVERSATION_SQL = `DELETE FROM conversations
+  WHERE id=? AND owner_id=?`;
 export const EXPLICIT_DELETE_NOTE_SQL = `DELETE FROM notes
   WHERE owner_id=? AND id=(
     SELECT c.note_id FROM conversations c
@@ -112,7 +115,13 @@ export async function loadConversation(
       branches[0]);
   if (!branch) throw new HttpError(404, 'Branch not found');
   if (branch.status !== 'active' || branch.expires_at <= nowIso()) {
-    if (options.branchId) throw new HttpError(410, 'Branch expired');
+    const hasActiveBranch = branches.some(
+      ({ status, expires_at }) => status === 'active' && expires_at > nowIso(),
+    );
+    // A new message may restart a fully expired note-backed conversation, even
+    // when the client supplies the branch shown in its empty transcript.
+    if (options.branchId && (!options.renewExpired || row.note_id === null || hasActiveBranch))
+      throw new HttpError(410, 'Branch expired');
     if (row.note_id === null || !options.renewExpired) {
       if (!branches.some(({ status, expires_at }) => status === 'active' && expires_at > nowIso()))
         await purgeConversationState(db, ownerId, id);
@@ -328,11 +337,14 @@ conversationRoutes.get('/conversations', async (c) => {
     expires_at: string;
     title: string;
     last_user_activity_at: string;
+    last_message_at: string | null;
+    note_updated_at: string | null;
   }>(
     c.env.DB.prepare(
       // A conversation attached to a note takes its name from that note: the
       // note is the durable object and the thread is a child of it.
-      `SELECT c.id,c.note_id,c.expires_at,c.last_user_activity_at,
+      `SELECT c.id,c.note_id,c.expires_at,c.last_user_activity_at,n.updated_at AS note_updated_at,
+         (SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id) AS last_message_at,
          COALESCE(NULLIF(TRIM(n.title),''),c.title) AS title
          FROM conversations c
          LEFT JOIN notes n ON n.id=c.note_id AND n.owner_id=c.owner_id
@@ -347,6 +359,8 @@ conversationRoutes.get('/conversations', async (c) => {
       expiresAt: row.expires_at,
       title: row.title,
       updatedAt: row.last_user_activity_at,
+      lastMessageAt: row.last_message_at ?? null,
+      noteUpdatedAt: row.note_updated_at ?? null,
     })),
   );
 });
@@ -571,12 +585,20 @@ conversationRoutes.delete('/conversations/:id', async (c) => {
     ),
   );
   if (!conversation) throw new HttpError(404, 'Conversation not found');
-  abortActiveTurnsForConversation(conversation.id, 'conversation deleted');
+  const keepNote = c.req.query('keepNote') === '1';
+  abortActiveTurnsForConversation(
+    conversation.id,
+    keepNote ? 'conversation archived' : 'conversation deleted',
+  );
   await deleteAgentMemoryThread(c.env.DB, ownerId, conversation.id);
-  const results = await c.env.DB.batch([
-    c.env.DB.prepare(EXPLICIT_DELETE_NOTE_SQL).bind(ownerId, conversation.id, ownerId),
-    c.env.DB.prepare(EXPLICIT_DELETE_CONVERSATION_SQL).bind(conversation.id, ownerId),
-  ]);
+  const results = await c.env.DB.batch(
+    keepNote
+      ? [c.env.DB.prepare(EXPLICIT_ARCHIVE_CONVERSATION_SQL).bind(conversation.id, ownerId)]
+      : [
+          c.env.DB.prepare(EXPLICIT_DELETE_NOTE_SQL).bind(ownerId, conversation.id, ownerId),
+          c.env.DB.prepare(EXPLICIT_DELETE_CONVERSATION_SQL).bind(conversation.id, ownerId),
+        ],
+  );
   if (!conversationDeleteSucceeded(results.at(-1)))
     throw new HttpError(409, 'Conversation ownership changed during deletion');
   return c.body(null, 204);

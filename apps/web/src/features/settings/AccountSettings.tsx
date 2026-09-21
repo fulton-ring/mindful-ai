@@ -46,6 +46,10 @@ export function AccountSettings() {
   return (
     <section>
       <h2>Account</h2>
+      <p className="account-retention-note">
+        Thread history expires seven days after your last message. Notes remain until you delete
+        them.
+      </p>
       <ConversationPrivacy />
       <div className="settings-row">
         <div>
@@ -124,10 +128,6 @@ export function AccountSettings() {
           {error}
         </p>
       )}
-      <p className="muted">
-        Thread history expires seven days after your last message. Notes remain until you delete
-        them.
-      </p>
       <div className="legal-links">
         <a href="/privacy" target="_blank" rel="noreferrer">
           Privacy Policy

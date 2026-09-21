@@ -2,7 +2,12 @@ import { ChangeSet, EditorState } from '@codemirror/state';
 import type { EditProposal } from '@walden/contracts';
 import { acceptQueueEdit } from '@walden/domain';
 import { describe, expect, it } from 'vitest';
-import { additionQueue, candidateOnLine, projectPendingEdits } from './pending-projection';
+import {
+  acceptedProposalMarkdown,
+  additionQueue,
+  candidateOnLine,
+  projectPendingEdits,
+} from './pending-projection';
 
 function proposal(id: string, oldText: string, newText: string): EditProposal {
   return {
@@ -17,6 +22,13 @@ function proposal(id: string, oldText: string, newText: string): EditProposal {
 }
 
 describe('pending note projection', () => {
+  it('submits the exact reviewed replacement, including untouched text', () => {
+    const replacement = proposal('edit', 'old', 'new');
+    expect(acceptedProposalMarkdown('Start old end', replacement, [replacement])).toBe(
+      'Start new end',
+    );
+    expect(acceptedProposalMarkdown('Start changed end', replacement, [replacement])).toBeNull();
+  });
   it('places an addition after the note, whatever the note has become', () => {
     const pending = proposal('second', '', 'Second');
     const result = projectPendingEdits('First', [pending]);

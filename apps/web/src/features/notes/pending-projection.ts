@@ -1,5 +1,5 @@
 import type { EditProposal } from '@walden/contracts';
-import { type QueuedAddition, renderWithQueue, resolveEdit } from '@walden/domain';
+import { acceptQueueEdit, type QueuedAddition, renderWithQueue, resolveEdit } from '@walden/domain';
 
 export type PendingRange = {
   proposalId: string;
@@ -72,6 +72,22 @@ export function additionQueue(
       .filter(([id]) => !known.has(id))
       .map(([id, text]) => ({ id, text, accepted: false })),
   ];
+}
+
+export function acceptedProposalMarkdown(
+  markdown: string,
+  proposal: EditProposal,
+  proposals: readonly EditProposal[],
+  queueOrder: readonly { id: string; text: string; accepted: boolean }[] = [],
+): string | null {
+  try {
+    const edit = proposal.oldText
+      ? resolveEdit(markdown, proposal.oldText, proposal.newText)
+      : acceptQueueEdit(markdown, additionQueue(proposals, queueOrder), proposal.id);
+    return edit ? markdown.slice(0, edit.from) + edit.insert + markdown.slice(edit.to) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function projectPendingEdits(

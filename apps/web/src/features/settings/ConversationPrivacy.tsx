@@ -3,9 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../../lib/api';
 
-export const conversationPrivacyCopy =
-  'Share new messages and visible replies with Fulton Ring and PostHog to diagnose problems, review response quality, and develop and improve Walden. Authorized team members may review them. This does not include training AI models. Content is retained in PostHog for up to 30 days; diagnostic metadata is retained separately. Replies may repeat information from your notes or earlier messages. You can turn sharing off at any time; doing so does not delete previously collected data.';
-
 export function ConversationPrivacy({ notice = false }: { notice?: boolean }) {
   const client = useQueryClient();
   const preference = useQuery({ queryKey: ['account-privacy'], queryFn: api.accountPrivacy });
@@ -17,10 +14,13 @@ export function ConversationPrivacy({ notice = false }: { notice?: boolean }) {
   if (notice && (!preference.data || preference.data.acknowledged)) return null;
   const control = (
     <>
-      <p>{conversationPrivacyCopy}</p>
-      <label className="settings-row">
-        Help improve Walden
+      <div className="privacy-choice">
+        <label htmlFor={notice ? 'privacy-notice-choice' : 'privacy-settings-choice'}>
+          <strong>Help improve Walden</strong>
+          <span>Share new messages and replies</span>
+        </label>
         <input
+          id={notice ? 'privacy-notice-choice' : 'privacy-settings-choice'}
           type="checkbox"
           aria-label="Help improve Walden"
           checked={notice ? initialChoice : (preference.data?.enabled ?? true)}
@@ -29,7 +29,7 @@ export function ConversationPrivacy({ notice = false }: { notice?: boolean }) {
             notice ? setInitialChoice(event.target.checked) : save.mutate(event.target.checked)
           }
         />
-      </label>
+      </div>
       {preference.isError && (
         <p role="alert">
           Could not load your preference.{' '}
@@ -51,29 +51,41 @@ export function ConversationPrivacy({ notice = false }: { notice?: boolean }) {
       <Dialog.Portal>
         <Dialog.Overlay className="modal-backdrop" />
         <Dialog.Content
-          className="modal"
-          aria-describedby={undefined}
+          className="modal privacy-modal"
           onEscapeKeyDown={(event) => event.preventDefault()}
           onPointerDownOutside={(event) => event.preventDefault()}
         >
-          <Dialog.Title>Your conversation privacy</Dialog.Title>
+          <div className="privacy-heading">
+            <Dialog.Title>Conversation privacy</Dialog.Title>
+            <Dialog.Description>
+              You choose whether to share conversations to help improve Walden.
+            </Dialog.Description>
+          </div>
+          <p className="privacy-summary">
+            Sharing lets Fulton Ring review new messages and replies through PostHog to diagnose
+            issues and improve Walden. We don’t use them to train AI models.
+          </p>
           {control}
-          <p>
-            Sharing starts with new exchanges after you continue. Existing history is not uploaded.
-            Basic server diagnostics continue when sharing is off.
+          <p className="privacy-change-note">
+            Sharing is optional. You can change this anytime in Settings → Account.
           </p>
-          <p>
-            <a href="/privacy" target="_blank" rel="noreferrer">
-              Privacy Policy
-            </a>{' '}
-            ·{' '}
-            <a href="/terms" target="_blank" rel="noreferrer">
-              Terms of Service
-            </a>
-          </p>
-          <button disabled={save.isPending} onClick={() => save.mutate(initialChoice)}>
-            {save.isPending ? 'Saving…' : 'Continue'}
-          </button>
+          <footer className="privacy-footer">
+            <nav aria-label="Privacy and terms">
+              <a href="/privacy" target="_blank" rel="noreferrer">
+                Privacy Policy
+              </a>
+              <a href="/terms" target="_blank" rel="noreferrer">
+                Terms of Service
+              </a>
+            </nav>
+            <button
+              className="privacy-continue"
+              disabled={save.isPending}
+              onClick={() => save.mutate(initialChoice)}
+            >
+              {save.isPending ? 'Saving…' : 'Continue'}
+            </button>
+          </footer>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

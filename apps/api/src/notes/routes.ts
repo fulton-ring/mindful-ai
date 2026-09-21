@@ -76,7 +76,7 @@ notesRoutes.get('/', async (c) =>
     (
       await all<NoteRow>(
         c.env.DB.prepare(
-          `SELECT n.id,COALESCE((SELECT c.title FROM conversations c WHERE c.note_id=n.id AND c.owner_id=n.owner_id ORDER BY c.last_user_activity_at DESC LIMIT 1),'Untitled note') AS title,n.markdown,n.revision,n.provenance_json,n.created_at,n.updated_at FROM notes n WHERE n.owner_id=? ORDER BY n.updated_at DESC`,
+          `SELECT n.id,COALESCE(NULLIF(TRIM(n.title),''),(SELECT c.title FROM conversations c WHERE c.note_id=n.id AND c.owner_id=n.owner_id ORDER BY c.last_user_activity_at DESC LIMIT 1),'Untitled note') AS title,n.markdown,n.revision,n.provenance_json,n.created_at,n.updated_at FROM notes n WHERE n.owner_id=? ORDER BY n.updated_at DESC`,
         ).bind(c.get('userId')),
       )
     ).map(toNote),
@@ -304,18 +304,8 @@ notesRoutes.post('/:id/suggestions/:suggestionId/decision', async (c) => {
   );
   if (!suggestion) throw new HttpError(404, 'Suggestion not found');
   if (suggestion.status !== 'pending') throw new HttpError(409, 'Suggestion is no longer pending');
-  // Apply only a still-unique exact anchor against the latest note. Unrelated
-  // typing can advance the revision without invalidating a reviewed edit.
-  // applySuggestionPatch rejects edited/ambiguous anchors before any writes.
-  // Accepting is a save: the reader already has the note rendered in front of
-  // them, so the client sends that text and this keeps it when the sole
-  // difference is the suggestion's own words. Placing it again here is what let
-  // an accepted line appear somewhere other than where it was drawn.
-  //
-  // When the submitted text does not check out — the note moved on, or the
-  // client rendered it differently — the edit is simply computed here instead.
-  // Refusing outright left the reader stuck with a suggestion they could
-  // neither accept nor get rid of by regenerating.
+  // The reviewed markdown is authoritative for an addition's position. If it
+  // no longer describes exactly this suggestion, require a refreshed preview.
   const offered =
     parsed.data.decision === 'accept' &&
     suggestion.old_text === '' &&
@@ -324,6 +314,13 @@ notesRoutes.post('/:id/suggestions/:suggestionId/decision', async (c) => {
       : null;
   const submitted =
     offered && offered.insert.trim() === suggestion.new_text.trim() ? offered : null;
+  if (
+    parsed.data.decision === 'accept' &&
+    parsed.data.markdown !== undefined &&
+    suggestion.old_text === '' &&
+    !submitted
+  )
+    throw new HttpError(409, 'Suggestion preview changed. Refresh the note and review it again.');
   const after =
     parsed.data.decision === 'accept'
       ? submitted
@@ -339,11 +336,15 @@ notesRoutes.post('/:id/suggestions/:suggestionId/decision', async (c) => {
               newText: suggestion.new_text,
               reason: suggestion.reason,
             },
-            // Computed here, so it still lands where the queue puts it rather
-            // than as though it were the only suggestion on the note.
             await loadNoteAdditionQueue(c.env.DB, ownerId, noteId),
           )
       : { markdown: state.note.markdown, provenance: state.note.provenance };
+  if (
+    parsed.data.decision === 'accept' &&
+    parsed.data.markdown !== undefined &&
+    after.markdown !== parsed.data.markdown
+  )
+    throw new HttpError(409, 'Suggestion preview changed. Refresh the note and review it again.');
   const now = nowIso();
   const editId = newId();
   const afterProvenance = JSON.stringify(after.provenance);

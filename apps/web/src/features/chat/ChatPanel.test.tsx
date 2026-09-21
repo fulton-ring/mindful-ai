@@ -1139,6 +1139,32 @@ describe('ChatPanel annotation recovery', () => {
     expect(values.onOpenNote).toHaveBeenCalledOnce();
   });
 
+  it('offers a manual note proposal for a completed reply', async () => {
+    transport.streamNoteProposal.mockResolvedValue(undefined);
+    const history = {
+      ...conversation('conversation-1'),
+      messages: [
+        {
+          id: 'assistant-1',
+          role: 'assistant' as const,
+          content: 'Change the term in the note.',
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    };
+    render(<ChatPanel {...props(history)} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Propose note edit' }));
+
+    await waitFor(() => expect(transport.streamNoteProposal).toHaveBeenCalledOnce());
+    expect(transport.streamNoteProposal).toHaveBeenCalledWith(
+      'assistant-1',
+      expect.objectContaining({ noteProposalRequested: true }),
+      expect.any(Function),
+      expect.any(AbortSignal),
+    );
+  });
+
   it('delivers every streamed preview and hydrates a terminal proposal batch once', async () => {
     const first = {
       id: 'proposal-first',

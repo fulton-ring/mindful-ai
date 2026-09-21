@@ -2,17 +2,27 @@ import * as Dialog from '@radix-ui/react-dialog';
 
 export function DeleteThreadDialog({
   title,
+  mode,
+  target = 'thread',
   pending,
   error,
   onCancel,
   onConfirm,
 }: {
   title: string;
+  mode: 'archive' | 'delete';
+  target?: 'thread' | 'note';
   pending: boolean;
   error?: string;
   onCancel(): void;
   onConfirm(): void;
 }) {
+  const archive = mode === 'archive';
+  const description = archive
+    ? `“${title || 'Untitled thread'}” and its messages will be permanently deleted. The note will remain in Notes.`
+    : target === 'note'
+      ? `“${title || 'Untitled note'}” will be permanently deleted.`
+      : `“${title || 'Untitled thread'}”, its messages, and its note will be permanently deleted.`;
   return (
     <Dialog.Root
       open
@@ -25,12 +35,12 @@ export function DeleteThreadDialog({
         <Dialog.Content
           className="modal delete-thread-dialog"
           role="alertdialog"
-          aria-describedby="delete-thread-description"
+          aria-describedby="thread-removal-description"
         >
-          <Dialog.Title>Delete thread?</Dialog.Title>
-          <Dialog.Description id="delete-thread-description">
-            “{title || 'Untitled thread'}”, its messages, and its note will be permanently deleted.
-          </Dialog.Description>
+          <Dialog.Title>
+            {archive ? 'Archive thread?' : target === 'note' ? 'Delete note?' : 'Delete thread?'}
+          </Dialog.Title>
+          <Dialog.Description id="thread-removal-description">{description}</Dialog.Description>
           {error && (
             <p className="inline-error" role="alert">
               {error}
@@ -41,7 +51,15 @@ export function DeleteThreadDialog({
               Cancel
             </button>
             <button type="button" className="danger" disabled={pending} onClick={onConfirm}>
-              {pending ? 'Deleting…' : 'Delete thread'}
+              {pending
+                ? archive
+                  ? 'Archiving…'
+                  : 'Deleting…'
+                : archive
+                  ? 'Archive thread'
+                  : target === 'note'
+                    ? 'Delete everything'
+                    : 'Delete thread'}
             </button>
           </div>
         </Dialog.Content>

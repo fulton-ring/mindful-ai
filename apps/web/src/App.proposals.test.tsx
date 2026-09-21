@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, cleanup, render, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { App } from './App';
@@ -89,6 +89,7 @@ async function setup(linked = true) {
   };
   vi.spyOn(api, 'personas').mockResolvedValue([]);
   vi.spyOn(api, 'conversations').mockResolvedValue([]);
+  vi.spyOn(api, 'notes').mockResolvedValue([]);
   vi.spyOn(api, 'conversation').mockResolvedValue(conversation);
   vi.spyOn(api, 'noteState').mockResolvedValue({
     note,
@@ -118,8 +119,35 @@ async function setup(linked = true) {
     act(() => chat.onOpenNote());
     await view.findByText('Test editor');
   }
-  return { note, proposal, decide, client, conversation };
+  return { note, proposal, decide, client, conversation, view };
 }
+
+it('removes a deleted thread and its note from the sidebar', async () => {
+  const { note, client, view } = await setup();
+  const thread = {
+    id: 'thread',
+    noteId: note.id,
+    title: 'Test',
+    updatedAt: '2026-09-20T12:00:00.000Z',
+    expiresAt: '2999-01-01T00:00:00.000Z',
+  };
+  act(() => {
+    client.setQueryData(['conversations'], [thread]);
+    client.setQueryData(['notes'], [note]);
+  });
+  await view.findByRole('button', { name: 'Thread options: Test' });
+  vi.spyOn(api, 'deleteConversation').mockResolvedValue(undefined);
+  fireEvent.click(view.getByRole('button', { name: 'Thread options: Test' }));
+  fireEvent.click(await view.findByRole('button', { name: 'Delete everything' }));
+  const dialog = await view.findByRole('alertdialog');
+  fireEvent.click(dialog.querySelector('.danger')!);
+
+  await waitFor(() => expect(api.deleteConversation).toHaveBeenCalledWith('thread'));
+  await waitFor(() => expect(client.getQueryData(['conversations'])).toEqual([]));
+  expect(client.getQueryData(['notes'])).toEqual([]);
+  expect(view.queryByRole('button', { name: 'Open note: Note' })).toBeNull();
+  client.clear();
+});
 
 it.each(['single', 'batch'])('settles a %s result before allowing its decision', async (kind) => {
   const { note, proposal, decide, client } = await setup();

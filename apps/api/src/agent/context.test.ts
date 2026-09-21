@@ -53,7 +53,7 @@ describe('turn context selection', () => {
       maxNoteChars: 100,
     });
 
-    expect(result.noteAvailableForExactEdits).toBe(true);
+    expect(result.context[0]?.content).toContain('revision 4');
     expect(result.context[0]?.content).toContain('FULL NOTE');
     expect(result.messages.at(-1)?.content).toBe('current question verbatim');
     expect(result.messages.map((item) => item.id)).toEqual(['u2', 'a2', 'request-1']);
@@ -116,7 +116,7 @@ describe('turn context selection', () => {
     );
   });
 
-  it('omits an oversized note whole and makes exact note editing unavailable', () => {
+  it('supplies an outline for an oversized note and directs the model to read the needed text', () => {
     const result = buildTurnContext({
       note: note('n'.repeat(101)),
       messages: [],
@@ -127,8 +127,9 @@ describe('turn context selection', () => {
       maxNoteChars: 100,
     });
 
-    expect(result.noteAvailableForExactEdits).toBe(false);
-    expect(result.context[0]?.content).toContain('omitted in full');
+    expect(result.context[0]?.content).toContain('Note outline');
+    expect(result.context[0]?.content).toContain('readNote');
+    expect(result.context[0]?.content).not.toContain('Exact note edits are unavailable');
     expect(JSON.stringify(result)).not.toContain('nnnnnnnnnn');
     expect(result.messages.at(-1)?.content).toBe('Edit the ending exactly.');
   });

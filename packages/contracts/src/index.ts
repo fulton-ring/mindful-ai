@@ -185,6 +185,8 @@ export type Conversation = {
   branches: ConversationBranch[];
 };
 export type ConversationSummary = {
+  noteUpdatedAt?: string | null;
+  lastMessageAt?: string | null;
   id: string;
   noteId: string | null;
   title: string;

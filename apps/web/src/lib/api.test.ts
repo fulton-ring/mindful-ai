@@ -456,19 +456,26 @@ describe('authenticated API transport', () => {
     );
   });
 
-  it('lists and deletes conversation history', async () => {
+  it('lists, archives, and deletes conversation history', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(Response.json({ data: [] }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
     vi.stubGlobal('fetch', fetchMock);
 
     await api.conversations();
+    await api.archiveConversation('conversation-1');
     await api.deleteConversation('conversation-1');
 
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/conversations', expect.any(Object));
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
+      '/api/conversations/conversation-1?keepNote=1',
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
       '/api/conversations/conversation-1',
       expect.objectContaining({ method: 'DELETE' }),
     );

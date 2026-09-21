@@ -79,6 +79,32 @@ describe('note proposal capture basis', () => {
     mocks.primitives.mockReset();
   });
 
+  it('gives a large note an outline and reading tools without duplicating its body', async () => {
+    mocks.stream.mockRejectedValue(new Error('stop after input inspection'));
+    const largeNote = {
+      id: 'note-1',
+      title: 'Research',
+      markdown: `# Start\n${'secret'.repeat(10_000)}\n# End`,
+      revision: 3,
+      provenance: [],
+      createdAt: 'now',
+      updatedAt: 'now',
+    };
+    for await (const _event of streamNoteProposal(
+      input('Update the ending', true, { note: largeNote }),
+      assistantMessage,
+      model,
+      new AbortController().signal,
+    )) {
+      // The mocked model stops before producing a proposal.
+    }
+    const task = mocks.stream.mock.calls[0]?.[0] as string;
+    expect(task).toContain('currentNoteOutline');
+    expect(task).not.toContain('secretsecretsecret');
+    expect(mocks.options.mock.calls[0]?.[0]?.tools).toHaveProperty('readNote');
+    expect(mocks.options.mock.calls[0]?.[0]?.tools).toHaveProperty('searchNote');
+  });
+
   it.each([
     [
       'Workers AI API error (429 Too Many Requests): daily free allocation exceeded',

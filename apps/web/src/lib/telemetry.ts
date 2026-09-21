@@ -5,6 +5,7 @@ type Interaction =
   | 'chat_submitted'
   | 'chat_completed'
   | 'chat_failed'
+  | 'conversation_archived'
   | 'conversation_deleted'
   | 'note_opened'
   | 'note_closed'
@@ -43,7 +44,11 @@ export function setBrowserAnalyticsEnabled(enabled: boolean) {
 }
 
 function analyticsPath(path: string): string {
-  return path.split(/[?#]/)[0].replace(/\/conversations\/[^/]+/, '/conversations/:id');
+  return path
+    .split(/[?#]/)[0]
+    .replace(/\/(?:conversations|notes)\/[^/]+/, (segment) =>
+      segment.startsWith('/notes/') ? '/notes/:id' : '/conversations/:id',
+    );
 }
 
 export function initializeTelemetry(config?: { key: string; host: string }): Promise<void> {

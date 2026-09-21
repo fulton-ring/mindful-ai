@@ -119,6 +119,39 @@ it.each(['scheduled', 'renew'] as const)(
           .mock.calls.map(([, , id]) => id)
           .sort(),
       ).toEqual(['expired-empty', 'expired-note']);
+      if (mode === 'scheduled') {
+        const archived = await loadConversation(db, 'owner', 'expired-note');
+        expect(archived.messages).toEqual([]);
+        expect(archived.noteId).toBe('note');
+        const resumed = await loadConversation(db, 'owner', 'expired-note', {
+          renewExpired: true,
+          branchId: archived.branchId,
+        });
+        expect(resumed.messages).toEqual([]);
+        expect(resumed.noteId).toBe('note');
+        expect(Date.parse(resumed.expiresAt)).toBeGreaterThan(Date.now());
+        await db
+          .prepare(
+            "INSERT INTO turns (id,request_id,conversation_id,owner_id,status,created_at,branch_id) VALUES ('resumed','resumed','expired-note','owner','completed','now',?)",
+          )
+          .bind(resumed.branchId)
+          .run();
+        await db
+          .prepare(
+            "INSERT INTO messages (id,conversation_id,turn_id,owner_id,role,content,sequence,created_at,origin_branch_id) VALUES ('resumed','expired-note','resumed','owner','user','Continue from my note',1,'now',?)",
+          )
+          .bind(resumed.branchId)
+          .run();
+        await db
+          .prepare('UPDATE conversation_branches SET head_message_id=? WHERE id=?')
+          .bind('resumed', resumed.branchId)
+          .run();
+        const reopened = await loadConversation(db, 'owner', 'expired-note');
+        expect(reopened.messages.map(({ content }) => content)).toEqual(['Continue from my note']);
+        expect(await db.prepare("SELECT markdown FROM notes WHERE id='note'").first()).toEqual({
+          markdown: 'Permanent note',
+        });
+      }
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

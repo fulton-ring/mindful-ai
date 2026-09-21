@@ -29,7 +29,8 @@ const conversationRoute = createRoute({
     branch: typeof search.branch === 'string' && search.branch ? search.branch : undefined,
   }),
 });
-const routeTree = rootRoute.addChildren([indexRoute, conversationRoute]);
+const noteRoute = createRoute({ getParentRoute: () => rootRoute, path: '/notes/$noteId' });
+const routeTree = rootRoute.addChildren([indexRoute, conversationRoute, noteRoute]);
 
 export const router = createRouter({
   routeTree,
