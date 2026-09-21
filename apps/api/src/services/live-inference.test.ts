@@ -1,11 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { expect, it } from 'vitest';
 import { createAgentService, DEFAULT_AI_MODEL } from './agent';
 
 const token = process.env.CLOUDFLARE_API_TOKEN;
 const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
 
-describe.skipIf(!token || !accountId)('Cloudflare live inference', () => {
-  it('streams a real Gemma response through Mastra', async () => {
+it.skipIf(!token || !accountId)(
+  'Cloudflare live inference: streams a real Gemma response through Mastra',
+  async () => {
     const service = createAgentService({
       AI_MODEL: DEFAULT_AI_MODEL,
       CLOUDFLARE_ACCOUNT_ID: accountId,
@@ -44,9 +45,13 @@ describe.skipIf(!token || !accountId)('Cloudflare live inference', () => {
     }
     expect(text.toLowerCase()).toContain('walden live');
     expect(finished).toBe(true);
-  }, 90_000);
+  },
+  90_000,
+);
 
-  it('manual duplicate proposal uses the current note reason despite an earlier no-note preference', async () => {
+it.skipIf(!token || !accountId)(
+  'Cloudflare live inference: manual duplicate proposal uses the current note reason despite an earlier no-note preference',
+  async () => {
     const sentence = 'The fictional observatory opens at noon.';
     const service = createAgentService({
       AI_MODEL: DEFAULT_AI_MODEL,
@@ -104,9 +109,13 @@ describe.skipIf(!token || !accountId)('Cloudflare live inference', () => {
       expect(done.reason?.toLowerCase()).toMatch(/already|duplicat|existing|covered|no new/);
       expect(done.reason?.toLowerCase()).not.toMatch(/requested.*not|no.note preference/);
     }
-  }, 90_000);
+  },
+  90_000,
+);
 
-  it('manual correction already present becomes a contextual no-op', async () => {
+it.skipIf(!token || !accountId)(
+  'Cloudflare live inference: manual correction already present becomes a contextual no-op',
+  async () => {
     const current = 'The fictional observatory opens at one. Version A.';
     const service = createAgentService({
       AI_MODEL: DEFAULT_AI_MODEL,
@@ -163,5 +172,6 @@ describe.skipIf(!token || !accountId)('Cloudflare live inference', () => {
       expect(done.proposal).toBeNull();
       expect(done.reason?.toLowerCase()).toMatch(/already|current|existing|covered|no change/);
     }
-  }, 90_000);
-});
+  },
+  90_000,
+);

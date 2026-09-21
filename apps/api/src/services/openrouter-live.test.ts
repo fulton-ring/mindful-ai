@@ -1,12 +1,13 @@
 import type { NoteProposalEvent } from '@walden/contracts';
-import { describe, expect, it } from 'vitest';
+import { expect, it } from 'vitest';
 import { createAgentService, OPENROUTER_DEFAULT_MODEL } from './agent';
 
 const key = process.env.OPENROUTER_API_KEY;
 const model = process.env.OPENROUTER_TEST_MODEL ?? OPENROUTER_DEFAULT_MODEL;
 
-describe.skipIf(!key)('OpenRouter live inference', () => {
-  it('streams a Gemma answer through Mastra', async () => {
+it.skipIf(!key)(
+  'OpenRouter live inference: streams a Gemma answer through Mastra',
+  async () => {
     const service = createAgentService({
       AI_PROVIDER: 'openrouter',
       AI_MODEL: model,
@@ -40,9 +41,13 @@ describe.skipIf(!key)('OpenRouter live inference', () => {
     let text = '';
     for await (const event of stream) if (event.type === 'text') text += event.text;
     expect(text.toLowerCase()).toContain('openrouter is connected');
-  }, 90_000);
+  },
+  90_000,
+);
 
-  it('returns a structured note suggestion for a concrete capture', async () => {
+it.skipIf(!key)(
+  'OpenRouter live inference: returns a structured note suggestion for a concrete capture',
+  async () => {
     const service = createAgentService({
       AI_PROVIDER: 'openrouter',
       AI_MODEL: model,
@@ -87,5 +92,6 @@ describe.skipIf(!key)('OpenRouter live inference', () => {
       if (event.type === 'done' || event.type === 'error') final = event;
     expect(final).toMatchObject({ type: 'done' });
     if (final?.type === 'done') expect(final.proposal?.newText).toContain('noon');
-  }, 90_000);
-});
+  },
+  90_000,
+);
