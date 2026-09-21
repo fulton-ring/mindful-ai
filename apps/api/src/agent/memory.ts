@@ -119,21 +119,20 @@ const toMemoryMessage = (
   },
 });
 
-export async function prepareAgentMemory(
-  db: D1Database,
-  ownerId: string,
+type PrepareMemoryOptions = {
+  model: LanguageModelV3;
+  signal: AbortSignal;
+  isActive?: () => Promise<boolean>;
+  onLifecycle?: (event: MemoryLifecycleEvent) => void;
+};
+
+async function syncConversationMessages(
+  storage: D1Store,
+  memory: Memory,
   conversation: Conversation,
-  options: {
-    model: LanguageModelV3;
-    signal: AbortSignal;
-    isActive?: () => Promise<boolean>;
-    onLifecycle?: (event: MemoryLifecycleEvent) => void;
-  },
-): Promise<{ memory: Memory; threadId: string; resourceId: string }> {
-  options.signal.throwIfAborted();
-  const storage = await storeFor(db);
-  const memory = createObservationalMemory(storage, options.model, options.signal);
-  const { threadId, resourceId } = identity(ownerId, conversation.id, conversation.branchId);
+  threadId: string,
+  resourceId: string,
+) {
   const recent = conversation.messages;
   const firstUser = recent.findIndex(({ role }) => role === 'user');
   const messages = (firstUser < 0 ? [] : recent.slice(firstUser)).map((message) =>
@@ -168,6 +167,61 @@ export async function prepareAgentMemory(
   const changedIds = new Set(changed.map(({ id }) => id));
   const additions = messages.filter(({ id }) => !byId.has(id) || changedIds.has(id));
   if (additions.length) await memory.saveMessages({ messages: additions });
+  return messages;
+}
+
+async function observeConversation(
+  memory: Memory,
+  engine: NonNullable<Awaited<Memory['omEngine']>>,
+  messages: MastraDBMessage[],
+  threadId: string,
+  resourceId: string,
+  lifecycle?: (event: MemoryLifecycleEvent) => void,
+) {
+  let observationEnd: { usage?: MemoryLifecycleEvent['usage']; error?: Error } | undefined;
+  const observationResult = await engine.observe({
+    threadId,
+    resourceId,
+    messages: messagesBeforeRecentTokenFloor(memory, messages),
+    hooks: lifecycle
+      ? {
+          onObservationStart: () => lifecycle({ phase: 'observation', state: 'start' }),
+          onObservationEnd: ({ usage, error }) => {
+            if (error) lifecycle({ phase: 'observation', state: 'end', usage, error });
+            else observationEnd = { usage };
+          },
+          onReflectionStart: () => lifecycle({ phase: 'reflection', state: 'start' }),
+          onReflectionEnd: ({ usage, error }) =>
+            lifecycle({ phase: 'reflection', state: 'end', usage, error }),
+        }
+      : undefined,
+  });
+  if (observationEnd)
+    lifecycle?.({
+      phase: 'observation',
+      state: 'end',
+      observed: observationResult.observed,
+      ...observationEnd,
+    });
+}
+
+export async function prepareAgentMemory(
+  db: D1Database,
+  ownerId: string,
+  conversation: Conversation,
+  options: PrepareMemoryOptions,
+): Promise<{ memory: Memory; threadId: string; resourceId: string }> {
+  options.signal.throwIfAborted();
+  const storage = await storeFor(db);
+  const memory = createObservationalMemory(storage, options.model, options.signal);
+  const { threadId, resourceId } = identity(ownerId, conversation.id, conversation.branchId);
+  const messages = await syncConversationMessages(
+    storage,
+    memory,
+    conversation,
+    threadId,
+    resourceId,
+  );
   const assertActive = async () => {
     if (options.isActive && !(await options.isActive())) {
       await memory.deleteThread(threadId);
@@ -182,33 +236,7 @@ export async function prepareAgentMemory(
   // Native observe checks its own token threshold and reflects when needed.
   // Await it over committed history; main-agent writes remain read-only.
   try {
-    const lifecycle = options.onLifecycle;
-    let observationEnd: { usage?: MemoryLifecycleEvent['usage']; error?: Error } | undefined;
-    const observationResult = await engine.observe({
-      threadId,
-      resourceId,
-      messages: messagesBeforeRecentTokenFloor(memory, messages),
-      hooks: lifecycle
-        ? {
-            onObservationStart: () => lifecycle({ phase: 'observation', state: 'start' }),
-            onObservationEnd: ({ usage, error }) => {
-              if (error) lifecycle({ phase: 'observation', state: 'end', usage, error });
-              else observationEnd = { usage };
-            },
-            onReflectionStart: () => lifecycle({ phase: 'reflection', state: 'start' }),
-            onReflectionEnd: ({ usage, error }) =>
-              lifecycle({ phase: 'reflection', state: 'end', usage, error }),
-          }
-        : undefined,
-    });
-    if (observationEnd) {
-      lifecycle?.({
-        phase: 'observation',
-        state: 'end',
-        observed: observationResult.observed,
-        ...observationEnd,
-      });
-    }
+    await observeConversation(memory, engine, messages, threadId, resourceId, options.onLifecycle);
   } catch {
     options.signal.throwIfAborted();
     throw new Error('Conversation memory update failed.');
