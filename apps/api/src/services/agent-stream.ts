@@ -17,7 +17,7 @@ import { createResearchTools, publicUrl } from './research';
 import type { AgentTurnInput, ServiceEnv } from './types';
 import { createWebSearchTools } from './web-search';
 
-type AgentModel = Parameters<typeof prepareAgentMemory>[2]['model'];
+type AgentModel = Parameters<typeof prepareAgentMemory>[3]['model'];
 
 export type TurnStreamContext = {
   controller: AbortController;
