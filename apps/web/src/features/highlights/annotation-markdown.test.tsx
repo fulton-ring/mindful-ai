@@ -78,7 +78,9 @@ describe('Markdown annotations', () => {
     expect(html).toContain('href="https://example.com"');
     expect(html).not.toContain('<mark');
   });
+});
 
+describe('Markdown annotation source mapping', () => {
   it.each([
     ['Fish &amp; chips', 5, 10, '&'],
     ['Escaped \\*text', 8, 10, '*'],
