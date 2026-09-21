@@ -42,19 +42,18 @@ function lineStarts(markdown: string): number[] {
   return starts;
 }
 
-/** Return source ranges that receive a visual Markdown treatment. */
-export function markdownSyntax(markdown: string): MarkdownSyntax[] {
+type FenceRange = { from: number; to: number };
+
+function blockSyntax(markdown: string): { syntax: MarkdownSyntax[]; fenced: FenceRange[] } {
   const syntax: MarkdownSyntax[] = [];
-  const fenced: Array<{ from: number; to: number }> = [];
+  const fenced: FenceRange[] = [];
   let openFence = -1;
   for (const from of lineStarts(markdown)) {
-    const end =
-      markdown.indexOf('\n', from) === -1 ? markdown.length : markdown.indexOf('\n', from);
-    const line = markdown.slice(from, end);
+    const lineEnd = markdown.indexOf('\n', from);
+    const line = markdown.slice(from, lineEnd === -1 ? markdown.length : lineEnd);
     const heading = /^(#{1,6})(\s+)/.exec(line);
-    if (heading) {
+    if (heading)
       syntax.push({ from, to: from + heading[0].length, kind: 'heading', replacement: '' });
-    }
     const bullet = /^(\s*)([-*+])(\s+)/.exec(line);
     if (bullet) {
       syntax.push({
@@ -65,31 +64,41 @@ export function markdownSyntax(markdown: string): MarkdownSyntax[] {
       });
     }
     const fence = /^(\s*)(```+|~~~+).*$/.exec(line);
-    if (fence) {
-      syntax.push({
-        from: from + fence[1].length,
-        to: from + line.length,
-        kind: 'fence',
-        replacement: '',
-      });
-      if (openFence < 0) openFence = from;
-      else {
-        fenced.push({ from: openFence, to: from + line.length });
-        openFence = -1;
-      }
+    if (!fence) continue;
+    syntax.push({
+      from: from + fence[1].length,
+      to: from + line.length,
+      kind: 'fence',
+      replacement: '',
+    });
+    if (openFence < 0) openFence = from;
+    else {
+      fenced.push({ from: openFence, to: from + line.length });
+      openFence = -1;
     }
   }
   if (openFence >= 0) fenced.push({ from: openFence, to: markdown.length });
+  return { syntax, fenced };
+}
+
+function inlineSyntax(markdown: string, fenced: FenceRange[]): MarkdownSyntax[] {
+  const syntax: MarkdownSyntax[] = [];
   const inline = /(`+[^`\n]+`+|\*\*[^*\n]+\*\*|__[^_\n]+__|(?<!\*)\*[^*\n]+\*(?!\*))/g;
   for (const match of markdown.matchAll(inline)) {
     const value = match[0];
     const from = match.index ?? 0;
     if (fenced.some((range) => from >= range.from && from < range.to)) continue;
-    if (value.startsWith('`')) syntax.push({ from, to: from + value.length, kind: 'code' });
-    else if (value.startsWith('**') || value.startsWith('__'))
-      syntax.push({ from, to: from + value.length, kind: 'strong' });
-    else syntax.push({ from, to: from + value.length, kind: 'emphasis' });
+    const kind = value.startsWith('`')
+      ? 'code'
+      : value.startsWith('**') || value.startsWith('__')
+        ? 'strong'
+        : 'emphasis';
+    syntax.push({ from, to: from + value.length, kind });
   }
+  return syntax;
+}
+
+function linkSyntax(markdown: string): MarkdownSyntax[] {
   const links: MarkdownSyntax[] = [];
   const cursor = markdownLanguage.parser.parse(markdown).cursor();
   do {
@@ -113,6 +122,14 @@ export function markdownSyntax(markdown: string): MarkdownSyntax[] {
       href: safeUrl.href,
     });
   } while (cursor.next());
+  return links;
+}
+
+/** Return source ranges that receive a visual Markdown treatment. */
+export function markdownSyntax(markdown: string): MarkdownSyntax[] {
+  const { syntax, fenced } = blockSyntax(markdown);
+  syntax.push(...inlineSyntax(markdown, fenced));
+  const links = linkSyntax(markdown);
   const visibleSyntax = syntax.filter(
     (item) =>
       item.kind === 'fence' ||
@@ -137,47 +154,75 @@ export const markdownPreviewTheme = EditorView.baseTheme({
   '.cm-markdown-marker': { color: 'currentColor', fontWeight: '600' },
 });
 
+function syntaxDecorations(markdown: string, item: MarkdownSyntax) {
+  if (item.kind === 'bullet') {
+    return Decoration.replace({ widget: new TextMarker(item.replacement ?? '• ') }).range(
+      item.from,
+      item.to,
+    );
+  }
+  if (item.kind === 'link') {
+    return Decoration.replace({ widget: new TextMarker(item.replacement ?? '', item.href) }).range(
+      item.from,
+      item.to,
+    );
+  }
+  const className = `cm-markdown-${item.kind}`;
+  if (item.kind === 'heading') {
+    const lineEnd = markdown.indexOf('\n', item.to);
+    const end = lineEnd === -1 ? markdown.length : lineEnd;
+    return [
+      Decoration.replace({}).range(item.from, item.to),
+      ...(item.to < end ? [Decoration.mark({ class: className }).range(item.to, end)] : []),
+    ];
+  }
+  if (item.kind === 'fence') return Decoration.replace({}).range(item.from, item.to);
+  const delimiterSize = item.kind === 'code' || item.kind === 'emphasis' ? 1 : 2;
+  const innerStart = item.from + delimiterSize;
+  const innerEnd = item.to - delimiterSize;
+  return [
+    Decoration.replace({}).range(item.from, innerStart),
+    Decoration.mark({ class: className }).range(innerStart, innerEnd),
+    Decoration.replace({}).range(innerEnd, item.to),
+  ];
+}
+
 export function markdownPreviewDecorations(markdown: string): DecorationSet {
   const decorations = markdownSyntax(markdown)
-    .map((item) => {
-      if (item.kind === 'bullet') {
-        return Decoration.replace({ widget: new TextMarker(item.replacement ?? '• ') }).range(
-          item.from,
-          item.to,
-        );
-      }
-      if (item.kind === 'link') {
-        return Decoration.replace({
-          widget: new TextMarker(item.replacement ?? '', item.href),
-        }).range(item.from, item.to);
-      }
-      const className = `cm-markdown-${item.kind}`;
-      if (item.kind === 'heading') {
-        const lineEnd = markdown.indexOf('\n', item.to);
-        return [
-          Decoration.replace({}).range(item.from, item.to),
-          ...(item.to < (lineEnd === -1 ? markdown.length : lineEnd)
-            ? [
-                Decoration.mark({ class: className }).range(
-                  item.to,
-                  lineEnd === -1 ? markdown.length : lineEnd,
-                ),
-              ]
-            : []),
-        ];
-      }
-      if (item.kind === 'fence') return Decoration.replace({}).range(item.from, item.to);
-      const delimiterSize = item.kind === 'code' || item.kind === 'emphasis' ? 1 : 2;
-      const innerStart = item.from + delimiterSize;
-      const innerEnd = item.to - delimiterSize;
-      return [
-        Decoration.replace({}).range(item.from, innerStart),
-        Decoration.mark({ class: className }).range(innerStart, innerEnd),
-        Decoration.replace({}).range(innerEnd, item.to),
-      ];
-    })
+    .map((item) => syntaxDecorations(markdown, item))
     .flat();
   return Decoration.set(decorations, true);
+}
+
+function appendRenderedSyntax(container: HTMLElement, value: string, item: MarkdownSyntax): void {
+  if (item.kind === 'link' && item.replacement !== undefined && item.href) {
+    const link = document.createElement('a');
+    link.href = item.href;
+    link.target = '_blank';
+    link.rel = 'noreferrer';
+    link.textContent = item.replacement;
+    link.addEventListener('click', (event) => {
+      if (!event.metaKey && !event.ctrlKey) event.preventDefault();
+    });
+    container.append(link);
+  } else if (item.replacement !== undefined) {
+    container.append(document.createTextNode(item.replacement));
+  } else if (item.kind !== 'fence') {
+    const delimiters =
+      item.kind === 'strong' ? 2 : item.kind === 'emphasis' || item.kind === 'code' ? 1 : 0;
+    const element = document.createElement(
+      item.kind === 'strong'
+        ? 'strong'
+        : item.kind === 'emphasis'
+          ? 'em'
+          : item.kind === 'code'
+            ? 'code'
+            : 'span',
+    );
+    element.className = `cm-markdown-${item.kind}`;
+    element.textContent = value.slice(item.from + delimiters, item.to - delimiters);
+    container.append(element);
+  }
 }
 
 /** Render the same lightweight Markdown treatment used by the editor into a safe DOM container. */
@@ -189,34 +234,7 @@ export function renderMarkdownPreview(container: HTMLElement, value: string): vo
     if (item.from < cursor) continue;
     if (item.from > cursor)
       container.append(document.createTextNode(value.slice(cursor, item.from)));
-    if (item.kind === 'link' && item.replacement !== undefined && item.href) {
-      const link = document.createElement('a');
-      link.href = item.href;
-      link.target = '_blank';
-      link.rel = 'noreferrer';
-      link.textContent = item.replacement;
-      link.addEventListener('click', (event) => {
-        if (!event.metaKey && !event.ctrlKey) event.preventDefault();
-      });
-      container.append(link);
-    } else if (item.replacement !== undefined) {
-      container.append(document.createTextNode(item.replacement));
-    } else if (item.kind !== 'fence') {
-      const delimiters =
-        item.kind === 'strong' ? 2 : item.kind === 'emphasis' || item.kind === 'code' ? 1 : 0;
-      const element = document.createElement(
-        item.kind === 'strong'
-          ? 'strong'
-          : item.kind === 'emphasis'
-            ? 'em'
-            : item.kind === 'code'
-              ? 'code'
-              : 'span',
-      );
-      element.className = `cm-markdown-${item.kind}`;
-      element.textContent = value.slice(item.from + delimiters, item.to - delimiters);
-      container.append(element);
-    }
+    appendRenderedSyntax(container, value, item);
     cursor = item.to;
   }
   if (cursor < value.length) container.append(document.createTextNode(value.slice(cursor)));
