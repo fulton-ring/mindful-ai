@@ -317,7 +317,7 @@ export async function streamChat(
       );
     }
     receivedTerminalEvent =
-      (await consumeEventStream(
+      (await consumeEventStream<ChatEvent>(
         response,
         (event) => {
           if (event.type === 'done' || event.type === 'error') receivedTerminalEvent = true;
