@@ -122,6 +122,38 @@ async function setup(linked = true) {
   return { note, proposal, decide, client, conversation, view };
 }
 
+it('searches thread content and standalone note bodies with plain timestamps', async () => {
+  const { client, note, view } = await setup();
+  const thread = {
+    id: 'thread',
+    title: 'Photosynthesis',
+    noteId: 'note',
+    updatedAt: '2026-09-20T12:00:00.000Z',
+    lastMessageAt: '2026-09-20T12:01:00.000Z',
+    expiresAt: '2999-01-01T00:00:00.000Z',
+  };
+  act(() => {
+    client.setQueryData(['conversations'], [thread]);
+    client.setQueryData(
+      ['notes'],
+      [note, { ...note, id: 'standalone', title: 'Plant diary', markdown: 'Chloroplast pigments' }],
+    );
+  });
+  const search = await view.findByRole('searchbox', { name: 'Search threads and notes' });
+  vi.mocked(api.conversations).mockResolvedValue([thread]);
+  fireEvent.change(search, { target: { value: 'chloroplast' } });
+
+  await waitFor(() => expect(api.conversations).toHaveBeenCalledWith('chloroplast'));
+  await view.findByText('Photosynthesis');
+  expect(view.getByText('Plant diary')).toBeTruthy();
+  const timestamps = view.container.querySelectorAll('time.conversation-timestamp');
+  expect(timestamps).toHaveLength(2);
+  for (const timestamp of timestamps) {
+    expect(timestamp.textContent).not.toMatch(/^(Last message|Edited):/);
+    expect(timestamp.getAttribute('title')).not.toMatch(/^(Last message|Edited):/);
+  }
+});
+
 it('removes a deleted thread and its note from the sidebar', async () => {
   const { note, client, view } = await setup();
   const thread = {

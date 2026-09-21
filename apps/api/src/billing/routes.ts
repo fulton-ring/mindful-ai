@@ -5,6 +5,7 @@ import {
   createCheckoutSession,
   createPortalSession,
   eventToEntitlement,
+  stripeEventObject,
   verifyStripeWebhook,
 } from '../services/billing';
 import type { Bindings, Variables } from '../types';
@@ -43,7 +44,7 @@ export const billingWebhookRoutes = new Hono<{ Bindings: Bindings; Variables: Va
 billingWebhookRoutes.post('/', async (c) => {
   requireBilling(c.env.BILLING_ENABLED);
   const rawBody = await c.req.text();
-  let event: Record<string, any>;
+  let event: Record<string, unknown>;
   try {
     event = await verifyStripeWebhook(
       rawBody,
@@ -64,7 +65,7 @@ billingWebhookRoutes.post('/', async (c) => {
       .run();
     return c.json({ received: true });
   }
-  const object = event.data?.object ?? {};
+  const object = stripeEventObject(event) ?? {};
   const ownerId =
     typeof object.client_reference_id === 'string'
       ? object.client_reference_id

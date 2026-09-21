@@ -141,7 +141,7 @@ export function createAgentService(
         let completed = false;
         try {
           const ownerId = input.ownerId;
-          let memory;
+          let memory: Awaited<ReturnType<typeof prepareAgentMemory>> | undefined;
           if (env.DB && ownerId) {
             const preparation = streamMemoryPreparation((onLifecycle) =>
               prepareAgentMemory(env.DB!, ownerId, input.conversation, {
@@ -228,11 +228,12 @@ export function createAgentService(
           for await (const event of annotatedStream) {
             if (event.type === 'text')
               visibleResponse = (visibleResponse + event.text).slice(0, 24_000);
-            if (event.type === 'intervention' && 'question' in event.intervention)
-              visibleResponse = (visibleResponse + '\n' + event.intervention.question).slice(
-                0,
-                24_000,
-              );
+            if (event.type === 'intervention' && event.intervention.kind === 'learning_check')
+              visibleResponse = (
+                visibleResponse +
+                '\n' +
+                event.intervention.questions.map(({ question }) => question).join('\n')
+              ).slice(0, 24_000);
             yield event;
           }
           completed = true;

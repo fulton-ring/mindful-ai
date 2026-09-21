@@ -34,8 +34,13 @@ export function ResponseActivity({
   live?: boolean;
   sources?: MessageSource[];
 }) {
-  if (!tools.length && !sources.length) return null;
-  const assigned = new Set(tools.flatMap((tool) => tool.sources ?? []).map((source) => source.url));
+  const visibleTools = tools.filter(
+    ({ name }) => name !== 'proposeAsk' && name !== 'proposeLearningCheck',
+  );
+  if (!visibleTools.length && !sources.length) return null;
+  const assigned = new Set(
+    visibleTools.flatMap((tool) => tool.sources ?? []).map((source) => source.url),
+  );
   const unassigned = sources.filter((source) => !assigned.has(source.url));
 
   // While the turn is still running this panel is the only progress the reader
@@ -46,7 +51,7 @@ export function ResponseActivity({
     <ChainOfThought className="mt-1" aria-label="Response activity" defaultOpen={live}>
       <ChainOfThoughtHeader>Activity</ChainOfThoughtHeader>
       <ChainOfThoughtContent>
-        {tools.map((tool) => (
+        {visibleTools.map((tool) => (
           <ChainOfThoughtStep
             key={tool.id}
             // A running step is the only thing on screen during a multi-second

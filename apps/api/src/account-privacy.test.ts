@@ -9,30 +9,34 @@ import { sqliteD1Binding } from './agent/d1-test-binding';
 import { contentPreference, PRIVACY_VERSION, purgeTelemetry } from './content-telemetry';
 import type { Bindings, Variables } from './types';
 
+function privacyTestApp(directory: string) {
+  const file = join(directory, 'test.sqlite');
+  const migrations = new URL('../migrations/', import.meta.url);
+  execFileSync('sqlite3', [file], {
+    input: readdirSync(migrations)
+      .filter((name) => name.endsWith('.sql'))
+      .sort()
+      .map((name) => readFileSync(new URL(name, migrations), 'utf8'))
+      .join('\n'),
+  });
+  const DB = sqliteD1Binding(file);
+  const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+  app.use('*', async (c, next) => {
+    c.set('userId', 'owner');
+    c.set('authSubject', 'subject');
+    await next();
+  });
+  app.route('/', accountRoutes);
+  return { DB, app, env: { DB } as Bindings };
+}
+
 it('enforces per-account preferences and keeps retryable deletion requests after account removal', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'walden-privacy-'));
   try {
-    const file = join(directory, 'test.sqlite');
-    const migrations = new URL('../migrations/', import.meta.url);
-    execFileSync('sqlite3', [file], {
-      input: readdirSync(migrations)
-        .filter((n) => n.endsWith('.sql'))
-        .sort()
-        .map((n) => readFileSync(new URL(n, migrations), 'utf8'))
-        .join('\n'),
-    });
-    const DB = sqliteD1Binding(file);
+    const { DB, app, env } = privacyTestApp(directory);
     await DB.prepare(
       "INSERT INTO users VALUES ('owner','subject','now','now',0),('other','other','now','now',0)",
     ).run();
-    const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
-    app.use('*', async (c, next) => {
-      c.set('userId', 'owner');
-      c.set('authSubject', 'subject');
-      await next();
-    });
-    app.route('/', accountRoutes);
-    const env = { DB } as Bindings;
     const initial = await app.request('/account/privacy', {}, env);
     expect(await initial.json()).toEqual({
       enabled: true,

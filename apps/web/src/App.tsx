@@ -1,5 +1,4 @@
-import * as Popover from '@radix-ui/react-popover';
-import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useBlocker, useNavigate, useRouterState } from '@tanstack/react-router';
 import type {
   AppConfig,
@@ -12,21 +11,9 @@ import type {
   ProvenanceSpan,
 } from '@walden/contracts';
 import { DEFAULT_PERSONAS } from '@walden/contracts';
-import { applyProposal, resolveEdit } from '@walden/domain';
+import { resolveEdit } from '@walden/domain';
+import { ChevronLeft, Download, Menu, Moon, Redo2, Settings, Sun, Undo2, X } from 'lucide-react';
 import {
-  ChevronLeft,
-  Download,
-  Ellipsis,
-  Menu,
-  Moon,
-  Redo2,
-  Settings,
-  Sun,
-  Undo2,
-  X,
-} from 'lucide-react';
-import {
-  Fragment,
   lazy,
   type ReactNode,
   Suspense,
@@ -37,17 +24,40 @@ import {
   useState,
 } from 'react';
 import { usePanelRef } from 'react-resizable-panels';
+import {
+  type CaptureAttempt,
+  captureFirstNote,
+  captureSpan,
+  captureVerbatim,
+  firstNoteState,
+} from './app/capture-note';
+import {
+  type CachedNoteDraft,
+  cacheConversationTitle,
+  cacheConversationUpdate,
+  cachedDismissedSuggestionIds,
+  isExpiredNoteConversation,
+  isLazyConversationAdoption,
+  mergeConversationAggregate,
+  type NoteMutationScope,
+  noteMutationBelongsToRoute,
+  readDismissedNotePanels,
+  readStoredPersona,
+  resolveCapturePlacement,
+  restoreCachedNoteDraft,
+  type SaveState,
+  shouldBypassLazyConversationBlock,
+  visiblePendingSuggestions,
+  waitForPendingCapture,
+  writeDismissedNotePanels,
+  writeStoredPersona,
+} from './app/workspace-helpers';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './components/ui/resizable';
 import { ChatPanel } from './features/chat/ChatPanel';
 import { DeleteThreadDialog } from './features/chat/DeleteThreadDialog';
-import {
-  filterThreads,
-  isRetainedNote,
-  sidebarGroups,
-  threadRetention,
-  threadTimestamp,
-} from './features/chat/thread-list';
-import { acceptedProposalMarkdown, additionQueue } from './features/notes/pending-projection';
+import { ThreadHistory } from './features/chat/ThreadHistory';
+import { matchesSearch, sidebarGroups } from './features/chat/thread-list';
+import { acceptedProposalMarkdown } from './features/notes/pending-projection';
 import { proposalStillApplies } from './features/notes/proposal-scope';
 import { PersonaEditor } from './features/personas/PersonaEditor';
 import { ConversationPrivacy } from './features/settings/ConversationPrivacy';
@@ -68,55 +78,8 @@ type ProposalRequest = {
 };
 const NO_PREVIEWS: ReadonlySet<string> = new Set();
 
-type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
-type CachedNoteDraft = {
-  version: 1;
-  baseRevision: number;
-  markdown: string;
-  provenance: ProvenanceSpan[];
-  dismissedSuggestionIds?: string[];
-};
 const LAST_NOTE = 'walden:last-note';
 const SIDEBAR_WIDTH = 'walden:sidebar-width';
-function personaStorageKey(identity: string) {
-  return `walden:persona:${identity}`;
-}
-function readStoredPersona(identity?: string): string {
-  if (!identity) return '';
-  try {
-    return localStorage.getItem(personaStorageKey(identity)) ?? '';
-  } catch {
-    return '';
-  }
-}
-function writeStoredPersona(identity: string | undefined, value: string) {
-  if (!identity) return;
-  try {
-    if (value) localStorage.setItem(personaStorageKey(identity), value);
-    else localStorage.removeItem(personaStorageKey(identity));
-  } catch {
-    // Private browsing and storage quotas must not block the workspace.
-  }
-}
-export function readDismissedNotePanels(identity?: string): Set<string> {
-  try {
-    const value: unknown = JSON.parse(
-      sessionStorage.getItem(`walden:closed-notes:${identity ?? ''}`) ?? '[]',
-    );
-    return new Set(
-      Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [],
-    );
-  } catch {
-    return new Set();
-  }
-}
-export function writeDismissedNotePanels(identity: string | undefined, dismissed: Set<string>) {
-  try {
-    sessionStorage.setItem(`walden:closed-notes:${identity ?? ''}`, JSON.stringify([...dismissed]));
-  } catch {
-    // Retain in-memory dismissals if browser storage is unavailable.
-  }
-}
 function threadError(error: unknown, fallback: string) {
   return error instanceof Error ? error.message.replace(/conversation/gi, 'thread') : fallback;
 }
@@ -127,205 +90,6 @@ function decodePathPart(value: string) {
     return value;
   }
 }
-export function restoreCachedNoteDraft(
-  note: Note,
-  stored: string | null,
-): { draft: Note; state: SaveState } {
-  if (!stored) return { draft: note, state: 'idle' };
-  try {
-    const cached = JSON.parse(stored) as Partial<CachedNoteDraft>;
-    if (
-      cached.version === 1 &&
-      Number.isInteger(cached.baseRevision) &&
-      typeof cached.markdown === 'string' &&
-      Array.isArray(cached.provenance)
-    ) {
-      if (
-        cached.markdown === note.markdown &&
-        JSON.stringify(cached.provenance) === JSON.stringify(note.provenance)
-      )
-        return { draft: note, state: 'idle' };
-      return {
-        draft: {
-          ...note,
-          markdown: cached.markdown,
-          provenance: cached.provenance,
-          revision: cached.baseRevision!,
-        },
-        state: cached.baseRevision === note.revision ? 'dirty' : 'conflict',
-      };
-    }
-  } catch {
-    // Plain-text caches predate revision tracking and cannot be safely rebased.
-  }
-  if (stored === note.markdown) return { draft: note, state: 'idle' };
-  return { draft: { ...note, markdown: stored }, state: 'conflict' };
-}
-export function cachedDismissedSuggestionIds(stored: string | null): string[] {
-  if (!stored) return [];
-  try {
-    const cached = JSON.parse(stored) as Partial<CachedNoteDraft>;
-    return Array.isArray(cached.dismissedSuggestionIds)
-      ? cached.dismissedSuggestionIds.filter((id): id is string => typeof id === 'string')
-      : [];
-  } catch {
-    return [];
-  }
-}
-export function isLazyConversationAdoption(activeId: string | null, adoptingId: string | null) {
-  return activeId !== null && activeId === adoptingId;
-}
-export function shouldBypassLazyConversationBlock(
-  currentPath: string,
-  nextPath: string,
-  adoptingId: string | null,
-) {
-  if (currentPath !== '/' || !nextPath.startsWith('/conversations/')) return false;
-  return isLazyConversationAdoption(
-    decodePathPart(nextPath.slice('/conversations/'.length)),
-    adoptingId,
-  );
-}
-export async function resolveCaptureConversation(
-  conversation: Conversation | null,
-  activeConversationId: string | null,
-  load: (id: string) => Promise<Conversation>,
-  ensure: () => Promise<Conversation>,
-) {
-  if (conversation) return conversation;
-  if (activeConversationId) return load(activeConversationId);
-  return ensure();
-}
-export async function waitForPendingCapture(pending: Promise<boolean> | null) {
-  return pending ? pending : true;
-}
-export type CapturePlacementResult =
-  | { kind: 'applied'; markdown: string; provenance: ProvenanceSpan[]; from: number; to: number }
-  | { kind: 'already-present' }
-  | { kind: 'conflict' }
-  | { kind: 'unavailable' };
-export async function resolveCapturePlacement(
-  getCurrent: () => Note | null,
-  flushCurrent: () => Promise<number | null | false>,
-  requestPlacement: (revision: number) => Promise<{ proposal: EditProposal | null }>,
-): Promise<CapturePlacementResult> {
-  const noteId = getCurrent()?.id;
-  if (!noteId) return { kind: 'unavailable' };
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const revision = await flushCurrent();
-    if (revision === false) return { kind: 'unavailable' };
-    const snapshot = getCurrent();
-    if (!snapshot || snapshot.id !== noteId) return { kind: 'unavailable' };
-    const { proposal } = await requestPlacement(snapshot.revision);
-    if (!proposal) return { kind: 'already-present' };
-    const latest = getCurrent();
-    if (!latest || latest.id !== noteId) return { kind: 'unavailable' };
-    try {
-      const rebased = { ...proposal, baseRevision: latest.revision };
-      const edit = resolveEdit(latest.markdown, rebased.oldText, rebased.newText);
-      const applied = applyProposal(latest, rebased);
-      return {
-        kind: 'applied',
-        ...applied,
-        from: edit.from,
-        to: edit.from + edit.insert.length,
-      };
-    } catch {
-      if (attempt === 1) return { kind: 'conflict' };
-    }
-  }
-  return { kind: 'conflict' };
-}
-export function visiblePendingSuggestions<T extends { id: string; status: string }>(
-  suggestions: readonly T[],
-  active: T | null,
-  locallyDismissed: ReadonlySet<string>,
-): T[] {
-  const pending = suggestions.filter(
-    (item) => item.status === 'pending' && !locallyDismissed.has(item.id),
-  );
-  if (
-    active &&
-    active.status === 'pending' &&
-    !locallyDismissed.has(active.id) &&
-    !pending.some((item) => item.id === active.id)
-  )
-    return [active, ...pending];
-  return pending;
-}
-
-/** An expired conversation with a note is reopened from its durable note, not its transcript. */
-export function isExpiredNoteConversation(
-  conversation: Pick<Conversation, 'noteId' | 'expiresAt'> | null,
-  now: Date = new Date(),
-) {
-  if (!conversation?.noteId) return false;
-  const expiresAt = Date.parse(conversation.expiresAt);
-  return Number.isFinite(expiresAt) && expiresAt <= now.getTime();
-}
-export function cacheConversationUpdate(
-  queryClient: QueryClient,
-  value: Conversation,
-  activeConversationId: string | null,
-  activeBranchId: string | null,
-  currentBranchId: string | null,
-): boolean {
-  const changingBranch =
-    activeConversationId === value.id &&
-    currentBranchId !== null &&
-    currentBranchId !== value.branchId;
-  if (changingBranch) return false;
-  queryClient.setQueryData(['conversation', value.id, value.branchId], value);
-  if (!activeConversationId || activeConversationId === value.id)
-    queryClient.setQueryData(['conversation', value.id, activeBranchId], value);
-  return true;
-}
-
-export function mergeConversationAggregate(
-  selected: Conversation,
-  aggregate: Conversation,
-): Conversation {
-  return {
-    ...selected,
-    title: aggregate.title,
-    noteId: aggregate.noteId,
-    learningChecksEnabled: aggregate.learningChecksEnabled,
-  };
-}
-
-export function cacheConversationTitle(
-  queryClient: QueryClient,
-  conversationId: string,
-  title: string,
-) {
-  queryClient.setQueriesData<Conversation>(
-    { queryKey: ['conversation', conversationId] },
-    (current) => (current ? { ...current, title } : current),
-  );
-  queryClient.setQueryData<ConversationSummary[]>(['conversations'], (all) =>
-    all?.map((item) => (item.id === conversationId ? { ...item, title } : item)),
-  );
-}
-
-export type NoteMutationScope = {
-  conversationId: string | null;
-  branchId: string | null;
-  noteId: string;
-};
-
-export function noteMutationBelongsToRoute(
-  scope: NoteMutationScope,
-  conversationId: string | null,
-  branchId: string | null,
-  noteId: string | null,
-): boolean {
-  return (
-    scope.conversationId === conversationId &&
-    scope.branchId === branchId &&
-    scope.noteId === noteId
-  );
-}
-
 export function App({
   config,
   authControls,
@@ -393,12 +157,7 @@ export function App({
   const deletedNoteIds = useRef(new Set<string>());
   const deletedThreadIds = useRef(new Set<string>());
   const capturePromise = useRef<Promise<boolean> | null>(null);
-  const captureAttempt = useRef<{
-    conversationId: string;
-    text: string;
-    verbatim: boolean;
-    operationId: string;
-  } | null>(null);
+  const captureAttempt = useRef<CaptureAttempt | null>(null);
   const [proposal, setProposal] = useState<EditProposal | null>(null);
   const proposalRef = useRef<EditProposal | null>(null);
   proposalRef.current = proposal;
@@ -452,26 +211,44 @@ export function App({
   const adoptingConversationId = useRef<string | null>(null);
   const conversationsQuery = useQuery({
     queryKey: ['conversations'],
-    queryFn: api.conversations,
+    queryFn: () => api.conversations(),
   });
   const notesQuery = useQuery({ queryKey: ['notes'], queryFn: api.notes });
   const [threadSearch, setThreadSearch] = useState('');
+  const [settledThreadSearch, setSettledThreadSearch] = useState('');
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSettledThreadSearch(threadSearch.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [threadSearch]);
+  const searchThreadsQuery = useQuery({
+    queryKey: ['conversations', 'search', settledThreadSearch],
+    queryFn: () => api.conversations(settledThreadSearch),
+    enabled: Boolean(settledThreadSearch),
+  });
+  const searchActive = Boolean(threadSearch.trim());
+  const searchWaiting =
+    searchActive && (threadSearch.trim() !== settledThreadSearch || searchThreadsQuery.isPending);
+  const searchFailed = searchActive && !searchWaiting && searchThreadsQuery.isError;
+  const listedThreads = searchActive
+    ? searchWaiting || searchFailed
+      ? []
+      : (searchThreadsQuery.data ?? [])
+    : (conversationsQuery.data ?? []);
   const [threadClock, setThreadClock] = useState(() => new Date());
   useEffect(() => {
     const timer = window.setInterval(() => setThreadClock(new Date()), 60_000);
     return () => window.clearInterval(timer);
   }, []);
   const visibleThreadGroups = useMemo(
-    () => sidebarGroups(filterThreads(conversationsQuery.data ?? [], threadSearch), threadClock),
-    [conversationsQuery.data, threadSearch, threadClock],
+    () => sidebarGroups(listedThreads, threadClock),
+    [listedThreads, threadClock],
   );
   const standaloneNotes = useMemo(() => {
     const linked = new Set(
       (conversationsQuery.data ?? []).flatMap((thread) => (thread.noteId ? [thread.noteId] : [])),
     );
-    const terms = threadSearch.trim().toLocaleLowerCase();
     return (notesQuery.data ?? []).filter(
-      (note) => !linked.has(note.id) && (!terms || note.title.toLocaleLowerCase().includes(terms)),
+      (note) => !linked.has(note.id) && matchesSearch(threadSearch, note.title, note.markdown),
     );
   }, [conversationsQuery.data, notesQuery.data, threadSearch]);
   const conversationQuery = useQuery({
@@ -1326,111 +1103,69 @@ export function App({
     setNotice(message);
   }
   async function performCaptureText(text: string, verbatim: boolean): Promise<boolean> {
-    const captureSpan = (from: number): ProvenanceSpan => ({
-      from,
-      to: from + text.length,
-      origin: verbatim ? 'agent' : 'user',
-      verbatim,
-      captureId: verbatim ? id('capture') : undefined,
-    });
     const current = draftRef.current;
     if (!current) {
-      let targetConversationId: string | null = null;
-      try {
-        const targetConversation = await resolveCaptureConversation(
-          conversation,
-          activeConversationId,
-          (conversationId) =>
-            queryClient.fetchQuery({
-              queryKey: ['conversation', conversationId, activeBranchId],
-              queryFn: () => api.conversation(conversationId, activeBranchId),
-              staleTime: 20_000,
-            }),
-          ensureConversation,
-        );
-        targetConversationId = targetConversation.id;
-        const previousAttempt = captureAttempt.current;
-        const operationId =
-          previousAttempt?.conversationId === targetConversation.id &&
-          previousAttempt.text === text &&
-          previousAttempt.verbatim === verbatim
-            ? previousAttempt.operationId
-            : id('capture-save');
-        captureAttempt.current = {
-          conversationId: targetConversation.id,
-          text,
-          verbatim,
-          operationId,
-        };
-        const { conversation: linked, note: saved } = await api.captureFirstNote(
-          targetConversation.id,
-          text,
-          verbatim,
-          operationId,
-        );
-        if (deletedThreadIds.current.has(targetConversation.id)) return false;
-        captureAttempt.current = null;
-        queryClient.setQueryData<NoteState>(['note-state', saved.id], {
-          note: saved,
-          suggestions: [],
-          canUndo: false,
-          canRedo: false,
-        });
-        await setConversation(mergeConversationAggregate(targetConversation, linked));
-        setDraft(saved);
-        draftRef.current = saved;
-        setSaveState('saved');
-      } catch (error) {
-        if (targetConversationId && deletedThreadIds.current.has(targetConversationId))
-          return false;
-        captureError(error instanceof Error ? error.message : 'The capture could not be saved.');
-        return false;
-      }
-      return true;
+      return captureFirstNote({
+        activeConversationId,
+        capture: api.captureFirstNote,
+        conversation,
+        deletedThreadIds: deletedThreadIds.current,
+        ensureConversation,
+        getAttempt: () => captureAttempt.current,
+        loadConversation: (conversationId) =>
+          queryClient.fetchQuery({
+            queryKey: ['conversation', conversationId, activeBranchId],
+            queryFn: () => api.conversation(conversationId, activeBranchId),
+            staleTime: 20_000,
+          }),
+        newOperationId: () => id('capture-save'),
+        onError: captureError,
+        onSaved: async (target, linked, saved) => {
+          queryClient.setQueryData<NoteState>(['note-state', saved.id], firstNoteState(saved));
+          await setConversation(mergeConversationAggregate(target, linked));
+          setDraft(saved);
+          draftRef.current = saved;
+          setSaveState('saved');
+        },
+        setAttempt: (attempt) => {
+          captureAttempt.current = attempt;
+        },
+        text,
+        verbatim,
+      });
     }
     if (verbatim) {
       const targetConversationId = conversation?.id ?? activeConversationId;
       if (!targetConversationId) return false;
-      const requestedNoteId = current.id;
-      try {
-        const result = await resolveCapturePlacement(
-          draftRef.current ? () => draftRef.current : () => null,
-          flushNoteDraft,
-          (revision) => api.capturePlacement(targetConversationId, text, revision),
-        );
-        if (
-          deletedNoteIds.current.has(requestedNoteId) ||
-          deletedThreadIds.current.has(targetConversationId) ||
-          (activeConversationId && activeConversationId !== targetConversationId)
-        )
-          return false;
-        if (result.kind === 'already-present') {
-          setNotice('Already in note.');
-          return true;
-        }
-        if (result.kind === 'conflict') {
-          captureError('Your writing changed this location. Retry to find a new place.');
-          return false;
-        }
-        if (result.kind !== 'applied') return false;
-        updateDraft(result.markdown, result.provenance, false);
-        setCaptureRevealRange((previous) => ({
-          from: result.from,
-          to: result.to,
-          key: (previous?.key ?? 0) + 1,
-        }));
-        return true;
-      } catch (error) {
-        if (deletedNoteIds.current.has(requestedNoteId)) return false;
-        captureError(error instanceof Error ? error.message : 'The capture could not be placed.');
-        return false;
-      }
+      return captureVerbatim({
+        deletedNoteIds: deletedNoteIds.current,
+        deletedThreadIds: deletedThreadIds.current,
+        isCurrent: () => !activeConversationId || activeConversationId === targetConversationId,
+        note: current,
+        onAlreadyPresent: () => setNotice('Already in note.'),
+        onApplied: (result) => {
+          updateDraft(result.markdown, result.provenance, false);
+          setCaptureRevealRange((previous) => ({
+            from: result.from,
+            to: result.to,
+            key: (previous?.key ?? 0) + 1,
+          }));
+        },
+        onError: captureError,
+        resolve: () =>
+          resolveCapturePlacement(
+            draftRef.current ? () => draftRef.current : () => null,
+            flushNoteDraft,
+            (revision) => api.capturePlacement(targetConversationId, text, revision),
+          ),
+        targetConversationId,
+      });
     }
     const separator = current.markdown.trim() ? '\n\n' : '';
     const from = current.markdown.length + separator.length;
     updateDraft(
       `${current.markdown}${separator}${text}`,
-      [...current.provenance, captureSpan(from)],
+      [...current.provenance, captureSpan(text, verbatim, from, id('capture'))],
       !verbatim,
     );
     return true;
@@ -1655,231 +1390,69 @@ export function App({
                 New thread
               </button>
             </div>
-            {(conversationsQuery.data?.length ?? 0) > 6 && (
-              <input
-                type="search"
-                className="thread-search"
-                placeholder="Search threads"
-                aria-label="Search threads"
-                value={threadSearch}
-                onChange={(event) => setThreadSearch(event.target.value)}
-              />
-            )}
-            {conversationsQuery.isPending && (
-              <p role="status" className="px-2 py-2 text-sm text-muted-foreground">
-                Loading threads…
-              </p>
-            )}
-            {conversationsQuery.isError && (
-              <div role="alert" className="px-2 py-2 text-sm">
-                <p>Couldn’t load threads.</p>
-                <button
-                  type="button"
-                  className="text-button mt-1"
-                  disabled={conversationsQuery.isFetching}
-                  onClick={() => void conversationsQuery.refetch()}
-                >
-                  {conversationsQuery.isFetching ? 'Retrying…' : 'Retry'}
-                </button>
-              </div>
-            )}
-            {visibleThreadGroups.length === 0 &&
-              standaloneNotes.length === 0 &&
-              !conversationsQuery.isPending &&
-              !conversationsQuery.isError && (
-                <p className="thread-empty">
-                  {threadSearch.trim() ? 'No threads match that search.' : 'No threads yet.'}
-                </p>
-              )}
-            {visibleThreadGroups.map((group) => (
-              <Fragment key={group.label}>
-                <h2
-                  className={
-                    group.label === 'Notes'
-                      ? 'sidebar-section-heading notes-section-heading'
-                      : 'thread-group'
-                  }
-                >
-                  {group.label}
-                </h2>
-                {group.threads.map((item) => {
-                  const retainedNote = isRetainedNote(item, threadClock);
-                  const timestamp = threadTimestamp(
-                    retainedNote
-                      ? {
-                          ...item,
-                          lastMessageAt: null,
-                          updatedAt: item.noteUpdatedAt ?? item.updatedAt,
-                        }
-                      : item,
-                  );
-                  if (timestamp && retainedNote) timestamp.label = 'Edited';
-                  const retention = retainedNote ? null : threadRetention(item, threadClock);
-                  return (
-                    <div
-                      className={`conversation-row ${item.id === activeConversationId ? 'active' : ''}`}
-                      key={item.id}
-                    >
-                      <button
-                        className="conversation-link"
-                        aria-label={`Open ${retainedNote ? 'note' : 'thread'}: ${item.title}`}
-                        aria-describedby={retention ? `thread-retention-${item.id}` : undefined}
-                        onClick={async () => {
-                          if ((await flush(true)) === false) return;
-                          setRetainedNoteChatStarted(false);
-                          await queryClient.invalidateQueries({
-                            queryKey: ['conversation', item.id],
-                            exact: true,
-                          });
-                          setSidebar(false);
-                          void navigate({
-                            to: '/conversations/$conversationId',
-                            params: { conversationId: item.id },
-                            search: { branch: undefined },
-                          });
-                          setMobilePane(retainedNote ? 'note' : 'chat');
-                        }}
-                      >
-                        <span className="conversation-title">
-                          {item.title || 'Untitled thread'}
-                        </span>
-                        {timestamp && (
-                          <time
-                            className="conversation-timestamp"
-                            dateTime={timestamp.value}
-                            title={`${timestamp.label}: ${timestamp.full}`}
-                          >
-                            {timestamp.label}: {timestamp.text}
-                          </time>
-                        )}
-                        {retention && (
-                          <span
-                            className="conversation-retention"
-                            id={`thread-retention-${item.id}`}
-                            title={`After seven days without a message from you, ${item.noteId ? 'message history is permanently cleared; your note is kept' : 'this thread is permanently deleted'}. Expiry: ${new Date(item.expiresAt).toLocaleString()}.`}
-                          >
-                            {retention}
-                          </span>
-                        )}
-                      </button>
-                      <Popover.Root
-                        open={threadOptionsId === item.id}
-                        onOpenChange={(open) => setThreadOptionsId(open ? item.id : null)}
-                      >
-                        <Popover.Trigger asChild>
-                          <button
-                            className="icon-button"
-                            aria-label={`Thread options: ${item.title}`}
-                            disabled={deleteConversation.isPending}
-                          >
-                            <Ellipsis />
-                          </button>
-                        </Popover.Trigger>
-                        <Popover.Portal>
-                          <Popover.Content
-                            className="thread-options-menu"
-                            side="right"
-                            align="start"
-                          >
-                            {item.noteId && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  deleteConversation.reset();
-                                  setThreadOptionsId(null);
-                                  setThreadToDelete({ thread: item, mode: 'archive' });
-                                }}
-                              >
-                                Archive thread
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              className="danger"
-                              onClick={() => {
-                                deleteConversation.reset();
-                                setThreadOptionsId(null);
-                                setThreadToDelete({ thread: item, mode: 'delete' });
-                              }}
-                            >
-                              {item.noteId ? 'Delete everything' : 'Delete thread'}
-                            </button>
-                          </Popover.Content>
-                        </Popover.Portal>
-                      </Popover.Root>
-                    </div>
-                  );
-                })}
-              </Fragment>
-            ))}
-            {standaloneNotes.length > 0 && (
-              <>
-                {!visibleThreadGroups.some((group) => group.label === 'Notes') && (
-                  <h2 className="sidebar-section-heading notes-section-heading">Notes</h2>
-                )}
-                {standaloneNotes.map((note) => (
-                  <div
-                    className={`conversation-row ${note.id === activeNoteId ? 'active' : ''}`}
-                    key={note.id}
-                  >
-                    <button
-                      className="conversation-link"
-                      aria-label={`Open note: ${note.title}`}
-                      onClick={async () => {
-                        if ((await flush(true)) === false) return;
-                        setSidebar(false);
-                        void navigate({ to: '/notes/$noteId', params: { noteId: note.id } });
-                        setMobilePane('note');
-                      }}
-                    >
-                      <span className="conversation-title">{note.title || 'Untitled note'}</span>
-                      <time
-                        className="conversation-timestamp"
-                        dateTime={note.updatedAt}
-                        title={`Edited: ${new Date(note.updatedAt).toLocaleString()}`}
-                      >
-                        Edited:{' '}
-                        {new Date(note.updatedAt).toLocaleString(undefined, {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: 'numeric',
-                          minute: '2-digit',
-                        })}
-                      </time>
-                    </button>
-                    <Popover.Root
-                      open={threadOptionsId === `note:${note.id}`}
-                      onOpenChange={(open) => setThreadOptionsId(open ? `note:${note.id}` : null)}
-                    >
-                      <Popover.Trigger asChild>
-                        <button
-                          className="icon-button"
-                          aria-label={`Note options: ${note.title}`}
-                          disabled={deleteNote.isPending}
-                        >
-                          <Ellipsis />
-                        </button>
-                      </Popover.Trigger>
-                      <Popover.Portal>
-                        <Popover.Content className="thread-options-menu" side="right" align="start">
-                          <button
-                            type="button"
-                            className="danger"
-                            onClick={() => {
-                              deleteNote.reset();
-                              setThreadOptionsId(null);
-                              setNoteToDelete(note);
-                            }}
-                          >
-                            Delete everything
-                          </button>
-                        </Popover.Content>
-                      </Popover.Portal>
-                    </Popover.Root>
-                  </div>
-                ))}
-              </>
-            )}
+            <ThreadHistory
+              hasThreadOrNote={
+                (conversationsQuery.data?.length ?? 0) > 0 || (notesQuery.data?.length ?? 0) > 0
+              }
+              loading={conversationsQuery.isPending}
+              loadError={conversationsQuery.isError}
+              search={threadSearch}
+              searchActive={searchActive}
+              searchWaiting={searchWaiting}
+              searchFailed={searchFailed}
+              groups={visibleThreadGroups}
+              notes={standaloneNotes}
+              activeConversationId={activeConversationId}
+              activeNoteId={activeNoteId}
+              now={threadClock}
+              threadOptionsId={threadOptionsId}
+              deletingThread={deleteConversation.isPending}
+              deletingNote={deleteNote.isPending}
+              onSearchChange={setThreadSearch}
+              onRetryLoad={() => void conversationsQuery.refetch()}
+              onRetrySearch={() => void searchThreadsQuery.refetch()}
+              onThreadOptionsChange={setThreadOptionsId}
+              onOpenThread={(thread, retainedNote) => {
+                void (async () => {
+                  if ((await flush(true)) === false) return;
+                  setRetainedNoteChatStarted(false);
+                  await queryClient.invalidateQueries({
+                    queryKey: ['conversation', thread.id],
+                    exact: true,
+                  });
+                  setSidebar(false);
+                  void navigate({
+                    to: '/conversations/$conversationId',
+                    params: { conversationId: thread.id },
+                    search: { branch: undefined },
+                  });
+                  setMobilePane(retainedNote ? 'note' : 'chat');
+                })();
+              }}
+              onArchiveThread={(thread) => {
+                deleteConversation.reset();
+                setThreadOptionsId(null);
+                setThreadToDelete({ thread, mode: 'archive' });
+              }}
+              onDeleteThread={(thread) => {
+                deleteConversation.reset();
+                setThreadOptionsId(null);
+                setThreadToDelete({ thread, mode: 'delete' });
+              }}
+              onOpenNote={(note) => {
+                void (async () => {
+                  if ((await flush(true)) === false) return;
+                  setSidebar(false);
+                  void navigate({ to: '/notes/$noteId', params: { noteId: note.id } });
+                  setMobilePane('note');
+                })();
+              }}
+              onDeleteNote={(note) => {
+                deleteNote.reset();
+                setThreadOptionsId(null);
+                setNoteToDelete(note);
+              }}
+            />
           </section>
           <footer>
             <button onClick={() => setSettingsOpen(true)}>

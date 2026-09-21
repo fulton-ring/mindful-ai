@@ -28,7 +28,9 @@ export const markdownBlocks = (markdown: string): MarkdownBlock[] => {
 const occurrenceCount = (value: string, needle: string) => {
   let count = 0;
   let offset = 0;
-  while ((offset = value.indexOf(needle, offset)) >= 0) {
+  while (true) {
+    offset = value.indexOf(needle, offset);
+    if (offset < 0) break;
     count += 1;
     offset += Math.max(1, needle.length);
   }

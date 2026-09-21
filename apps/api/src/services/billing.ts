@@ -106,8 +106,17 @@ export async function verifyStripeWebhook(
   return JSON.parse(rawBody) as Record<string, unknown>;
 }
 
-export function eventToEntitlement(event: Record<string, any>): EntitlementUpdate | undefined {
-  const object = event.data?.object;
+export function stripeEventObject(event: Record<string, unknown>): Record<string, unknown> | null {
+  const data = event.data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  const object = (data as Record<string, unknown>).object;
+  return object && typeof object === 'object' && !Array.isArray(object)
+    ? (object as Record<string, unknown>)
+    : null;
+}
+
+export function eventToEntitlement(event: Record<string, unknown>): EntitlementUpdate | undefined {
+  const object = stripeEventObject(event);
   if (!object || typeof event.id !== 'string') return undefined;
   if (event.type === 'checkout.session.completed')
     return {
@@ -127,9 +136,10 @@ export function eventToEntitlement(event: Record<string, any>): EntitlementUpdat
       subscriptionId: String(object.id),
       plan: object.status === 'active' || object.status === 'trialing' ? 'personal' : 'free',
       active: object.status === 'active' || object.status === 'trialing',
-      periodEnd: object.current_period_end
-        ? new Date(object.current_period_end * 1000).toISOString()
-        : undefined,
+      periodEnd:
+        typeof object.current_period_end === 'number' && object.current_period_end > 0
+          ? new Date(object.current_period_end * 1000).toISOString()
+          : undefined,
     };
   return undefined;
 }

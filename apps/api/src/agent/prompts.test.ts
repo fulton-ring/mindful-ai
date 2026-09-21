@@ -14,7 +14,8 @@ describe('agent proposal language', () => {
       'The note editor handles the edit and its accept/reject controls separately.',
     );
     expect(CORE_INSTRUCTIONS).toContain('Never claim that an edit was saved or applied');
-    expect(CORE_INSTRUCTIONS).toContain('at most one ask or learning-check intervention');
+    expect(CORE_INSTRUCTIONS).toContain('one to three short questions');
+    expect(CORE_INSTRUCTIONS).toContain('at most one ask or learning-check request');
     expect(CORE_INSTRUCTIONS).not.toContain('proposeRecord');
     expect(CORE_INSTRUCTIONS).not.toContain('proposeGhost');
   });
@@ -77,10 +78,10 @@ describe('agent proposal language', () => {
     expect(studyPartner).toBeDefined();
     expect(studyPartner?.prompt.length).toBeLessThan(450);
     expect(studyPartner?.prompt).not.toMatch(/tool|proposeLearningCheck|card/iu);
-    expect(studyPartner?.prompt).toContain('active recall');
-    expect(studyPartner?.prompt).toContain('Do not reveal the answer before I respond');
-    expect(studyPartner?.prompt).toContain('Do not ask whether I want a quiz');
-    expect(CORE_INSTRUCTIONS).not.toContain('proposeLearningCheck');
+    expect(studyPartner?.prompt).toBe(
+      'Be my study partner using active recall. Regularly quiz me when appropriate. Do not reveal the answer before I respond. Offer hints, explain what I got right or missed, adapt the difficulty, and revisit mistakes. Respect requests for a direct answer or to stop quizzing. When checks are off, teach without quizzing.',
+    );
+    expect(CORE_INSTRUCTIONS).toContain('proposeLearningCheck');
   });
 
   it('frames user-authored persona guidance as data that cannot override the rules', () => {

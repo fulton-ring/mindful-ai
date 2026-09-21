@@ -2,9 +2,23 @@ import { describe, expect, it } from 'vitest';
 import { recoveredFrontendIntervention } from './index';
 
 const call = {
-  name: 'proposeLearningCheck',
-  input: { question: 'What does anodizing thicken?' },
-} as const;
+  name: 'proposeLearningCheck' as const,
+  input: {
+    questions: [
+      {
+        id: 'anodizing_layer',
+        header: 'Anodizing',
+        question: 'What does anodizing thicken?',
+      },
+      {
+        id: 'surface_result',
+        header: 'Result',
+        question: 'Which surface changes?',
+        options: ['The oxide layer', 'The metal core'],
+      },
+    ],
+  },
+};
 
 // Whether a check is warranted is a judgement the model makes from the prompt;
 // there is deliberately no heuristic here trying to guess it from the user's
@@ -18,7 +32,10 @@ describe('the learning-check off switch', () => {
   it('passes the check through while checks are on', () => {
     expect(recoveredFrontendIntervention(call, 'turn', true)).toMatchObject({
       kind: 'learning_check',
-      question: call.input.question,
+      questions: [
+        { id: 'anodizing_layer', format: 'short_answer' },
+        { id: 'surface_result', format: 'multiple_choice' },
+      ],
     });
   });
 

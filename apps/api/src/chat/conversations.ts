@@ -184,6 +184,8 @@ export async function loadConversation(
       tools?: ToolActivity[];
       sources?: MessageSource[];
       contextCompacted?: boolean;
+      learningCheck?: Message['learningCheck'];
+      learningCheckResponse?: Message['learningCheckResponse'];
     }>(message.activity_json, {});
     return {
       id: message.id,
@@ -205,6 +207,10 @@ export async function loadConversation(
       ...(activity.tools?.length ? { tools: activity.tools } : {}),
       ...(activity.sources?.length ? { sources: activity.sources } : {}),
       ...(activity.contextCompacted ? { contextCompacted: true } : {}),
+      ...(activity.learningCheck ? { learningCheck: activity.learningCheck } : {}),
+      ...(activity.learningCheckResponse
+        ? { learningCheckResponse: activity.learningCheckResponse }
+        : {}),
       incomplete: Boolean(message.incomplete),
     };
   });
@@ -331,6 +337,24 @@ conversationRoutes.post('/notes/:id/conversations', async (c) => {
   return c.json(await createConversation(c.env.DB, ownerId, note.id, body), 201);
 });
 conversationRoutes.get('/conversations', async (c) => {
+  const query = c.req.query('q')?.trim() ?? '';
+  if (query.length > 200) throw new HttpError(400, 'Search is too long');
+  const terms = query.match(/[\p{L}\p{N}]+/gu) ?? [];
+  if (terms.length > 8) throw new HttpError(400, 'Use fewer search terms');
+  const searchConditions = terms
+    .map(
+      () => `AND (
+        instr(lower(c.title),lower(?))>0
+        OR instr(lower(COALESCE(n.title,'')),lower(?))>0
+        OR instr(lower(COALESCE(n.markdown,'')),lower(?))>0
+        OR EXISTS (
+          SELECT 1 FROM messages searched
+          WHERE searched.conversation_id=c.id AND searched.owner_id=c.owner_id
+            AND instr(lower(searched.content),lower(?))>0
+        )
+      )`,
+    )
+    .join('\n');
   const rows = await all<{
     id: string;
     note_id: string | null;
@@ -349,8 +373,9 @@ conversationRoutes.get('/conversations', async (c) => {
          FROM conversations c
          LEFT JOIN notes n ON n.id=c.note_id AND n.owner_id=c.owner_id
          WHERE c.owner_id=? AND ((c.status='active' AND c.expires_at>?) OR c.note_id IS NOT NULL)
+         ${searchConditions}
          ORDER BY c.last_user_activity_at DESC`,
-    ).bind(c.get('userId'), nowIso()),
+    ).bind(c.get('userId'), nowIso(), ...terms.flatMap((term) => [term, term, term, term])),
   );
   return c.json(
     rows.map((row) => ({

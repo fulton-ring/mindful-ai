@@ -109,7 +109,7 @@ describe('GemmaToolLeakDecoder', () => {
     expect(result.calls).toEqual([]);
   });
 
-  it('recovers learning checks with optional choices', () => {
+  it('recovers a multiple-choice learning check with required choices', () => {
     const decoder = new GemmaToolLeakDecoder();
     const result = decoder.push(
       'proposeLearningCheck{question:<|"|>What shared driver affects both measures?<|"|>,options:[<|"|>Demand<|"|>,<|"|>Timing<|"|>]}',
@@ -129,7 +129,30 @@ describe('GemmaToolLeakDecoder', () => {
     expect(recoveredFrontendIntervention(call, 'turn', false)).toBeNull();
     expect(recoveredFrontendIntervention(call, 'turn', true)).toMatchObject({
       kind: 'learning_check',
-      question: call.input.question,
+      questions: [
+        {
+          format: 'multiple_choice',
+          question: 'What shared driver affects both measures?',
+        },
+      ],
     });
+  });
+
+  it('recovers a short-answer check and rejects invalid choice counts', () => {
+    const decoder = new GemmaToolLeakDecoder();
+    expect(
+      decoder.push('proposeLearningCheck{question:<|"|>Where is the stroma?<|"|>}').calls,
+    ).toEqual([
+      {
+        name: 'proposeLearningCheck',
+        input: { question: 'Where is the stroma?' },
+      },
+    ]);
+    for (const input of [
+      'question:<|"|>Where?<|"|>,options:[<|"|>A<|"|>]',
+      'question:<|"|>Where?<|"|>,options:[]',
+    ]) {
+      expect(new GemmaToolLeakDecoder().push(`proposeLearningCheck{${input}}`).calls).toEqual([]);
+    }
   });
 });

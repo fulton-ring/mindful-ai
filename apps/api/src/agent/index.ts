@@ -76,23 +76,67 @@ const askInputSchema = z.object({
   question: z.string().min(1).max(400),
   options: z.array(z.string().min(1).max(240)).min(2).max(4),
 });
-const learningCheckInputSchema = z.object({
-  question: z
-    .string()
-    .min(1)
-    .max(500)
-    .describe(
-      'One concrete recall or understanding question. Ask about the material itself, never which topic the user wants to be tested on.',
+const learningCheckQuestionSchema = z
+  .string()
+  .min(1)
+  .max(500)
+  .describe('One concrete recall or understanding question about the material itself.');
+const singleLearningCheckInputSchema = z.union([
+  z
+    .object({
+      question: learningCheckQuestionSchema,
+      options: z.array(z.string().min(1).max(240)).min(2).max(4),
+    })
+    .strict(),
+  z.object({ question: learningCheckQuestionSchema }).strict(),
+]);
+const learningCheckPromptSchema = z.union([
+  z
+    .object({
+      id: z.string().min(1).max(100).optional(),
+      header: z.string().min(1).max(40).optional(),
+      question: learningCheckQuestionSchema,
+      options: z.array(z.string().min(1).max(240)).min(2).max(4),
+    })
+    .strict(),
+  z
+    .object({
+      id: z.string().min(1).max(100).optional(),
+      header: z.string().min(1).max(40).optional(),
+      question: learningCheckQuestionSchema,
+    })
+    .strict(),
+]);
+const learningCheckInputSchema = z
+  .object({ questions: z.array(learningCheckPromptSchema).min(1).max(3) })
+  .strict();
+
+function learningCheckIntervention(
+  input: z.infer<typeof learningCheckInputSchema> | z.infer<typeof singleLearningCheckInputSchema>,
+  turnId: string,
+): Intervention {
+  const inputs =
+    'questions' in input ? input.questions : [{ id: 'question', header: 'Question', ...input }];
+  return {
+    id: stableId('check', turnId, ...inputs.map(({ question }) => question)),
+    kind: 'learning_check',
+    questions: inputs.map((question, index) =>
+      'options' in question
+        ? {
+            ...question,
+            id: question.id ?? `question_${index + 1}`,
+            header: question.header ?? `Question ${index + 1}`,
+            format: 'multiple_choice' as const,
+          }
+        : {
+            ...question,
+            id: question.id ?? `question_${index + 1}`,
+            header: question.header ?? `Question ${index + 1}`,
+            format: 'short_answer' as const,
+          },
     ),
-  options: z
-    .array(z.string().min(1).max(240))
-    .min(2)
-    .max(4)
-    .optional()
-    .describe(
-      'Optional possible answers to the question, including distractors. These are answers, not topics or questions to choose from. Omit for free-response questions.',
-    ),
-});
+  };
+}
 type NoteProposalCandidate = z.infer<typeof noteProposalOutputSchema>;
 type NoteProposalPolicy = {
   explicitCapture?: boolean;
@@ -156,7 +200,12 @@ export type AgentTraceContext = {
 
 type RecoveredFrontendToolCall =
   | { name: 'proposeAsk'; input: z.infer<typeof askInputSchema> }
-  | { name: 'proposeLearningCheck'; input: z.infer<typeof learningCheckInputSchema> };
+  | {
+      name: 'proposeLearningCheck';
+      input:
+        | z.infer<typeof learningCheckInputSchema>
+        | z.infer<typeof singleLearningCheckInputSchema>;
+    };
 
 const GEMMA_TOOL_MARKERS = ['proposeAsk{', 'proposeLearningCheck{'] as const;
 const SENTINEL_QUOTE = '<|"|>';
@@ -194,14 +243,16 @@ function parseGemmaToolLeak(value: string): RecoveredFrontendToolCall | null {
     const json = value
       .slice(name.length)
       .replaceAll(SENTINEL_QUOTE, '"')
-      .replace(/([{,]\s*)(question|options)\s*:/gu, '$1"$2":');
+      .replace(/([{,]\s*)(id|header|question|questions|options)\s*:/gu, '$1"$2":');
     const parsed = JSON.parse(json) as unknown;
     if (name === 'proposeAsk') {
       const input = askInputSchema.safeParse(parsed);
       return input.success ? { name, input: input.data } : null;
     }
-    const input = learningCheckInputSchema.safeParse(parsed);
-    return input.success ? { name, input: input.data } : null;
+    const batch = learningCheckInputSchema.safeParse(parsed);
+    if (batch.success) return { name, input: batch.data };
+    const single = singleLearningCheckInputSchema.safeParse(parsed);
+    return single.success ? { name, input: single.data } : null;
   } catch {
     return null;
   }
@@ -269,11 +320,7 @@ export function recoveredFrontendIntervention(
       ...call.input,
     };
   if (!learningChecksEnabled) return null;
-  return {
-    id: stableId('check', turnId, call.input.question),
-    kind: 'learning_check',
-    ...call.input,
-  };
+  return learningCheckIntervention(call.input, turnId);
 }
 
 /** Recover only a complete quiz-shaped reply; this does not decide when to quiz. */
@@ -283,19 +330,31 @@ function standaloneLearningCheck(text: string, turnId: string): Intervention | n
     .split(/\r?\n/u)
     .map((line) => line.trim())
     .filter(Boolean);
-  if (lines.length < 3 || lines.length > 5 || !lines[0]?.endsWith('?')) return null;
-  const options = lines.slice(1).map((line, index) => {
-    const match = /^([A-D])[).]\s+(.+)$/u.exec(line);
-    return match?.[1] === String.fromCharCode(65 + index) ? match[2] : null;
-  });
-  if (options.some((option) => !option)) return null;
-  const parsed = learningCheckInputSchema.safeParse({ question: lines[0], options });
-  if (!parsed.success) return null;
-  return {
-    id: stableId('check', turnId, parsed.data.question),
-    kind: 'learning_check',
-    ...parsed.data,
-  };
+  for (let count = 4; count >= 2; count -= 1) {
+    const questionIndex = lines.length - count - 1;
+    if (questionIndex < 0 || questionIndex > 1 || !lines[questionIndex]?.endsWith('?')) continue;
+    const options = lines.slice(questionIndex + 1).map((line, index) => {
+      const match = /^([A-D1-4])[).]\s+(.+)$/u.exec(line);
+      return match?.[1] === String.fromCharCode(65 + index) || match?.[1] === String(index + 1)
+        ? match[2]
+        : null;
+    });
+    if (options.some((option) => !option)) continue;
+    const parsed = singleLearningCheckInputSchema.safeParse({
+      question: lines[questionIndex],
+      options,
+    });
+    if (!parsed.success) continue;
+    return learningCheckIntervention(parsed.data, turnId);
+  }
+  return null;
+}
+
+function standaloneShortAnswerCheck(text: string, turnId: string): Intervention | null {
+  const question = text.trim();
+  if (question.includes('\n') || !question.endsWith('?')) return null;
+  const parsed = singleLearningCheckInputSchema.safeParse({ question });
+  return parsed.success ? learningCheckIntervention(parsed.data, turnId) : null;
 }
 
 export function visibleStreamEvent(chunk: {
@@ -1238,7 +1297,7 @@ export async function* streamMastraTurn(
   const proposals = new TurnProposals();
   const pendingContext =
     input.pendingIntervention?.kind === 'learning_check'
-      ? `Pending learning check: ${input.pendingIntervention.question}\nThe current user message answers this check. Give specific feedback on what was right, what needs correction, and one useful next step. Do not issue another check in this turn.`
+      ? `Pending learning check:\n${input.pendingIntervention.questions.map(({ id, question }) => `${id}: ${question}`).join('\n')}\nThe current user message contains the user's structured answers to this check. Give specific feedback on what was right, what needs correction, and one useful next step. Do not issue another check in this turn.`
       : input.pendingIntervention
         ? `Pending intervention kind: ${input.pendingIntervention.kind}.`
         : 'Pending intervention: none.';
@@ -1269,15 +1328,11 @@ export async function* streamMastraTurn(
     proposeLearningCheck: createTool({
       id: 'propose_learning_check',
       description:
-        'Show one skippable learning-check card when checks are enabled and you choose to quiz. Put the question and possible answers here, not in assistant text. Do not reveal the answer before the user responds.',
+        'Use this whenever you decide to quiz. Request one to three short questions. Include 2–4 options for multiple choice; omit options for short answer. A short id and header help label each answer, but may be omitted. The client collects the answers in one focused UI. Put questions here, never in assistant text. Do not reveal answers before the user responds.',
       inputSchema: learningCheckInputSchema,
       execute: async (context) =>
         input.conversation.learningChecksEnabled
-          ? proposals.propose({
-              id: stableId('check', input.turnId, context.question),
-              kind: 'learning_check',
-              ...context,
-            })
+          ? proposals.propose(learningCheckIntervention(context, input.turnId))
           : { accepted: false, reason: 'The user has turned learning checks off for this thread.' },
     }),
   };
@@ -1410,6 +1465,7 @@ export async function* streamMastraTurn(
     yield { type: 'source', source } as const;
   };
   const leakedTools = new GemmaToolLeakDecoder();
+  let quizToolCalled = false;
   const acceptRecoveredCall = (call: RecoveredFrontendToolCall) => {
     const intervention = recoveredFrontendIntervention(
       call,
@@ -1426,7 +1482,9 @@ export async function* streamMastraTurn(
       lengthLimited = true;
     if (chunk.type === 'tool-call') {
       const name = chunk.payload.toolName;
-      if (activityTools.size < 20) {
+      if (name === 'proposeLearningCheck') quizToolCalled = true;
+      const frontendTool = name === 'proposeAsk' || name === 'proposeLearningCheck';
+      if (!frontendTool && activityTools.size < 20) {
         const args = chunk.payload.args;
         const query =
           (name === 'searchWeb' || name === 'searchSources') &&
@@ -1452,14 +1510,21 @@ export async function* streamMastraTurn(
     }
     if (chunk.type === 'tool-result') {
       const { toolCallId, toolName, result, isError } = chunk.payload;
+      if (toolName === 'proposeAsk' || toolName === 'proposeLearningCheck') continue;
+      const toolFailed =
+        isError ||
+        (typeof result === 'object' &&
+          result !== null &&
+          'error' in result &&
+          result.error === true);
       const prior = activityTools.get(toolCallId);
       const tool: ToolActivity = {
         ...(prior?.query ? { query: prior.query } : {}),
         id: toolCallId.slice(0, 200),
         name: safeToolName(toolName),
-        state: isError ? ('error' as const) : ('complete' as const),
+        state: toolFailed ? ('error' as const) : ('complete' as const),
         summary:
-          !isError &&
+          !toolFailed &&
           toolName === 'readWebPage' &&
           result &&
           typeof result === 'object' &&
@@ -1469,10 +1534,10 @@ export async function* streamMastraTurn(
           'status' in result.indexing &&
           result.indexing.status === 'failed'
             ? 'Read, but not saved to search'
-            : toolSummary(toolName, isError ? 'error' : 'complete'),
+            : toolSummary(toolName, toolFailed ? 'error' : 'complete'),
       };
 
-      if (!isError && result && typeof result === 'object') {
+      if (!toolFailed && result && typeof result === 'object') {
         const found: MessageSource[] = [];
         if (toolName === 'readWebPage' && 'url' in result) {
           const source = publicSource(`${toolCallId}:0`, result.url);
@@ -1501,7 +1566,7 @@ export async function* streamMastraTurn(
         activityTools.set(tool.id, tool);
         yield { type: 'tool', tool };
       }
-      if (toolName === 'searchWeb' && isError)
+      if (toolName === 'searchWeb' && toolFailed)
         throw new Error(
           'Web search failed. Please retry; this does not mean no matching reports exist.',
         );
@@ -1565,7 +1630,10 @@ export async function* streamMastraTurn(
     !input.pendingIntervention &&
     input.action !== 'stop_checks'
   ) {
-    intervention = standaloneLearningCheck(text, input.turnId) ?? undefined;
+    intervention =
+      standaloneLearningCheck(text, input.turnId) ??
+      (quizToolCalled ? standaloneShortAnswerCheck(text, input.turnId) : null) ??
+      undefined;
     if (intervention) visibleText = '';
   }
   if (lengthLimited) throw new Error('The response reached its output limit. Please try again.');
@@ -1581,6 +1649,7 @@ export async function* streamMastraTurn(
     annotations: [],
     ...(activityTools.size ? { tools: [...activityTools.values()] } : {}),
     ...(sources.size ? { sources: [...sources.values()] } : {}),
+    ...(intervention?.kind === 'learning_check' ? { learningCheck: intervention } : {}),
   };
   yield {
     type: 'done',

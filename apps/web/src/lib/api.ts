@@ -172,7 +172,10 @@ export const api = {
     request<Conversation>(
       `/api/conversations/${encodeURIComponent(id)}${branchId ? `?branch=${encodeURIComponent(branchId)}` : ''}`,
     ),
-  conversations: () => request<ConversationSummary[]>('/api/conversations'),
+  conversations: (query?: string) =>
+    request<ConversationSummary[]>(
+      query ? `/api/conversations?q=${encodeURIComponent(query)}` : '/api/conversations',
+    ),
   renameConversation: (id: string, title: string) =>
     request<Conversation>(`/api/conversations/${id}`, {
       method: 'PATCH',

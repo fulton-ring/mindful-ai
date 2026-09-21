@@ -124,3 +124,26 @@ it('keeps legacy sources available inside activity without inventing a query', (
   expect(view.getByText('Retrieved sources')).toBeTruthy();
   expect(view.getByRole('link', { name: 'Old report' })).toBeTruthy();
 });
+
+it('hides tools that only control how a response is presented', () => {
+  const view = render(
+    <ResponseActivity
+      tools={[
+        {
+          id: 'quiz',
+          name: 'proposeLearningCheck',
+          state: 'complete',
+          summary: 'Prepared a learning check.',
+        },
+        {
+          id: 'question',
+          name: 'proposeAsk',
+          state: 'complete',
+          summary: 'Prepared a clarification.',
+        },
+      ]}
+    />,
+  );
+
+  expect(view.queryByRole('button', { name: 'Activity' })).toBeNull();
+});

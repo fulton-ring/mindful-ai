@@ -179,6 +179,34 @@ describe('conversation note attachment', () => {
             tools: [{ id: 'call', name: 'readWebPage', state: 'complete', summary: 'Source read' }],
             sources: [{ id: 'source', url: 'https://example.com/' }],
             contextCompacted: true,
+            learningCheck: {
+              id: 'check',
+              kind: 'learning_check',
+              questions: [
+                {
+                  id: 'location',
+                  header: 'Location',
+                  format: 'multiple_choice',
+                  question: 'Where does the Calvin cycle occur?',
+                  options: ['Stroma', 'Thylakoid'],
+                },
+              ],
+            },
+          }),
+          incomplete: 0,
+        },
+        {
+          id: 'user-answer',
+          role: 'user',
+          content: 'Stroma',
+          reasoning: null,
+          created_at: 'later',
+          annotations_json: '[]',
+          activity_json: JSON.stringify({
+            learningCheckResponse: {
+              checkId: 'check',
+              answers: { location: { answers: ['Stroma'] } },
+            },
           }),
           incomplete: 0,
         },
@@ -191,6 +219,17 @@ describe('conversation note attachment', () => {
       tools: [{ id: 'call', state: 'complete' }],
       sources: [{ id: 'source', url: 'https://example.com/' }],
       contextCompacted: true,
+      learningCheck: {
+        id: 'check',
+        questions: [{ id: 'location', format: 'multiple_choice' }],
+      },
+    });
+    expect(loaded.messages[1]).toMatchObject({
+      role: 'user',
+      learningCheckResponse: {
+        checkId: 'check',
+        answers: { location: { answers: ['Stroma'] } },
+      },
     });
   });
 

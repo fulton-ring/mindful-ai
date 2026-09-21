@@ -1,8 +1,8 @@
-import type { ConversationSummary } from '@walden/contracts';
+import type { ConversationSummary, Note } from '@walden/contracts';
 import { describe, expect, it } from 'vitest';
 import {
-  filterThreads,
   groupThreads,
+  matchesSearch,
   sidebarGroups,
   threadRetention,
   threadTimestamp,
@@ -53,23 +53,22 @@ describe('groupThreads', () => {
   });
 });
 
-describe('filterThreads', () => {
-  const threads = [
-    thread('a', 'How is the 30 year yield linked to savings accounts?', now.toISOString()),
-    thread('b', 'Explain how a heat pump moves heat', now.toISOString()),
-  ];
-
+describe('matchesSearch', () => {
   it('returns everything for an empty query', () => {
-    expect(filterThreads(threads, '   ')).toHaveLength(2);
+    expect(matchesSearch('   ', 'Any note')).toBe(true);
   });
 
   it('matches across punctuation and case', () => {
-    expect(filterThreads(threads, '30-YEAR').map((item) => item.id)).toEqual(['a']);
+    expect(matchesSearch('30-YEAR', 'How is the 30 year yield?')).toBe(true);
   });
 
-  it('requires every term to match', () => {
-    expect(filterThreads(threads, 'heat pump')).toHaveLength(1);
-    expect(filterThreads(threads, 'heat yield')).toHaveLength(0);
+  it('matches note body text and requires every term', () => {
+    const note = { title: 'Botany', markdown: 'The stroma contains enzymes.' } satisfies Pick<
+      Note,
+      'title' | 'markdown'
+    >;
+    expect(matchesSearch('botany enzymes', note.title, note.markdown)).toBe(true);
+    expect(matchesSearch('botany mitochondria', note.title, note.markdown)).toBe(false);
   });
 });
 
@@ -99,9 +98,10 @@ describe('thread metadata', () => {
     const latest = '2026-09-19T12:02:00.000Z';
     expect(threadTimestamp({ ...item, lastMessageAt: latest })).toMatchObject({
       value: latest,
-      label: 'Last message',
+      text: expect.any(String),
     });
-    expect(threadTimestamp(item)).toMatchObject({ value: item.updatedAt, label: 'Last active' });
+    expect(threadTimestamp(item)).toMatchObject({ value: item.updatedAt });
+    expect(threadTimestamp(item)).not.toHaveProperty('label');
     expect(threadTimestamp({ ...item, updatedAt: 'invalid' })).toBeNull();
   });
 });

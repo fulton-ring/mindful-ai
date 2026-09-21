@@ -135,11 +135,29 @@ export const messageHighlightSchema = z.object({
   kind: z.string().optional(),
 });
 export type MessageHighlight = z.infer<typeof messageHighlightSchema>;
+export type LearningCheckQuestion =
+  | {
+      id: string;
+      header: string;
+      format: 'multiple_choice';
+      question: string;
+      options: string[];
+    }
+  | { id: string; header: string; format: 'short_answer'; question: string };
+export type LearningCheck = {
+  id: string;
+  kind: 'learning_check';
+  questions: LearningCheckQuestion[];
+};
+export type LearningCheckResponse = {
+  checkId: string;
+  answers: Record<string, { answers: string[] }>;
+};
 export type Intervention =
   | { id: string; kind: 'ghost'; proposal: EditProposal }
   | { id: string; kind: 'ask'; question: string; options: string[] }
   | { id: string; kind: 'record'; text: string; reason: string }
-  | { id: string; kind: 'learning_check'; question: string; options?: string[] };
+  | LearningCheck;
 export type ToolActivity = {
   id: string;
   name: string;
@@ -162,6 +180,10 @@ export type Message = {
   highlights?: MessageHighlight[];
   tools?: ToolActivity[];
   sources?: MessageSource[];
+  /** A structured assistant request rendered as an interactive quiz card. */
+  learningCheck?: LearningCheck;
+  /** Structured answers rendered separately from ordinary user prose. */
+  learningCheckResponse?: LearningCheckResponse;
   contextCompacted?: boolean;
   incomplete?: boolean;
 };
@@ -235,6 +257,15 @@ export const chatRequestSchema = z.object({
   branchId: z.string().min(1),
   noteRevision: z.number().int().nonnegative().nullable(),
   message: z.string().min(1).max(16000),
+  learningCheckResponse: z
+    .object({
+      checkId: z.string().min(1).max(200),
+      answers: z.record(
+        z.string().min(1).max(100),
+        z.object({ answers: z.array(z.string().min(1).max(1000)).min(1).max(2) }),
+      ),
+    })
+    .optional(),
   personaId: z.string(),
   regenerateMessageId: z.string().min(1).optional(),
   editMessageId: z.string().min(1).optional(),
@@ -315,7 +346,7 @@ export const DEFAULT_PERSONAS: Persona[] = [
     name: 'Study partner',
     icon: 'graduation-cap',
     prompt:
-      'Be my study partner using active recall. When learning checks are on, regularly ask one specific question about what we are learning. Do not ask whether I want a quiz; give a check when useful. Do not reveal the answer before I respond. Offer hints, explain what I got right or missed, adapt the difficulty, and revisit mistakes. Respect requests for a direct answer or to stop quizzing. When checks are off, teach without quizzing.',
+      'Be my study partner using active recall. Regularly quiz me when appropriate. Do not reveal the answer before I respond. Offer hints, explain what I got right or missed, adapt the difficulty, and revisit mistakes. Respect requests for a direct answer or to stop quizzing. When checks are off, teach without quizzing.',
     brevity: 'balanced',
     challenge: 'balanced',
     tone: 'neutral',

@@ -1,3 +1,4 @@
+import type { NoteProposalEvent } from '@walden/contracts';
 import { describe, expect, it } from 'vitest';
 import { createAgentService, OPENROUTER_DEFAULT_MODEL } from './agent';
 
@@ -81,7 +82,7 @@ describe.skipIf(!key)('OpenRouter live inference', () => {
         createdAt: new Date().toISOString(),
       },
     );
-    let final;
+    let final: Extract<NoteProposalEvent, { type: 'done' | 'error' }> | undefined;
     for await (const event of stream)
       if (event.type === 'done' || event.type === 'error') final = event;
     expect(final).toMatchObject({ type: 'done' });

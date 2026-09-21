@@ -13,7 +13,7 @@ import {
 } from '@walden/contracts';
 import { conversationTitle } from '@walden/domain';
 import { Hono } from 'hono';
-import { all, first, parseJson } from '../db/client';
+import { first, parseJson } from '../db/client';
 import { HttpError, jsonBody, newId, nowIso } from '../http';
 import { createAgentService } from '../services/agent';
 import { aiProviderErrorMessage } from '../services/ai-errors';
@@ -224,6 +224,7 @@ chatRoutes.post('/turns', async (c) => {
               tools?: ToolActivity[];
               sources?: MessageSource[];
               contextCompacted?: boolean;
+              learningCheck?: Message['learningCheck'];
             }>(message.activity_json, {});
             return {
               type: 'done',
@@ -236,6 +237,7 @@ chatRoutes.post('/turns', async (c) => {
                 ...(activity.tools?.length ? { tools: activity.tools } : {}),
                 ...(activity.sources?.length ? { sources: activity.sources } : {}),
                 ...(activity.contextCompacted ? { contextCompacted: true } : {}),
+                ...(activity.learningCheck ? { learningCheck: activity.learningCheck } : {}),
                 incomplete: Boolean(message.incomplete),
               },
               conversationId: conversation.id,
@@ -278,14 +280,28 @@ chatRoutes.post('/turns', async (c) => {
     }
   }
   const persona = await personaFor(c.env.DB, ownerId, parsed.data.personaId);
-  const pendingRow = await first<{ payload_json: string }>(
+  const pendingRow = await first<{ id: string; payload_json: string }>(
     c.env.DB.prepare(
-      "SELECT payload_json FROM interventions WHERE branch_id=? AND owner_id=? AND status='pending' AND kind!='ghost' ORDER BY created_at DESC LIMIT 1",
+      "SELECT id,payload_json FROM interventions WHERE branch_id=? AND owner_id=? AND status='pending' AND kind!='ghost' ORDER BY created_at DESC LIMIT 1",
     ).bind(conversation.branchId, ownerId),
   );
   const pendingIntervention = pendingRow
     ? parseJson<Intervention | undefined>(pendingRow.payload_json, undefined)
     : undefined;
+  if (parsed.data.learningCheckResponse) {
+    const response = parsed.data.learningCheckResponse;
+    const questionIds = new Set(
+      pendingIntervention?.kind === 'learning_check'
+        ? pendingIntervention.questions.map(({ id }) => id)
+        : [],
+    );
+    if (
+      pendingIntervention?.kind !== 'learning_check' ||
+      response.checkId !== pendingIntervention.id ||
+      Object.keys(response.answers).some((id) => !questionIds.has(id))
+    )
+      throw new HttpError(409, 'This learning check is no longer pending');
+  }
   const turnId = newId();
   // An interrupted answer has no useful alternate path to preserve. Reuse its branch;
   // completed exchanges retain their history as a sibling branch, like ChatGPT/Claude edits.
@@ -357,13 +373,18 @@ chatRoutes.post('/turns', async (c) => {
             ownerId,
           )
         : c.env.DB.prepare(
-            "INSERT INTO messages (id,conversation_id,turn_id,owner_id,role,content,sequence,created_at,parent_message_id,origin_branch_id) VALUES (?,?,?,?, 'user',?,(SELECT COALESCE(MAX(sequence),0)+1 FROM messages WHERE conversation_id=?),?,?,?)",
+            "INSERT INTO messages (id,conversation_id,turn_id,owner_id,role,content,activity_json,sequence,created_at,parent_message_id,origin_branch_id) VALUES (?,?,?,?, 'user',?,?,(SELECT COALESCE(MAX(sequence),0)+1 FROM messages WHERE conversation_id=?),?,?,?)",
           ).bind(
             userMessageId,
             conversation.id,
             turnId,
             ownerId,
             requestMessage,
+            JSON.stringify({
+              ...(parsed.data.learningCheckResponse
+                ? { learningCheckResponse: parsed.data.learningCheckResponse }
+                : {}),
+            }),
             conversation.id,
             createdAt,
             conversation.messages.at(-1)?.id ?? null,
@@ -386,6 +407,13 @@ chatRoutes.post('/turns', async (c) => {
           c.env.DB.prepare(
             "UPDATE note_suggestions SET status='invalidated',updated_at=? WHERE owner_id=? AND conversation_id=? AND status='pending'",
           ).bind(createdAt, ownerId, conversation.id),
+        ]
+      : []),
+    ...(pendingRow && advancesConversation
+      ? [
+          c.env.DB.prepare(
+            "UPDATE interventions SET status='resolved' WHERE id=? AND owner_id=? AND status='pending'",
+          ).bind(pendingRow.id, ownerId),
         ]
       : []),
     ...(userMessageStatement ? [userMessageStatement] : []),
@@ -525,6 +553,7 @@ chatRoutes.post('/turns', async (c) => {
           tools: message.tools ?? [...tools.values()],
           sources: message.sources ?? [...sources.values()],
           contextCompacted: message.contextCompacted ?? contextCompacted,
+          ...(message.learningCheck ? { learningCheck: message.learningCheck } : {}),
         });
         const liveConversation = await first<{ id: string }>(
           c.env.DB.prepare(

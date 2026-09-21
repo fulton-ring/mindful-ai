@@ -646,14 +646,39 @@ describe('ChatPanel annotation recovery', () => {
         intervention: {
           id: 'check',
           kind: 'learning_check',
-          question,
-          options: ['Thylakoid', 'Stroma'],
+          questions: [
+            {
+              id: 'location',
+              header: 'Location',
+              format: 'multiple_choice',
+              question,
+              options: ['Thylakoid', 'Stroma'],
+            },
+          ],
         },
       });
       onEvent({
         type: 'done',
         annotationsHandled: true,
-        message: { id: 'answer', role: 'assistant', content: '', createdAt: '' },
+        message: {
+          id: 'answer',
+          role: 'assistant',
+          content: '',
+          createdAt: '',
+          learningCheck: {
+            id: 'check',
+            kind: 'learning_check',
+            questions: [
+              {
+                id: 'location',
+                header: 'Location',
+                format: 'multiple_choice',
+                question,
+                options: ['Thylakoid', 'Stroma'],
+              },
+            ],
+          },
+        },
         conversationId: 'conversation-1',
         branchId: 'branch-1',
         title: 'Conversation',

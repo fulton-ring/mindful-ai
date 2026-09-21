@@ -4,6 +4,8 @@ import type {
   Conversation,
   EditProposal,
   Intervention,
+  LearningCheck,
+  LearningCheckResponse,
   Message,
   MessageHighlight,
   MessageSource,
@@ -87,6 +89,17 @@ type Props = {
   ): void;
   onGhostBatch?(values: EditProposal[], sourceId: string): void;
 };
+
+function learningCheckResponseText(check: LearningCheck, response: LearningCheckResponse) {
+  return check.questions
+    .map((question, index) => {
+      const answer = response.answers[question.id]?.answers.join('; ') ?? 'Skipped';
+      return check.questions.length === 1
+        ? answer
+        : `${index + 1}. ${question.question}\n${answer}`;
+    })
+    .join('\n\n');
+}
 type ProposalNotice = {
   message: string;
   retryable: boolean;
@@ -180,9 +193,10 @@ export function ChatPanel(props: Props) {
   const optimisticMessageRef = useRef<Message | null>(null);
   const sendingRef = useRef(false);
   const pendingTurnCancellation = useRef<Promise<unknown>>(Promise.resolve());
-  const [intervention, setIntervention] = useState<Exclude<Intervention, { kind: 'ghost' }> | null>(
-    null,
-  );
+  const [intervention, setIntervention] = useState<Exclude<
+    Intervention,
+    { kind: 'ghost' } | { kind: 'learning_check' }
+  > | null>(null);
   const [savingChatPreference, setSavingChatPreference] = useState(false);
   const [liveAnnotations, setLiveAnnotations] = useState<Annotation[]>([]);
   const [recentAnimation, setRecentAnimation] = useState<{
@@ -707,7 +721,6 @@ export function ChatPanel(props: Props) {
     messageId: string,
     conversationId: string,
     noteRevision: number | null,
-    sourceId: string,
     annotationsHandled = false,
   ) {
     const input = {
@@ -1115,7 +1128,6 @@ export function ChatPanel(props: Props) {
                     event.message.id,
                     conversation.id,
                     noteRevision,
-                    requestId,
                     event.annotationsHandled,
                   );
               });
@@ -1163,8 +1175,7 @@ export function ChatPanel(props: Props) {
       )
         return;
       await props.onConversation({ ...conversation, ...result });
-      if (setting === 'learningChecks' && !enabled)
-        setIntervention((current) => (current?.kind === 'learning_check' ? null : current));
+      if (setting === 'learningChecks' && !enabled) setIntervention(null);
     } catch (cause) {
       if (activeConversationId.current === originalScope)
         setError(cause instanceof Error ? cause.message : 'Could not save chat preference.');
@@ -1176,6 +1187,7 @@ export function ChatPanel(props: Props) {
     message = input,
     action: 'message' | 'challenge' | 'source' | 'capture' | 'feedback' | 'stop_checks' = 'message',
     editMessageId?: string,
+    learningCheckResponse?: LearningCheckResponse,
   ) {
     const clean = message.trim();
     if (!clean || sendingRef.current || savingChatPreference) return;
@@ -1190,6 +1202,7 @@ export function ChatPanel(props: Props) {
       id: id('local'),
       role: 'user',
       content: clean,
+      ...(learningCheckResponse ? { learningCheckResponse } : {}),
       createdAt: new Date().toISOString(),
     };
     if (editMessageId) {
@@ -1320,6 +1333,7 @@ export function ChatPanel(props: Props) {
           message: clean,
           personaId: effectivePersonaId,
           action,
+          ...(learningCheckResponse ? { learningCheckResponse } : {}),
           ...(editMessageId ? { editMessageId } : {}),
         },
         (event: ChatEvent) => {
@@ -1344,7 +1358,10 @@ export function ChatPanel(props: Props) {
             // through the one proposal pipeline like every other capture.
             if (event.intervention.kind === 'record')
               pendingRecord.current = event.intervention.text;
-            else if (event.intervention.kind !== 'ghost') {
+            else if (
+              event.intervention.kind !== 'ghost' &&
+              event.intervention.kind !== 'learning_check'
+            ) {
               setIntervention(event.intervention);
             }
           } else if (event.type === 'done') {
@@ -1425,7 +1442,6 @@ export function ChatPanel(props: Props) {
               event.message.id,
               event.conversationId,
               noteRevision,
-              requestId,
               event.annotationsHandled,
             );
           } else if (event.type === 'error') {
@@ -1528,7 +1544,6 @@ export function ChatPanel(props: Props) {
     });
   }
   function messageToolbar(message: Message) {
-    const proposing = proposalMessageId === message.id;
     const notice = proposalNotices.get(message.id);
     const highlighting =
       backgroundAnnotations.has(message.id) || annotationFailures.get(message.id)?.retrying;
@@ -1719,6 +1734,23 @@ export function ChatPanel(props: Props) {
           )}
           {renderedMessages.map((message, index) => {
             const isLive = hasLiveResponse && message.id === liveResponseId;
+            const learningCheckResponse = message.learningCheck
+              ? renderedMessages
+                  .slice(index + 1)
+                  .find(
+                    (candidate) =>
+                      candidate.role === 'user' &&
+                      candidate.learningCheckResponse?.checkId === message.learningCheck?.id,
+                  )?.learningCheckResponse
+              : undefined;
+            const answeredCheck = message.learningCheckResponse
+              ? [...renderedMessages.slice(0, index)]
+                  .reverse()
+                  .find(
+                    (candidate) =>
+                      candidate.learningCheck?.id === message.learningCheckResponse?.checkId,
+                  )?.learningCheck
+              : undefined;
             return (
               <Fragment key={responseRenderKeys.current.get(message.id) ?? message.id}>
                 {message.role === 'assistant' && message.contextCompacted && <ContextCheckpoint />}
@@ -1742,35 +1774,77 @@ export function ChatPanel(props: Props) {
                           <ReasoningContent>{message.reasoning}</ReasoningContent>
                         </Reasoning>
                       )}
-                      <AnnotatedText
-                        active={props.visible !== false}
-                        actionStatus={captureStatus(message.id)}
-                        text={message.content}
-                        annotations={message.annotations}
-                        highlights={message.highlights}
-                        onHighlight={
-                          !isLive && !message.incomplete
-                            ? (value) => saveHighlight(message.id, value)
-                            : undefined
-                        }
-                        markdown
-                        animatedAnnotationIds={
-                          isLive
-                            ? new Set(liveAnnotations.map((annotation) => annotation.id))
-                            : message.id === recentAnimation?.messageId
-                              ? recentAnimation.annotationIds
+                      {message.learningCheck && (
+                        <InterventionCard
+                          intervention={message.learningCheck}
+                          resolved={learningCheckResponse}
+                          onResolve={(value) => {
+                            if (typeof value === 'string') return;
+                            void send(
+                              learningCheckResponseText(message.learningCheck!, value),
+                              'feedback',
+                              undefined,
+                              value,
+                            );
+                          }}
+                          onCapture={() => undefined}
+                          onDismiss={() => {
+                            const response: LearningCheckResponse = {
+                              checkId: message.learningCheck!.id,
+                              answers: {},
+                            };
+                            void send('Skip this learning check.', 'feedback', undefined, response);
+                          }}
+                        />
+                      )}
+                      {!message.learningCheck && (
+                        <AnnotatedText
+                          active={props.visible !== false}
+                          actionStatus={captureStatus(message.id)}
+                          text={message.content}
+                          annotations={message.annotations}
+                          highlights={message.highlights}
+                          onHighlight={
+                            !isLive && !message.incomplete
+                              ? (value) => saveHighlight(message.id, value)
                               : undefined
-                        }
-                        onAction={(action, quote) =>
-                          contextual(isLive ? null : message.id, action, quote)
-                        }
-                      />
+                          }
+                          markdown
+                          animatedAnnotationIds={
+                            isLive
+                              ? new Set(liveAnnotations.map((annotation) => annotation.id))
+                              : message.id === recentAnimation?.messageId
+                                ? recentAnimation.annotationIds
+                                : undefined
+                          }
+                          onAction={(action, quote) =>
+                            contextual(isLive ? null : message.id, action, quote)
+                          }
+                        />
+                      )}
                       <ResponseSources sources={message.sources} />
-                      {!isLive && !message.incomplete && messageToolbar(message)}
+                      {!isLive &&
+                        !message.incomplete &&
+                        !message.learningCheck &&
+                        messageToolbar(message)}
                     </>
                   ) : (
                     <>
-                      {editingMessageId === message.id ? (
+                      {message.learningCheckResponse && answeredCheck ? (
+                        <div className="learning-check-response">
+                          <p className="eyebrow">My answers</p>
+                          {answeredCheck.questions.map((question) => (
+                            <div key={question.id}>
+                              <span>{question.header}</span>
+                              <p>
+                                {message.learningCheckResponse?.answers[question.id]?.answers.join(
+                                  '; ',
+                                ) ?? 'Skipped'}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : editingMessageId === message.id ? (
                         <div className="user-message-editor">
                           <textarea
                             aria-label="Edit message"
@@ -1814,7 +1888,8 @@ export function ChatPanel(props: Props) {
                       ) : (
                         <p>{message.content}</p>
                       )}
-                      {editingMessageId !== message.id &&
+                      {!message.learningCheckResponse &&
+                        editingMessageId !== message.id &&
                         renderedMessages[index + 1]?.role === 'assistant' &&
                         renderedMessages[index + 1]?.incomplete &&
                         index + 1 === renderedMessages.length - 1 && (
@@ -1872,7 +1947,7 @@ export function ChatPanel(props: Props) {
               intervention={intervention}
               onResolve={(value) => {
                 setIntervention(null);
-                void send(value, 'feedback');
+                if (typeof value === 'string') void send(value, 'feedback');
               }}
               onCapture={(value) => {
                 if (!latestCompletedAssistantId) {

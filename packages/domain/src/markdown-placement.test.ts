@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { additionEdit, markdownBlocks } from './markdown-placement';
+import { additionEdit } from './markdown-placement';
 
 describe('additionEdit', () => {
   const applied = (markdown: string, text: string) => {

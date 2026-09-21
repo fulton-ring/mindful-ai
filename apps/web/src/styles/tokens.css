@@ -1299,6 +1299,106 @@
   .choice-list button {
     text-align: left;
   }
+  .learning-check-tabs {
+    display: flex;
+    gap: 0.25rem;
+    margin: 0.75rem 0 1rem;
+  }
+  .learning-check-tabs button {
+    border-radius: 5px;
+    font-size: 0.8rem;
+    min-width: 2rem;
+    padding: 0.3rem 0.5rem;
+  }
+  .learning-check-tabs button[aria-selected="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+  }
+  .learning-check-question {
+    border: 0;
+    margin: 0;
+    padding: 0;
+  }
+  .learning-check-question > p,
+  .learning-check-question legend {
+    font-weight: 500;
+    margin: 0;
+    padding: 0;
+  }
+  .learning-check-choice {
+    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    cursor: pointer;
+    display: flex;
+    gap: 0.55rem;
+    padding: 0.55rem 0.7rem;
+  }
+  .learning-check-choice:has(input:checked) {
+    background: color-mix(in srgb, var(--accent) 10%, var(--card));
+    border-color: var(--accent);
+  }
+  .learning-check-answer {
+    display: block;
+    font-size: 0.85rem;
+    margin: 0.6rem 0 0.35rem;
+  }
+  .learning-check-question input[type="text"],
+  .learning-check-question input:not([type]) {
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    box-sizing: border-box;
+    background: var(--ground);
+    padding: 0.55rem 0.75rem;
+    width: 100%;
+  }
+  .learning-check-continue {
+    margin-top: 0.75rem;
+  }
+  .learning-check-submit > p {
+    margin: 0 0 0.85rem;
+  }
+  .intervention-answer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 0.5rem;
+    margin: 0.8rem 0;
+  }
+  .intervention-answer label {
+    flex-basis: 100%;
+    font-size: 0.85rem;
+  }
+  .intervention-answer input {
+    flex: 1 1 12rem;
+    min-width: 0;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: var(--ground);
+    padding: 0.55rem 0.75rem;
+  }
+  .intervention-resolved {
+    border-color: var(--line);
+  }
+  .intervention-resolved > p:not(.eyebrow) {
+    margin: 0.45rem 0;
+  }
+  .learning-check-response {
+    display: grid;
+    gap: 0.55rem;
+  }
+  .learning-check-response > div {
+    display: grid;
+    gap: 0.1rem;
+  }
+  .learning-check-response span {
+    color: var(--muted);
+    font-size: 0.75rem;
+  }
+  .learning-check-response p {
+    margin: 0;
+  }
   .inline-error {
     background: color-mix(in srgb, var(--danger) 9%, var(--card));
     border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line));

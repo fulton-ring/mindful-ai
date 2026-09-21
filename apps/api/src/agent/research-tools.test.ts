@@ -57,7 +57,15 @@ function researchModel(
                   : 'readWebPage',
               input: JSON.stringify(
                 learningCheck
-                  ? { question: 'What does chlorophyll absorb?' }
+                  ? {
+                      questions: [
+                        {
+                          id: 'chlorophyll_light',
+                          header: 'Chlorophyll',
+                          question: 'What does chlorophyll absorb?',
+                        },
+                      ],
+                    }
                   : searchWeb
                     ? { query: 'OpenAI Hugging Face incident' }
                     : { url: 'https://example.com/research' },
@@ -441,7 +449,12 @@ it('ends the model loop once a learning check is ready for the user', async () =
       type: 'intervention',
       intervention: expect.objectContaining({
         kind: 'learning_check',
-        question: 'What does chlorophyll absorb?',
+        questions: [
+          expect.objectContaining({
+            format: 'short_answer',
+            question: 'What does chlorophyll absorb?',
+          }),
+        ],
       }),
     }),
   );
@@ -473,14 +486,126 @@ it.each(['study-partner', 'account-override'])(
         type: 'intervention',
         intervention: expect.objectContaining({
           kind: 'learning_check',
-          question: 'Where does the Calvin cycle occur?',
-          options: ['Thylakoid membrane', 'Stroma', 'Lumen', 'Outer membrane'],
+          questions: [
+            expect.objectContaining({
+              format: 'multiple_choice',
+              question: 'Where does the Calvin cycle occur?',
+              options: ['Thylakoid membrane', 'Stroma', 'Lumen', 'Outer membrane'],
+            }),
+          ],
         }),
       }),
     );
     expect(events.at(-1)).toMatchObject({ type: 'done', message: { content: '' } });
   },
 );
+
+it('turns an introduced, numbered multiple-choice reply into a learning-check card', async () => {
+  const input = turnInput();
+  input.conversation.learningChecksEnabled = true;
+  input.persona = DEFAULT_PERSONAS.find((persona) => persona.id === 'study-partner')!;
+  const events: ChatEvent[] = [];
+  for await (const event of streamMastraTurn(
+    input,
+    silentModel(
+      [],
+      'Since you said "Sure," I will test your understanding.\n\nWhich stage of the Calvin cycle uses ATP and NADPH to turn 3-PGA into G3P?\n\n1. Carbon Fixation\n2. Reduction\n3. Regeneration',
+    ),
+    new AbortController().signal,
+  ))
+    events.push(event);
+
+  expect(events).toContainEqual(
+    expect.objectContaining({
+      type: 'intervention',
+      intervention: expect.objectContaining({
+        kind: 'learning_check',
+        questions: [
+          expect.objectContaining({
+            format: 'multiple_choice',
+            question: 'Which stage of the Calvin cycle uses ATP and NADPH to turn 3-PGA into G3P?',
+            options: ['Carbon Fixation', 'Reduction', 'Regeneration'],
+          }),
+        ],
+      }),
+    }),
+  );
+  expect(events.at(-1)).toMatchObject({ type: 'done', message: { content: '' } });
+});
+
+it('recovers a short-answer card when Gemma calls the quiz tool with empty arguments then writes its question', async () => {
+  const input = turnInput();
+  input.conversation.learningChecksEnabled = true;
+  input.persona = DEFAULT_PERSONAS.find((persona) => persona.id === 'study-partner')!;
+  let step = 0;
+  const model: LanguageModelV3 = {
+    specificationVersion: 'v3',
+    provider: 'test',
+    modelId: 'empty-quiz-tool-args',
+    supportedUrls: {},
+    async doGenerate() {
+      throw new Error('This test expects streaming generation');
+    },
+    async doStream() {
+      step += 1;
+      const parts: LanguageModelV3StreamPart[] =
+        step === 1
+          ? [
+              {
+                type: 'tool-call',
+                toolCallId: 'quiz-1',
+                toolName: 'proposeLearningCheck',
+                input: '{}',
+              },
+              { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'tool-calls' }, usage },
+            ]
+          : [
+              { type: 'text-start', id: 'question' },
+              {
+                type: 'text-delta',
+                id: 'question',
+                delta: 'What five-carbon sugar accepts CO2 in the Calvin cycle?',
+              },
+              { type: 'text-end', id: 'question' },
+              { type: 'finish', finishReason: { unified: 'stop', raw: 'stop' }, usage },
+            ];
+      return {
+        stream: new ReadableStream<LanguageModelV3StreamPart>({
+          start(controller) {
+            controller.enqueue({ type: 'stream-start', warnings: [] });
+            for (const part of parts) controller.enqueue(part);
+            controller.close();
+          },
+        }),
+      };
+    },
+  };
+  const events: ChatEvent[] = [];
+  for await (const event of streamMastraTurn(input, model, new AbortController().signal))
+    events.push(event);
+
+  expect(events).toContainEqual(
+    expect.objectContaining({
+      type: 'intervention',
+      intervention: expect.objectContaining({
+        kind: 'learning_check',
+        questions: [
+          expect.objectContaining({
+            format: 'short_answer',
+            question: 'What five-carbon sugar accepts CO2 in the Calvin cycle?',
+          }),
+        ],
+      }),
+    }),
+  );
+  expect(events).not.toContainEqual(
+    expect.objectContaining({
+      type: 'tool',
+      tool: expect.objectContaining({ name: 'proposeLearningCheck' }),
+    }),
+  );
+  expect(events.at(-1)).toMatchObject({ type: 'done', message: { content: '' } });
+});
 
 it('removes web search from the model tools when disabled for the conversation', async () => {
   const calls: LanguageModelV3CallOptions[] = [];

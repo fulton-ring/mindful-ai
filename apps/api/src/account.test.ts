@@ -8,6 +8,56 @@ import { accountRoutes } from './account';
 import { sqliteD1Binding } from './agent/d1-test-binding';
 import type { Bindings, Variables } from './types';
 
+async function expectOwnedExport(
+  app: Hono<{ Bindings: Bindings; Variables: Variables }>,
+  db: D1Database,
+) {
+  const response = await app.request('/account/export', {}, { DB: db } as Bindings);
+  expect(response.status).toBe(200);
+  const exported = (await response.json()) as Record<
+    string,
+    Array<{ id: string; markdown?: string }>
+  >;
+  for (const table of ['conversations', 'branches', 'messages'])
+    expect(exported[table]?.map(({ id }) => id)).toEqual(['current']);
+  expect(exported.highlights).toEqual([
+    {
+      message_id: 'current',
+      origin: 'user',
+      start: 0,
+      end: 5,
+      quote: 'Trans',
+      color: 'blue',
+      kind: null,
+      updated_at: '1',
+    },
+    {
+      message_id: 'current',
+      origin: 'user',
+      start: 5,
+      end: 10,
+      quote: 'cript',
+      color: null,
+      kind: null,
+      updated_at: '2',
+    },
+  ]);
+  expect(exported.notes).toEqual([
+    expect.objectContaining({ id: 'note', markdown: 'Keep permanently' }),
+  ]);
+  expect((await db.prepare('SELECT id FROM messages').all()).results).toHaveLength(4);
+}
+
+function ownerApp() {
+  const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+  app.use('*', async (c, next) => {
+    c.set('userId', 'owner');
+    await next();
+  });
+  app.route('/', accountRoutes);
+  return app;
+}
+
 it('exports only current owned transcripts even before cleanup, while preserving expired-thread notes', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'walden-export-'));
   try {
@@ -66,46 +116,7 @@ it('exports only current owned transcripts even before cleanup, while preserving
         "INSERT INTO message_highlights (message_id,owner_id,origin,start,end,quote,color,updated_at) VALUES ('current','owner','user',5,10,'cript',NULL,'2')",
       )
       .run();
-    const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
-    app.use('*', async (c, next) => {
-      c.set('userId', 'owner');
-      await next();
-    });
-    app.route('/', accountRoutes);
-    const response = await app.request('/account/export', {}, { DB: db } as Bindings);
-    expect(response.status).toBe(200);
-    const exported = (await response.json()) as Record<
-      string,
-      Array<{ id: string; markdown?: string }>
-    >;
-    for (const table of ['conversations', 'branches', 'messages'])
-      expect(exported[table]?.map(({ id }) => id)).toEqual(['current']);
-    expect(exported.highlights).toEqual([
-      {
-        message_id: 'current',
-        origin: 'user',
-        start: 0,
-        end: 5,
-        quote: 'Trans',
-        color: 'blue',
-        kind: null,
-        updated_at: '1',
-      },
-      {
-        message_id: 'current',
-        origin: 'user',
-        start: 5,
-        end: 10,
-        quote: 'cript',
-        color: null,
-        kind: null,
-        updated_at: '2',
-      },
-    ]);
-    expect(exported.notes).toEqual([
-      expect.objectContaining({ id: 'note', markdown: 'Keep permanently' }),
-    ]);
-    expect((await db.prepare('SELECT id FROM messages').all()).results).toHaveLength(4);
+    await expectOwnedExport(ownerApp(), db);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

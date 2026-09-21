@@ -1,6 +1,14 @@
 import type { ConversationSummary } from '@walden/contracts';
 
 export type ThreadGroup = { label: string; threads: ConversationSummary[] };
+type RecencyBoundaries = {
+  today: number;
+  yesterday: number;
+  week: number;
+  month: number;
+};
+
+const RECENCY_LABELS = ['Today', 'Yesterday', 'Previous 7 days', 'Previous 30 days', 'Older'];
 
 /** Case- and punctuation-insensitive so "30-year" matches a search for "30 year". */
 const normalise = (value: string) =>
@@ -9,16 +17,33 @@ const normalise = (value: string) =>
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
 
-export function filterThreads(
-  threads: readonly ConversationSummary[],
-  query: string,
-): ConversationSummary[] {
+export function matchesSearch(query: string, ...texts: string[]): boolean {
   const terms = normalise(query).split(' ').filter(Boolean);
-  if (!terms.length) return [...threads];
-  return threads.filter((thread) => {
-    const title = normalise(thread.title || 'Untitled thread');
-    return terms.every((term) => title.includes(term));
-  });
+  if (!terms.length) return true;
+  const content = normalise(texts.join(' '));
+  return terms.every((term) => content.includes(term));
+}
+
+function recencyBoundaries(now: Date): RecencyBoundaries {
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const dayMs = 86_400_000;
+  return {
+    today: today.getTime(),
+    yesterday: today.getTime() - dayMs,
+    week: today.getTime() - 7 * dayMs,
+    month: today.getTime() - 30 * dayMs,
+  };
+}
+
+function recencyBucket(timestamp: string, boundaries: RecencyBoundaries): number {
+  const value = Date.parse(timestamp);
+  if (Number.isNaN(value)) return 4;
+  if (value >= boundaries.today) return 0;
+  if (value >= boundaries.yesterday) return 1;
+  if (value >= boundaries.week) return 2;
+  if (value >= boundaries.month) return 3;
+  return 4;
 }
 
 /**
@@ -30,35 +55,10 @@ export function groupThreads(
   threads: readonly ConversationSummary[],
   now: Date = new Date(),
 ): ThreadGroup[] {
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
-  const dayMs = 86_400_000;
-  const startOfYesterday = startOfToday.getTime() - dayMs;
-  const startOfWeek = startOfToday.getTime() - 7 * dayMs;
-  const startOfMonth = startOfToday.getTime() - 30 * dayMs;
-
-  const buckets: ThreadGroup[] = [
-    { label: 'Today', threads: [] },
-    { label: 'Yesterday', threads: [] },
-    { label: 'Previous 7 days', threads: [] },
-    { label: 'Previous 30 days', threads: [] },
-    { label: 'Older', threads: [] },
-  ];
+  const boundaries = recencyBoundaries(now);
+  const buckets: ThreadGroup[] = RECENCY_LABELS.map((label) => ({ label, threads: [] }));
   for (const thread of threads) {
-    const at = Date.parse(thread.updatedAt);
-    // An unparseable timestamp should not hide the thread.
-    const index = Number.isNaN(at)
-      ? 4
-      : at >= startOfToday.getTime()
-        ? 0
-        : at >= startOfYesterday
-          ? 1
-          : at >= startOfWeek
-            ? 2
-            : at >= startOfMonth
-              ? 3
-              : 4;
-    buckets[index]!.threads.push(thread);
+    buckets[recencyBucket(thread.updatedAt, boundaries)]?.threads.push(thread);
   }
   return buckets.filter((bucket) => bucket.threads.length > 0);
 }
@@ -83,7 +83,6 @@ export function threadTimestamp(thread: ConversationSummary) {
   if (!Number.isFinite(date.getTime())) return null;
   return {
     value,
-    label: thread.lastMessageAt ? 'Last message' : 'Last active',
     text: date.toLocaleString(undefined, {
       month: 'short',
       day: 'numeric',
