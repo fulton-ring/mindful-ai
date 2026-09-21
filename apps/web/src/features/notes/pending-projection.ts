@@ -32,9 +32,116 @@ type ResolvedReplacement = {
   insert: string;
 };
 
+type AppliedReplacement = {
+  baseFrom: number;
+  baseTo: number;
+  from: number;
+  to: number;
+};
+
 /** Two rewrites of the same span genuinely conflict; additions never can. */
 function overlaps(a: ResolvedReplacement, b: ResolvedReplacement): boolean {
   return a.from < b.to && b.from < a.to;
+}
+
+function resolveReplacements(
+  markdown: string,
+  proposals: readonly EditProposal[],
+): { replacements: ResolvedReplacement[]; issues: ProjectionIssue[] } {
+  const issues: ProjectionIssue[] = [];
+  const replacements: ResolvedReplacement[] = [];
+  for (const proposal of proposals) {
+    if (proposal.oldText === '') continue;
+    try {
+      const edit = resolveEdit(markdown, proposal.oldText, proposal.newText);
+      replacements.push({ proposalId: proposal.id, ...edit });
+    } catch (cause) {
+      issues.push({
+        kind: 'invalid',
+        proposalId: proposal.id,
+        message: cause instanceof Error ? cause.message : 'The proposal could not be resolved',
+      });
+    }
+  }
+  return { replacements, issues };
+}
+
+function findOverlaps(replacements: readonly ResolvedReplacement[]): ProjectionIssue[] {
+  const conflicted = new Set<string>();
+  for (const [index, left] of replacements.entries())
+    for (const right of replacements.slice(index + 1))
+      if (overlaps(left, right)) {
+        conflicted.add(left.proposalId);
+        conflicted.add(right.proposalId);
+      }
+  return [...conflicted].map((proposalId) => ({
+    kind: 'overlap',
+    proposalId,
+    withProposalIds: [...conflicted].filter((other) => other !== proposalId).sort(),
+  }));
+}
+
+function applyReplacements(
+  markdown: string,
+  replacements: readonly ResolvedReplacement[],
+  conflicted: ReadonlySet<string>,
+): { base: string; ranges: PendingRange[]; applied: AppliedReplacement[] } {
+  let base = markdown;
+  let drift = 0;
+  const ranges: PendingRange[] = [];
+  const applied: AppliedReplacement[] = [];
+  for (const replacement of replacements
+    .filter((value) => !conflicted.has(value.proposalId))
+    .sort((a, b) => a.from - b.from)) {
+    const from = replacement.from + drift;
+    base =
+      base.slice(0, from) +
+      replacement.insert +
+      base.slice(from + (replacement.to - replacement.from));
+    ranges.push({
+      proposalId: replacement.proposalId,
+      from,
+      to: from + replacement.insert.length,
+      sourceFrom: replacement.from,
+      sourceTo: replacement.to,
+      insert: replacement.insert,
+    });
+    applied.push({
+      baseFrom: from,
+      baseTo: from + replacement.insert.length,
+      from: replacement.from,
+      to: replacement.to,
+    });
+    drift += replacement.insert.length - (replacement.to - replacement.from);
+  }
+  return { base, ranges, applied };
+}
+
+function sourceOffset(
+  offset: number,
+  markdownLength: number,
+  applied: readonly AppliedReplacement[],
+): number {
+  let result = offset;
+  for (const replacement of applied) {
+    if (replacement.baseTo <= offset)
+      result += replacement.to - replacement.from - (replacement.baseTo - replacement.baseFrom);
+    else if (replacement.baseFrom < offset) return replacement.to;
+  }
+  return Math.max(0, Math.min(result, markdownLength));
+}
+
+function shiftReplacementRanges(
+  ranges: PendingRange[],
+  rendered: ReturnType<typeof renderWithQueue>,
+): void {
+  for (const range of ranges) {
+    const shift = rendered.spans
+      .filter((span) => span.from <= range.from)
+      .reduce((total, span) => total + span.insert.length, 0);
+    range.from += shift;
+    range.to += shift;
+  }
 }
 
 /**
@@ -103,107 +210,19 @@ export function projectPendingEdits(
    */
   queueOrder: readonly { id: string; text: string; accepted: boolean }[] = [],
 ): PendingProjection {
-  const issues: ProjectionIssue[] = [];
-  const ranges: PendingRange[] = [];
-
-  // Replacements are anchored to exact text, so they are resolved against the
-  // saved note and can collide with one another. Additions cannot: they insert,
-  // carry no position, and are laid out as a queue afterwards — which is why
-  // the sorting and tie-breaking this function used to do is gone.
-  const replacements: ResolvedReplacement[] = [];
-  for (const proposal of proposals) {
-    if (proposal.oldText === '') continue;
-    try {
-      const edit = resolveEdit(markdown, proposal.oldText, proposal.newText);
-      replacements.push({ proposalId: proposal.id, ...edit });
-    } catch (cause) {
-      issues.push({
-        kind: 'invalid',
-        proposalId: proposal.id,
-        message: cause instanceof Error ? cause.message : 'The proposal could not be resolved',
-      });
-    }
-  }
-  const conflicted = new Set<string>();
-  for (const [index, left] of replacements.entries())
-    for (const right of replacements.slice(index + 1))
-      if (overlaps(left, right)) {
-        conflicted.add(left.proposalId);
-        conflicted.add(right.proposalId);
-      }
-  for (const proposalId of conflicted)
-    issues.push({
-      kind: 'overlap',
-      proposalId,
-      withProposalIds: [...conflicted].filter((other) => other !== proposalId).sort(),
-    });
-
-  let base = markdown;
-  let drift = 0;
-  /** Each applied replacement in both coordinate spaces, to undo the drift below. */
-  const applied: { baseFrom: number; baseTo: number; from: number; to: number }[] = [];
-  for (const replacement of replacements
-    .filter((value) => !conflicted.has(value.proposalId))
-    .sort((a, b) => a.from - b.from)) {
-    const from = replacement.from + drift;
-    base =
-      base.slice(0, from) +
-      replacement.insert +
-      base.slice(from + (replacement.to - replacement.from));
-    ranges.push({
-      proposalId: replacement.proposalId,
-      from,
-      to: from + replacement.insert.length,
-      sourceFrom: replacement.from,
-      sourceTo: replacement.to,
-      insert: replacement.insert,
-    });
-    applied.push({
-      baseFrom: from,
-      baseTo: from + replacement.insert.length,
-      from: replacement.from,
-      to: replacement.to,
-    });
-    drift += replacement.insert.length - (replacement.to - replacement.from);
-  }
-
-  /**
-   * An offset in `base` as an offset in the saved note.
-   *
-   * Additions are laid into `base` — the note with the pending replacements
-   * already applied — so their own offsets mean nothing to the editor, which
-   * maps against the saved note. A replacement that lengthens the note used to
-   * push an addition's offset past the end of it outright.
-   */
-  function toSource(offset: number): number {
-    let result = offset;
-    for (const replacement of applied) {
-      if (replacement.baseTo <= offset)
-        result += replacement.to - replacement.from - (replacement.baseTo - replacement.baseFrom);
-      // Inside a replaced span there is no corresponding offset: the addition
-      // goes after the text being rewritten.
-      else if (replacement.baseFrom < offset) return replacement.to;
-    }
-    return Math.max(0, Math.min(result, markdown.length));
-  }
-
+  const { replacements, issues } = resolveReplacements(markdown, proposals);
+  const overlapIssues = findOverlaps(replacements);
+  const conflicted = new Set(overlapIssues.map((issue) => issue.proposalId));
+  const { base, ranges, applied } = applyReplacements(markdown, replacements, conflicted);
   const rendered = renderWithQueue(base, additionQueue(proposals, queueOrder, visibleInserts));
-  // Replacement ranges shift by whatever the queue inserted above them —
-  // separators included, which is the whole chunk rather than its text.
-  for (const range of ranges) {
-    const shift = rendered.spans
-      .filter((span) => span.from <= range.from)
-      .reduce((total, span) => total + span.insert.length, 0);
-    range.from += shift;
-    range.to += shift;
-  }
+  shiftReplacementRanges(ranges, rendered);
   for (const span of rendered.spans) {
     // An addition inserts, so its source range is a point — but it has to be
     // the point it actually inserts at, in the saved note's own coordinates.
     // Claiming they all append meant the editor's map between the note and what
     // it renders was wrong, and typing beside a suggestion could commit the
     // suggestion and lose the typing.
-    const sourceFrom = toSource(span.sourceFrom);
+    const sourceFrom = sourceOffset(span.sourceFrom, markdown.length, applied);
     ranges.push({
       proposalId: span.id,
       from: span.from,
@@ -214,7 +233,11 @@ export function projectPendingEdits(
     });
   }
 
-  return { text: rendered.markdown, ranges: ranges.sort((a, b) => a.from - b.from), issues };
+  return {
+    text: rendered.markdown,
+    ranges: ranges.sort((a, b) => a.from - b.from),
+    issues: [...issues, ...overlapIssues],
+  };
 }
 
 function lineAt(text: string, position: number): number {

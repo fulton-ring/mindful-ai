@@ -21,7 +21,7 @@ function proposal(id: string, oldText: string, newText: string): EditProposal {
   };
 }
 
-describe('pending note projection', () => {
+function describeReplacementProjection(): void {
   it('submits the exact reviewed replacement, including untouched text', () => {
     const replacement = proposal('edit', 'old', 'new');
     expect(acceptedProposalMarkdown('Start old end', replacement, [replacement])).toBe(
@@ -79,7 +79,9 @@ describe('pending note projection', () => {
       { kind: 'invalid', proposalId: 'missing', message: 'The proposed oldText was not found' },
     ]);
   });
+}
 
+function describeCandidateProjection(): void {
   it('returns a unique candidate only when one pending range touches the cursor line', () => {
     const projection = projectPendingEdits('one two\nthree\nfour', [
       proposal('one', 'one', 'ONE'),
@@ -153,21 +155,26 @@ describe('pending note projection', () => {
     // A deletion covering the paragraph and its newline stops short of the first.
     expect(result.ranges[0]!.from).toBeGreaterThan(note.length + 1);
   });
+}
+
+describe('pending note projection', () => {
+  describe('replacements', describeReplacementProjection);
+  describe('candidate ranges', describeCandidateProjection);
 });
 
-describe('accepting what was previewed', () => {
-  /** The note as it reads once `id` is kept and the other ghosts are taken out. */
-  const accepted = (
-    markdown: string,
-    proposals: EditProposal[],
-    order: { id: string; text: string; accepted: boolean }[],
-    id: string,
-  ) => {
-    const edit = acceptQueueEdit(markdown, additionQueue(proposals, order), id);
-    if (!edit) throw new Error(`no edit for ${id}`);
-    return markdown.slice(0, edit.from) + edit.insert + markdown.slice(edit.to);
-  };
+/** The note as it reads once `id` is kept and the other ghosts are taken out. */
+const accepted = (
+  markdown: string,
+  proposals: EditProposal[],
+  order: { id: string; text: string; accepted: boolean }[],
+  id: string,
+) => {
+  const edit = acceptQueueEdit(markdown, additionQueue(proposals, order), id);
+  if (!edit) throw new Error(`no edit for ${id}`);
+  return markdown.slice(0, edit.from) + edit.insert + markdown.slice(edit.to);
+};
 
+function describeHiddenAdditionAcceptance(): void {
   it('keeps an addition where the preview drew it when a pending sibling is hidden', () => {
     // 'hidden' is pending on the server but not on screen — dismissed here, or
     // on another branch. Laying it out anyway put a chunk above the accepted
@@ -188,10 +195,28 @@ describe('accepting what was previewed', () => {
     );
     expect(accepted(markdown, visible, order, 'shown')).toBe(preview.text);
   });
+}
 
+function assertQueueAgreement(markdown: string, first: string, second: string): void {
+  if (first === second) return;
+  const proposals = [proposal('a', '', first), proposal('b', '', second)];
+  const order = [
+    { id: 'hidden', text: 'Office moves in August.', accepted: false },
+    ...proposals.map((item) => ({ id: item.id, text: item.newText, accepted: false })),
+  ];
+  const preview = projectPendingEdits(markdown, proposals, new Map(), order);
+  for (const id of ['a', 'b']) {
+    const other = id === 'a' ? second : first;
+    const expected = preview.text
+      .replace(other, '')
+      .replace(/\n{3,}/gu, '\n\n')
+      .trim();
+    expect(accepted(markdown, proposals, order, id).trim()).toBe(expected);
+  }
+}
+
+function describeQueueAgreement(): void {
   it('agrees with the preview for every shape of queue', () => {
-    // The two used to be derived separately, and each divergence read as the
-    // note rearranging itself the moment the reader clicked accept.
     const notes = [
       '',
       'Budget is fixed at 40k.',
@@ -205,31 +230,13 @@ describe('accepting what was previewed', () => {
       'Vendor contract ends in May.',
       'Ship date slips to April.',
     ];
-
     for (const markdown of notes)
       for (const first of texts)
-        for (const second of texts) {
-          if (first === second) continue;
-          const proposals = [proposal('a', '', first), proposal('b', '', second)];
-          const order = [
-            { id: 'hidden', text: 'Office moves in August.', accepted: false },
-            ...proposals.map((item) => ({ id: item.id, text: item.newText, accepted: false })),
-          ];
-          const preview = projectPendingEdits(markdown, proposals, new Map(), order);
-
-          for (const id of ['a', 'b']) {
-            const other = id === 'a' ? second : first;
-            // The preview with the other ghost taken back out is what accepting
-            // this one has to produce.
-            const expected = preview.text
-              .replace(other, '')
-              .replace(/\n{3,}/gu, '\n\n')
-              .trim();
-            expect(accepted(markdown, proposals, order, id).trim()).toBe(expected);
-          }
-        }
+        for (const second of texts) assertQueueAgreement(markdown, first, second);
   });
+}
 
+function describeOutOfOrderAcceptance(): void {
   it('accepting out of order leaves the note reading as it was previewed', () => {
     const markdown = 'Budget is fixed at 40k.';
     const proposals = [
@@ -262,6 +269,12 @@ describe('accepting what was previewed', () => {
       'Budget is fixed at 40k.\n\nHiring pauses until June.\n\nOffice moves in August.',
     );
   });
+}
+
+describe('accepting what was previewed', () => {
+  describe('hidden additions', describeHiddenAdditionAcceptance);
+  describe('queue agreement', describeQueueAgreement);
+  describe('out of order', describeOutOfOrderAcceptance);
 });
 
 describe('mapping between the note and what is rendered', () => {
