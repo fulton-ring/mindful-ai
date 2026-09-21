@@ -14,6 +14,21 @@ const MIN_EARLY_CHARS = 120;
 const MAX_EARLY_CHARS = 1_200;
 const FINAL_WAIT_MS = 2_000;
 
+type DoneEvent = Extract<ChatEvent, { type: 'done' }>;
+
+type AnnotationStreamState = {
+  output: ChatEvent[];
+  finalized: Annotation[];
+  wake?: () => void;
+  fullText: string;
+  coveredUpTo: number;
+  running?: Promise<void>;
+  allSucceeded: boolean;
+  primaryDone: boolean;
+  pumpFailure?: unknown;
+  doneEvent?: DoneEvent;
+};
+
 function completedBoundary(text: string) {
   let boundary = 0;
   for (const match of text.matchAll(/(?:\n\s*\n|[.!?]["')\]]?(?=\s|$))/gu)) {
@@ -50,6 +65,149 @@ export function mergeAnnotationsPreservingExisting(
   return result;
 }
 
+function createAnnotationStreamState(): AnnotationStreamState {
+  return {
+    output: [],
+    finalized: [],
+    fullText: '',
+    coveredUpTo: 0,
+    allSucceeded: true,
+    primaryDone: false,
+  };
+}
+
+function notify(state: AnnotationStreamState) {
+  state.wake?.();
+  state.wake = undefined;
+}
+
+function queueEvent(state: AnnotationStreamState, event: ChatEvent) {
+  state.output.push(event);
+  notify(state);
+}
+
+async function consumeWindowEvents(
+  state: AnnotationStreamState,
+  events: AsyncIterable<AnnotationEvent>,
+) {
+  let reachedDone = false;
+  for await (const event of events) {
+    if (event.type === 'annotation') {
+      state.finalized.push(event.annotation);
+      queueEvent(state, event);
+    }
+    if (event.type === 'done') {
+      reachedDone = true;
+      state.finalized.push(...event.annotations);
+    }
+  }
+  return reachedDone;
+}
+
+function createWindowController(
+  state: AnnotationStreamState,
+  classify: (text: string, signal: AbortSignal) => Promise<AsyncIterable<AnnotationEvent>>,
+  annotationSignal: AbortSignal,
+) {
+  let startWindow = () => {};
+  const budgetReached = () => state.finalized.length >= annotationBudget(state.fullText);
+  const runWindow = (segment: string, final: boolean) => {
+    state.coveredUpTo += segment.length;
+    state.running = (async () => {
+      try {
+        const events = await classify(segment, annotationSignal);
+        const reachedDone = await consumeWindowEvents(state, events);
+        if (!reachedDone) state.allSucceeded = false;
+      } catch {
+        state.allSucceeded = false;
+      } finally {
+        state.running = undefined;
+        notify(state);
+        if (!final) startWindow();
+      }
+    })();
+  };
+  startWindow = () => {
+    if (state.running || annotationSignal.aborted) return;
+    if (budgetReached()) {
+      state.coveredUpTo = state.fullText.length;
+      return;
+    }
+    const remaining = state.fullText.slice(state.coveredUpTo);
+    const boundary = completedBoundary(remaining);
+    if (!boundary) return;
+    runWindow(remaining.slice(0, boundary), false);
+  };
+  return { budgetReached, runWindow, startWindow };
+}
+
+async function pumpPrimary(
+  primaryIterator: AsyncIterator<ChatEvent>,
+  state: AnnotationStreamState,
+  startWindow: () => void,
+) {
+  try {
+    for (;;) {
+      const next = await primaryIterator.next();
+      if (next.done) break;
+      const event = next.value;
+      if (event.type === 'done') state.doneEvent = event;
+      else {
+        if (event.type === 'text') {
+          state.fullText += event.text;
+          startWindow();
+        }
+        queueEvent(state, event);
+      }
+    }
+  } catch (error) {
+    state.pumpFailure = error;
+  } finally {
+    state.primaryDone = true;
+    notify(state);
+  }
+}
+
+async function* emitPrimaryOutput(state: AnnotationStreamState): AsyncIterable<ChatEvent> {
+  while (!state.primaryDone || state.output.length) {
+    while (state.output.length) yield state.output.shift()!;
+    if (!state.primaryDone && !state.output.length)
+      await new Promise<void>((resolve) => (state.wake = resolve));
+  }
+}
+
+function* drainOutput(state: AnnotationStreamState): Iterable<ChatEvent> {
+  while (state.output.length) yield state.output.shift()!;
+}
+
+async function settleRunning(state: AnnotationStreamState): Promise<boolean> {
+  if (!state.running) return true;
+  return Promise.race([
+    state.running.then(() => true),
+    new Promise<false>((resolve) => setTimeout(() => resolve(false), FINAL_WAIT_MS)),
+  ]);
+}
+
+async function finishAnnotations(
+  state: AnnotationStreamState,
+  annotationController: AbortController,
+  windows: ReturnType<typeof createWindowController>,
+) {
+  const deadline = () => {
+    state.allSucceeded = false;
+    annotationController.abort('annotation completion deadline exceeded');
+  };
+  if (!(await settleRunning(state))) deadline();
+  if (
+    !annotationController.signal.aborted &&
+    !windows.budgetReached() &&
+    state.coveredUpTo < state.fullText.length
+  ) {
+    windows.runWindow(state.fullText.slice(state.coveredUpTo), true);
+    if (!(await settleRunning(state))) deadline();
+  }
+}
+
 /**
  * Classify the response in successive windows as it streams, rather than once
  * over the opening portion. A single early pass covered only the first window
@@ -68,136 +226,33 @@ export async function* streamWithEarlyAnnotations(
   if (signal?.aborted) abort();
   else signal?.addEventListener('abort', abort, { once: true });
   const primaryIterator = primary[Symbol.asyncIterator]();
-  const output: ChatEvent[] = [];
-  const finalized: Annotation[] = [];
-  let wake: (() => void) | undefined;
-  let fullText = '';
-  let coveredUpTo = 0;
-  let running: Promise<void> | undefined;
-  let allSucceeded = true;
-  let primaryDone = false;
-  let pumpFailure: unknown;
-  let doneEvent: Extract<ChatEvent, { type: 'done' }> | undefined;
-  const notify = () => {
-    wake?.();
-    wake = undefined;
-  };
-  const queue = (event: ChatEvent) => {
-    output.push(event);
-    notify();
-  };
-  const budgetReached = () => finalized.length >= annotationBudget(fullText);
-
-  /** Classify one segment. `final` drops the boundary requirement. */
-  const runWindow = (segment: string, final: boolean) => {
-    coveredUpTo += segment.length;
-    running = (async () => {
-      try {
-        const events = await classify(segment, annotationController.signal);
-        let reachedDone = false;
-        for await (const event of events) {
-          if (event.type === 'annotation') {
-            finalized.push(event.annotation);
-            queue(event);
-          }
-          if (event.type === 'done') {
-            reachedDone = true;
-            finalized.push(...event.annotations);
-          }
-        }
-        if (!reachedDone) allSucceeded = false;
-      } catch {
-        allSucceeded = false;
-      } finally {
-        running = undefined;
-        notify();
-        if (!final) startWindow();
-      }
-    })();
-  };
-
-  const startWindow = () => {
-    if (running || annotationController.signal.aborted) return;
-    // Nothing more is wanted once the response has earned its full budget.
-    if (budgetReached()) {
-      coveredUpTo = fullText.length;
-      return;
-    }
-    const remaining = fullText.slice(coveredUpTo);
-    const boundary = completedBoundary(remaining);
-    if (!boundary) return;
-    runWindow(remaining.slice(0, boundary), false);
-  };
-
-  const pump = (async () => {
-    try {
-      for (;;) {
-        const next = await primaryIterator.next();
-        if (next.done) break;
-        const event = next.value;
-        if (event.type === 'done') doneEvent = event;
-        else {
-          if (event.type === 'text') {
-            fullText += event.text;
-            startWindow();
-          }
-          queue(event);
-        }
-      }
-    } catch (error) {
-      pumpFailure = error;
-    } finally {
-      primaryDone = true;
-      notify();
-    }
-  })();
+  const state = createAnnotationStreamState();
+  const windows = createWindowController(state, classify, annotationController.signal);
+  const pump = pumpPrimary(primaryIterator, state, windows.startWindow);
   try {
-    while (!primaryDone || output.length) {
-      while (output.length) yield output.shift()!;
-      if (!primaryDone && !output.length) await new Promise<void>((resolve) => (wake = resolve));
-    }
-    const settle = async () => {
-      if (!running) return true;
-      return Promise.race([
-        running.then(() => true),
-        new Promise<false>((resolve) => setTimeout(() => resolve(false), FINAL_WAIT_MS)),
-      ]);
-    };
-    // A window that misses the deadline is a failure: mark it before aborting,
-    // because the aborted window's own catch may not run before we report.
-    const deadline = () => {
-      allSucceeded = false;
-      annotationController.abort('annotation completion deadline exceeded');
-    };
-    if (!(await settle())) deadline();
-    // The text is complete, so the tail no longer needs a sentence boundary to
-    // be worth classifying. Covering it here is what lets the client skip its
-    // post-completion sweep entirely.
-    if (!annotationController.signal.aborted && !budgetReached() && coveredUpTo < fullText.length) {
-      runWindow(fullText.slice(coveredUpTo), true);
-      if (!(await settle())) deadline();
-    }
-    while (output.length) yield output.shift()!;
+    yield* emitPrimaryOutput(state);
+    await finishAnnotations(state, annotationController, windows);
+    yield* drainOutput(state);
     await pump;
-    if (pumpFailure) throw pumpFailure;
-    if (doneEvent) {
+    if (state.pumpFailure) throw state.pumpFailure;
+    if (state.doneEvent) {
       const annotations = mergeAnnotationsPreservingExisting(
         [],
-        finalized,
-        doneEvent.message.content,
+        state.finalized,
+        state.doneEvent.message.content,
       );
       yield {
-        ...doneEvent,
-        annotationsHandled: allSucceeded && coveredUpTo >= fullText.length,
-        message: { ...doneEvent.message, annotations },
+        ...state.doneEvent,
+        annotationsHandled: state.allSucceeded && state.coveredUpTo >= state.fullText.length,
+        message: { ...state.doneEvent.message, annotations },
       };
     }
   } finally {
     annotationController.abort('annotation stream closed');
-    wake?.();
+    state.wake?.();
     signal?.removeEventListener('abort', abort);
     void primaryIterator.return?.().catch(() => {});
     void pump;
-    void running?.catch(() => {});
+    void state.running?.catch(() => {});
   }
 }
