@@ -169,108 +169,104 @@ describe('visible pending suggestions', () => {
   });
 });
 
-describe('conversation branch cache', () => {
-  it('updates the mounted default-URL query after a regular turn', () => {
-    const queryClient = new QueryClient();
-    const before = {
-      id: 'conversation-1',
-      branchId: 'branch-1',
-      branches: [],
-      title: 'Thread',
-      noteId: null,
-      messages: [],
-      expiresAt: '2026-09-25T00:00:00.000Z',
-      learningChecksEnabled: false,
-    } satisfies Conversation;
-    const after = {
-      ...before,
-      messages: [
-        {
-          id: 'user-1',
-          role: 'user' as const,
-          content: 'Question',
-          createdAt: '2026-09-18T00:00:00.000Z',
-        },
-      ],
-    };
-    queryClient.setQueryData(['conversation', before.id, null], before);
+it('conversation branch cache updates the mounted default-URL query after a regular turn', () => {
+  const queryClient = new QueryClient();
+  const before = {
+    id: 'conversation-1',
+    branchId: 'branch-1',
+    branches: [],
+    title: 'Thread',
+    noteId: null,
+    messages: [],
+    expiresAt: '2026-09-25T00:00:00.000Z',
+    learningChecksEnabled: false,
+  } satisfies Conversation;
+  const after = {
+    ...before,
+    messages: [
+      {
+        id: 'user-1',
+        role: 'user' as const,
+        content: 'Question',
+        createdAt: '2026-09-18T00:00:00.000Z',
+      },
+    ],
+  };
+  queryClient.setQueryData(['conversation', before.id, null], before);
 
-    expect(cacheConversationUpdate(queryClient, after, before.id, null, before.branchId)).toBe(
-      true,
-    );
+  expect(cacheConversationUpdate(queryClient, after, before.id, null, before.branchId)).toBe(true);
 
-    expect(
-      queryClient.getQueryData<Conversation>(['conversation', before.id, null])?.messages,
-    ).toEqual(after.messages);
-    expect(
-      queryClient.getQueryData<Conversation>(['conversation', before.id, before.branchId]),
-    ).toEqual(after);
-  });
+  expect(
+    queryClient.getQueryData<Conversation>(['conversation', before.id, null])?.messages,
+  ).toEqual(after.messages);
+  expect(
+    queryClient.getQueryData<Conversation>(['conversation', before.id, before.branchId]),
+  ).toEqual(after);
+});
 
-  it('updates the mounted explicit-branch query after a regular turn', () => {
-    const queryClient = new QueryClient();
-    const after = {
-      id: 'conversation-1',
-      branchId: 'branch-2',
-      branches: [],
-      title: 'Thread',
-      noteId: null,
-      messages: [
-        {
-          id: 'assistant-2',
-          role: 'assistant' as const,
-          content: 'Branch answer',
-          createdAt: '2026-09-18T00:00:00.000Z',
-        },
-      ],
-      expiresAt: '2026-09-25T00:00:00.000Z',
-      learningChecksEnabled: false,
-    } satisfies Conversation;
+it('conversation branch cache updates the mounted explicit-branch query after a regular turn', () => {
+  const queryClient = new QueryClient();
+  const after = {
+    id: 'conversation-1',
+    branchId: 'branch-2',
+    branches: [],
+    title: 'Thread',
+    noteId: null,
+    messages: [
+      {
+        id: 'assistant-2',
+        role: 'assistant' as const,
+        content: 'Branch answer',
+        createdAt: '2026-09-18T00:00:00.000Z',
+      },
+    ],
+    expiresAt: '2026-09-25T00:00:00.000Z',
+    learningChecksEnabled: false,
+  } satisfies Conversation;
 
-    expect(
-      cacheConversationUpdate(queryClient, after, after.id, after.branchId, after.branchId),
-    ).toBe(true);
-    expect(
-      queryClient.getQueryData<Conversation>(['conversation', after.id, after.branchId]),
-    ).toEqual(after);
-  });
+  expect(
+    cacheConversationUpdate(queryClient, after, after.id, after.branchId, after.branchId),
+  ).toBe(true);
+  expect(
+    queryClient.getQueryData<Conversation>(['conversation', after.id, after.branchId]),
+  ).toEqual(after);
+});
 
-  it('keeps the selected branch path when first-note capture returns the default branch', () => {
-    const queryClient = new QueryClient();
-    const selected = {
-      id: 'conversation-1',
-      branchId: 'branch-2',
-      branches: [],
-      title: 'Thread',
-      noteId: null,
-      messages: [
-        {
-          id: 'branch-answer',
-          role: 'assistant' as const,
-          content: 'Selected path',
-          createdAt: '2026-09-18T00:00:00.000Z',
-        },
-      ],
-      expiresAt: '2026-09-25T00:00:00.000Z',
-      learningChecksEnabled: false,
-    } satisfies Conversation;
-    const defaultBranchResponse = {
-      ...selected,
-      branchId: 'branch-1',
-      noteId: 'note-1',
-      messages: [],
-    };
-    const merged = mergeConversationAggregate(selected, defaultBranchResponse);
+it('conversation branch cache keeps the selected branch path when first-note capture returns the default branch', () => {
+  const queryClient = new QueryClient();
+  const selected = {
+    id: 'conversation-1',
+    branchId: 'branch-2',
+    branches: [],
+    title: 'Thread',
+    noteId: null,
+    messages: [
+      {
+        id: 'branch-answer',
+        role: 'assistant' as const,
+        content: 'Selected path',
+        createdAt: '2026-09-18T00:00:00.000Z',
+      },
+    ],
+    expiresAt: '2026-09-25T00:00:00.000Z',
+    learningChecksEnabled: false,
+  } satisfies Conversation;
+  const defaultBranchResponse = {
+    ...selected,
+    branchId: 'branch-1',
+    noteId: 'note-1',
+    messages: [],
+  };
+  const merged = mergeConversationAggregate(selected, defaultBranchResponse);
 
-    cacheConversationUpdate(queryClient, merged, selected.id, selected.branchId, selected.branchId);
+  cacheConversationUpdate(queryClient, merged, selected.id, selected.branchId, selected.branchId);
 
-    expect(merged.branchId).toBe('branch-2');
-    expect(merged.noteId).toBe('note-1');
-    expect(
-      queryClient.getQueryData<Conversation>(['conversation', selected.id, selected.branchId])
-        ?.messages,
-    ).toEqual(selected.messages);
-  });
+  expect(merged.branchId).toBe('branch-2');
+  expect(merged.noteId).toBe('note-1');
+  expect(
+    queryClient.getQueryData<Conversation>(['conversation', selected.id, selected.branchId])
+      ?.messages,
+  ).toEqual(selected.messages);
 });
 
 describe('note mutation response ownership', () => {
@@ -364,83 +360,81 @@ describe('unsaved note capture', () => {
   });
 });
 
-describe('capture placement', () => {
-  const note = (markdown: string, revision = 3) => ({
-    id: 'note-1',
-    title: 'Note',
-    markdown,
-    revision,
-    provenance: [],
-    createdAt: '',
-    updatedAt: '',
+const captureNote = (markdown: string, revision = 3) => ({
+  id: 'note-1',
+  title: 'Note',
+  markdown,
+  revision,
+  provenance: [],
+  createdAt: '',
+  updatedAt: '',
+});
+
+it('capture placement applies immediately while preserving text typed elsewhere during placement', async () => {
+  let current = captureNote('Plans\n\nLater');
+  const request = vi.fn(async () => {
+    current = captureNote('Plans\n\nLater today', 4);
+    return {
+      proposal: {
+        id: 'capture-1',
+        noteId: current.id,
+        baseRevision: 3,
+        oldText: 'Plans',
+        newText: 'Plans\n\nCall Sam',
+        reason: 'capture',
+        status: 'pending' as const,
+      },
+    };
   });
 
-  it('applies immediately while preserving text typed elsewhere during placement', async () => {
-    let current = note('Plans\n\nLater');
-    const request = vi.fn(async () => {
-      current = note('Plans\n\nLater today', 4);
-      return {
-        proposal: {
-          id: 'capture-1',
-          noteId: current.id,
-          baseRevision: 3,
-          oldText: 'Plans',
-          newText: 'Plans\n\nCall Sam',
-          reason: 'capture',
-          status: 'pending' as const,
-        },
-      };
-    });
+  const result = await resolveCapturePlacement(
+    () => current,
+    async () => current.revision,
+    request,
+  );
 
-    const result = await resolveCapturePlacement(
+  expect(result).toMatchObject({
+    kind: 'applied',
+    markdown: 'Plans\n\nCall Sam\n\nLater today',
+  });
+  expect(request).toHaveBeenCalledTimes(1);
+});
+
+it('capture placement refreshes placement once and never overwrites typing in its anchor', async () => {
+  let current = captureNote('Plans\n\nLater');
+  const request = vi.fn(async () => {
+    current = captureNote('Changed plans\n\nLater', 4);
+    return {
+      proposal: {
+        id: 'capture-1',
+        noteId: current.id,
+        baseRevision: 3,
+        oldText: 'Plans',
+        newText: 'Plans\n\nCall Sam',
+        reason: 'capture',
+        status: 'pending' as const,
+      },
+    };
+  });
+
+  await expect(
+    resolveCapturePlacement(
       () => current,
       async () => current.revision,
       request,
-    );
+    ),
+  ).resolves.toEqual({ kind: 'conflict' });
+  expect(request).toHaveBeenCalledTimes(2);
+  expect(current.markdown).toBe('Changed plans\n\nLater');
+});
 
-    expect(result).toMatchObject({
-      kind: 'applied',
-      markdown: 'Plans\n\nCall Sam\n\nLater today',
-    });
-    expect(request).toHaveBeenCalledTimes(1);
-  });
-
-  it('refreshes placement once and never overwrites typing in its anchor', async () => {
-    let current = note('Plans\n\nLater');
-    const request = vi.fn(async () => {
-      current = note('Changed plans\n\nLater', 4);
-      return {
-        proposal: {
-          id: 'capture-1',
-          noteId: current.id,
-          baseRevision: 3,
-          oldText: 'Plans',
-          newText: 'Plans\n\nCall Sam',
-          reason: 'capture',
-          status: 'pending' as const,
-        },
-      };
-    });
-
-    await expect(
-      resolveCapturePlacement(
-        () => current,
-        async () => current.revision,
-        request,
-      ),
-    ).resolves.toEqual({ kind: 'conflict' });
-    expect(request).toHaveBeenCalledTimes(2);
-    expect(current.markdown).toBe('Changed plans\n\nLater');
-  });
-
-  it('treats an already-present capture as a successful no-op', async () => {
-    const current = note('Call Sam');
-    await expect(
-      resolveCapturePlacement(
-        () => current,
-        async () => current.revision,
-        async () => ({ proposal: null }),
-      ),
-    ).resolves.toEqual({ kind: 'already-present' });
-  });
+it('capture placement treats an already-present capture as a successful no-op', async () => {
+  const current = captureNote('Call Sam');
+  await expect(
+    resolveCapturePlacement(
+      () => current,
+      async () => current.revision,
+      async () => ({ proposal: null }),
+    ),
+  ).resolves.toEqual({ kind: 'already-present' });
 });

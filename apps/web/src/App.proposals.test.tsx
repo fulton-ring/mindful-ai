@@ -41,13 +41,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function setup(linked = true) {
+function stubStorage() {
   for (const key of ['localStorage', 'sessionStorage']) {
     const values = new Map<string, string>();
     vi.stubGlobal(key, {
-      getItem: (key: string) => values.get(key) ?? null,
-      setItem: (key: string, value: string) => values.set(key, value),
-      removeItem: (key: string) => values.delete(key),
+      getItem: (name: string) => values.get(name) ?? null,
+      setItem: (name: string, value: string) => values.set(name, value),
+      removeItem: (name: string) => values.delete(name),
     });
   }
   vi.stubGlobal('matchMedia', () => ({
@@ -55,6 +55,9 @@ async function setup(linked = true) {
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
   }));
+}
+
+function setupFixtures(linked: boolean) {
   const note = {
     id: 'note',
     title: 'Note',
@@ -87,6 +90,14 @@ async function setup(linked = true) {
     learningChecksEnabled: false,
     expiresAt: '',
   };
+  return { note, proposal, conversation };
+}
+
+function stubWorkspaceApi(
+  note: ReturnType<typeof setupFixtures>['note'],
+  proposal: ReturnType<typeof setupFixtures>['proposal'],
+  conversation: ReturnType<typeof setupFixtures>['conversation'],
+) {
   vi.spyOn(api, 'personas').mockResolvedValue([]);
   vi.spyOn(api, 'conversations').mockResolvedValue([]);
   vi.spyOn(api, 'notes').mockResolvedValue([]);
@@ -97,12 +108,18 @@ async function setup(linked = true) {
     canUndo: false,
     canRedo: false,
   });
-  const decide = vi.spyOn(api, 'decideSuggestion').mockResolvedValue({
+  return vi.spyOn(api, 'decideSuggestion').mockResolvedValue({
     note: { ...note, markdown: proposal.newText, revision: 1 },
     suggestions: [{ ...proposal, status: 'accepted' }],
     canUndo: true,
     canRedo: false,
   });
+}
+
+async function setup(linked = true) {
+  stubStorage();
+  const { note, proposal, conversation } = setupFixtures(linked);
+  const decide = stubWorkspaceApi(note, proposal, conversation);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const previousChat = chat;
   const view = render(
