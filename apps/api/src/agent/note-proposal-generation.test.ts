@@ -1,3 +1,4 @@
+// biome-ignore lint/style/noExcessiveLinesPerFile: this integration scenario file keeps the streaming matrix together.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -72,6 +73,7 @@ function objectStream(...values: unknown[]) {
   });
 }
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: the capture-basis scenarios share one mocked stream harness.
 describe('note proposal capture basis', () => {
   beforeEach(() => {
     mocks.stream.mockReset();

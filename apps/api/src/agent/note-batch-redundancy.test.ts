@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   stream: vi.fn(),
@@ -70,92 +70,90 @@ const input = (markdown: string): AgentTurnInput => ({
   noteProposalRequested: false,
 });
 
-describe('note proposal batches', () => {
-  beforeEach(() => {
-    mocks.stream.mockReset();
-    mocks.options.mockReset();
-    mocks.primitives.mockReset();
+beforeEach(() => {
+  mocks.stream.mockReset();
+  mocks.options.mockReset();
+  mocks.primitives.mockReset();
+});
+
+it('keeps only one operation when two restate the same correction', async () => {
+  const markdown =
+    'Team will ship the beta on March 14 and cap the pilot at 50 users.\n\n- Beta ships March 14, pilot capped at 50 users.';
+  const operations = [
+    {
+      shouldPropose: true,
+      captureBasis: 'user_decision',
+      mode: 'replace',
+      oldText: 'Team will ship the beta on March 14 and cap the pilot at 50 users.',
+      newText: 'Team will ship the beta on March 21 and cap the pilot at 50 users, run by Priya.',
+      reason: 'Records the new date and owner.',
+    },
+    {
+      shouldPropose: true,
+      captureBasis: 'user_decision',
+      mode: 'replace',
+      oldText: '- Beta ships March 14, pilot capped at 50 users.',
+      newText: '- Beta ships March 21, pilot capped at 50 users, run by Priya.',
+      reason: 'Records the new date and owner.',
+    },
+  ] as const;
+  const batch = { operations, reason: '' };
+  mocks.stream.mockResolvedValue({
+    objectStream: objectStream(batch),
+    object: Promise.resolve(batch),
   });
 
-  it('keeps only one operation when two restate the same correction', async () => {
-    const markdown =
-      'Team will ship the beta on March 14 and cap the pilot at 50 users.\n\n- Beta ships March 14, pilot capped at 50 users.';
-    const operations = [
-      {
-        shouldPropose: true,
-        captureBasis: 'user_decision',
-        mode: 'replace',
-        oldText: 'Team will ship the beta on March 14 and cap the pilot at 50 users.',
-        newText: 'Team will ship the beta on March 21 and cap the pilot at 50 users, run by Priya.',
-        reason: 'Records the new date and owner.',
-      },
-      {
-        shouldPropose: true,
-        captureBasis: 'user_decision',
-        mode: 'replace',
-        oldText: '- Beta ships March 14, pilot capped at 50 users.',
-        newText: '- Beta ships March 21, pilot capped at 50 users, run by Priya.',
-        reason: 'Records the new date and owner.',
-      },
-    ] as const;
-    const batch = { operations, reason: '' };
-    mocks.stream.mockResolvedValue({
-      objectStream: objectStream(batch),
-      object: Promise.resolve(batch),
-    });
+  const events = [];
+  for await (const event of streamNoteProposal(
+    input(markdown),
+    assistantMessage,
+    model,
+    new AbortController().signal,
+  ))
+    events.push(event);
 
-    const events = [];
-    for await (const event of streamNoteProposal(
-      input(markdown),
-      assistantMessage,
-      model,
-      new AbortController().signal,
-    ))
-      events.push(event);
+  const done = events.at(-1);
+  if (done?.type !== 'done') throw new Error('Expected done event');
+  expect(done.proposals).toHaveLength(1);
+  expect(done.proposals?.[0]?.newText).toContain('March 21');
+});
 
-    const done = events.at(-1);
-    if (done?.type !== 'done') throw new Error('Expected done event');
-    expect(done.proposals).toHaveLength(1);
-    expect(done.proposals?.[0]?.newText).toContain('March 21');
+it('keeps both operations when they record genuinely different facts', async () => {
+  const markdown = 'Beta ships March 14.\n\nOpen question: staffing.';
+  const operations = [
+    {
+      shouldPropose: true,
+      captureBasis: 'user_decision',
+      mode: 'replace',
+      oldText: 'Beta ships March 14.',
+      newText: 'Beta ships March 21.',
+      reason: 'Records the new date.',
+    },
+    {
+      shouldPropose: true,
+      captureBasis: 'user_decision',
+      mode: 'replace',
+      oldText: 'Open question: staffing.',
+      newText: 'Priya is running the pilot.',
+      reason: 'Records the owner.',
+    },
+  ] as const;
+  const batch = { operations, reason: '' };
+  mocks.stream.mockResolvedValue({
+    objectStream: objectStream(batch),
+    object: Promise.resolve(batch),
   });
 
-  it('keeps both operations when they record genuinely different facts', async () => {
-    const markdown = 'Beta ships March 14.\n\nOpen question: staffing.';
-    const operations = [
-      {
-        shouldPropose: true,
-        captureBasis: 'user_decision',
-        mode: 'replace',
-        oldText: 'Beta ships March 14.',
-        newText: 'Beta ships March 21.',
-        reason: 'Records the new date.',
-      },
-      {
-        shouldPropose: true,
-        captureBasis: 'user_decision',
-        mode: 'replace',
-        oldText: 'Open question: staffing.',
-        newText: 'Priya is running the pilot.',
-        reason: 'Records the owner.',
-      },
-    ] as const;
-    const batch = { operations, reason: '' };
-    mocks.stream.mockResolvedValue({
-      objectStream: objectStream(batch),
-      object: Promise.resolve(batch),
-    });
+  const events = [];
+  for await (const event of streamNoteProposal(
+    input(markdown),
+    assistantMessage,
+    model,
+    new AbortController().signal,
+  ))
+    events.push(event);
 
-    const events = [];
-    for await (const event of streamNoteProposal(
-      input(markdown),
-      assistantMessage,
-      model,
-      new AbortController().signal,
-    ))
-      events.push(event);
-
-    const done = events.at(-1);
-    if (done?.type !== 'done') throw new Error('Expected done event');
-    expect(done.proposals).toHaveLength(2);
-  });
+  const done = events.at(-1);
+  if (done?.type !== 'done') throw new Error('Expected done event');
+  expect(done.proposals).toHaveLength(2);
 });

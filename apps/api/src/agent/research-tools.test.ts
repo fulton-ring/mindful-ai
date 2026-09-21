@@ -186,6 +186,7 @@ const turnInput = (): AgentTurnInput => ({
   action: 'message',
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: these cases exercise one complete multi-step turn harness.
 describe('research tools in a Mastra turn', () => {
   it('stops a failed web lookup before the model can turn it into an unsupported answer', async () => {
     const events: ChatEvent[] = [];
@@ -246,6 +247,7 @@ describe('research tools in a Mastra turn', () => {
     });
   });
 
+  // biome-ignore lint/complexity/noExcessiveLinesPerFunction: the assertion covers the full tool-call sequence.
   it('reads, searches, exposes tool results to later model steps, and returns a cited answer', async () => {
     const controller = new AbortController();
     const calls: LanguageModelV3CallOptions[] = [];

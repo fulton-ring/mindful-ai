@@ -59,6 +59,7 @@ describe('visibleStreamEvent', () => {
   });
 });
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: decoder cases share the same leaked syntax fixtures.
 describe('GemmaToolLeakDecoder', () => {
   const leaked =
     'proposeAsk{options:[<|"|>Focus on the \'common driver\' mechanism<|"|>,<|"|>Focus on the conditions for decoupling<|"|>,<|"|>Focus on the lag between instruments<|"|>,<|"|>Other<|"|>],question:<|"|>Which aspect of the challenge best serves your current thinking?<|"|>}';
