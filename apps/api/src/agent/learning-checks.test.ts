@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { recoveredFrontendIntervention } from './index';
+import { normalizeLearningCheck, recoveredFrontendIntervention } from './learning-checks';
 
 const call = {
   name: 'proposeLearningCheck' as const,
@@ -45,5 +45,27 @@ describe('the learning-check off switch', () => {
       input: { question: 'Which draft should I edit?', options: ['First', 'Second'] },
     };
     expect(recoveredFrontendIntervention(ask, 'turn', false)).toMatchObject({ kind: 'ask' });
+  });
+});
+
+describe('learning-check normalization', () => {
+  it('normalizes mixed question batches into durable learning checks', () => {
+    expect(
+      normalizeLearningCheck(
+        {
+          questions: [
+            { question: 'Which layer changes?', options: ['Oxide', 'Core'] },
+            { question: 'Why does the layer matter?' },
+          ],
+        },
+        'turn-1',
+      ),
+    ).toMatchObject({
+      kind: 'learning_check',
+      questions: [
+        { format: 'multiple_choice', id: 'question_1' },
+        { format: 'short_answer', id: 'question_2' },
+      ],
+    });
   });
 });
