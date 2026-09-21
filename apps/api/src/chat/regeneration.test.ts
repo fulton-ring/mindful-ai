@@ -30,7 +30,9 @@ describe('assistant response regeneration', () => {
 
     await expect(batchIfAny(db, [])).resolves.toBeUndefined();
   });
+});
 
+describe('regeneration context', () => {
   it('uses any completed assistant and its preceding user prompt', () => {
     const messages = [
       message('u1', 'user', 'Earlier'),
@@ -67,7 +69,9 @@ describe('assistant response regeneration', () => {
     });
     expect(editContext(messages, 'a2')).toBeNull();
   });
+});
 
+describe('assistant response regeneration SQL', () => {
   it('replaces the latest assistant ID and content at the same sequence only on success', () => {
     const db = join(mkdtempSync(join(tmpdir(), 'walden-regenerate-')), 'fixture.sqlite');
     execFileSync('sqlite3', [db], {

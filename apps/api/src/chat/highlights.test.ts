@@ -33,38 +33,43 @@ const request = (ownerId: string, body: unknown) => {
   );
 };
 
+async function createHighlightsDatabase(): Promise<D1Database> {
+  const file = join(mkdtempSync(join(tmpdir(), 'walden-highlights-')), 'fixture.sqlite');
+  const migrations = new URL('../../migrations/', import.meta.url);
+  execFileSync('sqlite3', [file], {
+    input: readdirSync(migrations)
+      .filter((name) => name.endsWith('.sql'))
+      .sort()
+      .map((name) => readFileSync(new URL(name, migrations), 'utf8'))
+      .join('\n'),
+  });
+  const database = sqliteD1Binding(file);
+  await database.prepare("INSERT INTO users VALUES ('owner','subject','now','now',0)").run();
+  await database.prepare("INSERT INTO users VALUES ('other','other-subject','now','now',0)").run();
+  await database
+    .prepare(
+      "INSERT INTO conversations (id,owner_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('conversation','owner','Title','now','2999-01-01','active','now')",
+    )
+    .run();
+  await database
+    .prepare(
+      "INSERT INTO conversation_branches (id,conversation_id,owner_id,head_message_id,is_default,status,last_user_activity_at,expires_at,created_at) VALUES ('branch','conversation','owner',NULL,1,'active','now','2999-01-01','now')",
+    )
+    .run();
+  await database
+    .prepare(
+      "INSERT INTO messages (id,conversation_id,owner_id,role,content,sequence,created_at,origin_branch_id) VALUES ('message','conversation','owner','assistant','A😀B answer',1,'now','branch')",
+    )
+    .run();
+  await database
+    .prepare("UPDATE conversation_branches SET head_message_id='message' WHERE id='branch'")
+    .run();
+  return database;
+}
+
 describe('saved message highlights', () => {
   beforeEach(async () => {
-    const file = join(mkdtempSync(join(tmpdir(), 'walden-highlights-')), 'fixture.sqlite');
-    const migrations = new URL('../../migrations/', import.meta.url);
-    execFileSync('sqlite3', [file], {
-      input: readdirSync(migrations)
-        .filter((name) => name.endsWith('.sql'))
-        .sort()
-        .map((name) => readFileSync(new URL(name, migrations), 'utf8'))
-        .join('\n'),
-    });
-    db = sqliteD1Binding(file);
-    await db.prepare("INSERT INTO users VALUES ('owner','subject','now','now',0)").run();
-    await db.prepare("INSERT INTO users VALUES ('other','other-subject','now','now',0)").run();
-    await db
-      .prepare(
-        "INSERT INTO conversations (id,owner_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('conversation','owner','Title','now','2999-01-01','active','now')",
-      )
-      .run();
-    await db
-      .prepare(
-        "INSERT INTO conversation_branches (id,conversation_id,owner_id,head_message_id,is_default,status,last_user_activity_at,expires_at,created_at) VALUES ('branch','conversation','owner',NULL,1,'active','now','2999-01-01','now')",
-      )
-      .run();
-    await db
-      .prepare(
-        "INSERT INTO messages (id,conversation_id,owner_id,role,content,sequence,created_at,origin_branch_id) VALUES ('message','conversation','owner','assistant','A😀B answer',1,'now','branch')",
-      )
-      .run();
-    await db
-      .prepare("UPDATE conversation_branches SET head_message_id='message' WHERE id='branch'")
-      .run();
+    db = await createHighlightsDatabase();
   });
 
   it('validates raw UTF-16 ranges and rejects another owner', async () => {

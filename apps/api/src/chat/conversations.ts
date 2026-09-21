@@ -84,12 +84,11 @@ async function purgeConversationState(
   ]);
 }
 
-export async function loadConversation(
+async function loadConversationRow(
   db: D1Database,
   ownerId: string,
   id: string,
-  options: { renewExpired?: boolean; branchId?: string } = {},
-): Promise<Conversation> {
+): Promise<ConversationRow> {
   const row = await first<ConversationRow>(
     db
       .prepare(
@@ -102,31 +101,92 @@ export async function loadConversation(
       .bind(id, ownerId),
   );
   if (!row) throw new HttpError(404, 'Conversation not found');
-  let branches = await all<BranchRow>(
+  return row;
+}
+
+async function loadConversationBranches(
+  db: D1Database,
+  ownerId: string,
+  id: string,
+): Promise<BranchRow[]> {
+  return all<BranchRow>(
     db
       .prepare(
         'SELECT id,head_message_id,forked_from_message_id,expires_at,status FROM conversation_branches WHERE conversation_id=? AND owner_id=? ORDER BY is_default DESC,created_at',
       )
       .bind(id, ownerId),
   );
-  let branch = options.branchId
+}
+
+const isActiveBranch = ({ status, expires_at }: BranchRow) =>
+  status === 'active' && expires_at > nowIso();
+
+type ResolvedBranch = {
+  branch: BranchRow;
+  branches: BranchRow[];
+  expiredConversation?: Conversation;
+};
+
+async function renewConversation(
+  db: D1Database,
+  ownerId: string,
+  id: string,
+  branch: BranchRow,
+  branches: BranchRow[],
+): Promise<ResolvedBranch> {
+  await purgeConversationState(db, ownerId, id);
+  const renewedAt = nowIso();
+  const renewedExpiry = new Date(Date.now() + RETENTION_MS).toISOString();
+  await db.batch([
+    db
+      .prepare(
+        "UPDATE conversation_branches SET status='active',head_message_id=NULL,forked_from_message_id=NULL,last_user_activity_at=?,expires_at=? WHERE id=? AND owner_id=?",
+      )
+      .bind(renewedAt, renewedExpiry, branch.id, ownerId),
+    db
+      .prepare(
+        "UPDATE conversations SET status='active',last_user_activity_at=?,expires_at=? WHERE id=? AND owner_id=?",
+      )
+      .bind(renewedAt, renewedExpiry, id, ownerId),
+  ]);
+  const renewedBranch = {
+    ...branch,
+    status: 'active',
+    head_message_id: null,
+    expires_at: renewedExpiry,
+  };
+  return {
+    branch: renewedBranch,
+    branches: branches.map((item) => (item.id === renewedBranch.id ? renewedBranch : item)),
+  };
+}
+
+async function resolveConversationBranch(
+  db: D1Database,
+  ownerId: string,
+  id: string,
+  row: ConversationRow,
+  branches: BranchRow[],
+  options: { renewExpired?: boolean; branchId?: string },
+): Promise<ResolvedBranch> {
+  const branch = options.branchId
     ? branches.find(({ id: branchId }) => branchId === options.branchId)
-    : (branches.find(({ status, expires_at }) => status === 'active' && expires_at > nowIso()) ??
-      branches[0]);
+    : (branches.find(isActiveBranch) ?? branches[0]);
   if (!branch) throw new HttpError(404, 'Branch not found');
-  if (branch.status !== 'active' || branch.expires_at <= nowIso()) {
-    const hasActiveBranch = branches.some(
-      ({ status, expires_at }) => status === 'active' && expires_at > nowIso(),
-    );
-    // A new message may restart a fully expired note-backed conversation, even
-    // when the client supplies the branch shown in its empty transcript.
-    if (options.branchId && (!options.renewExpired || row.note_id === null || hasActiveBranch))
-      throw new HttpError(410, 'Branch expired');
-    if (row.note_id === null || !options.renewExpired) {
-      if (!branches.some(({ status, expires_at }) => status === 'active' && expires_at > nowIso()))
-        await purgeConversationState(db, ownerId, id);
-      if (row.note_id === null) throw new HttpError(410, 'Conversation expired');
-      return {
+  if (branch.status === 'active' && branch.expires_at > nowIso()) return { branch, branches };
+
+  const hasActiveBranch = branches.some(isActiveBranch);
+  // A new message may restart a fully expired note-backed conversation, even
+  // when the client supplies the branch shown in its empty transcript.
+  if (options.branchId && (!options.renewExpired || row.note_id === null || hasActiveBranch))
+    throw new HttpError(410, 'Branch expired');
+  if (row.note_id === null || !options.renewExpired) {
+    if (!hasActiveBranch) await purgeConversationState(db, ownerId, id);
+    if (row.note_id === null) throw new HttpError(410, 'Conversation expired');
+    return {
+      branch,
+      branches: [],
+      expiredConversation: {
         id: row.id,
         title: row.title,
         noteId: row.note_id,
@@ -136,84 +196,85 @@ export async function loadConversation(
         webSearchEnabled: row.web_search_enabled !== 0,
         branchId: branch.id,
         branches: [],
-      };
-    }
-    await purgeConversationState(db, ownerId, id);
-    const renewedAt = nowIso();
-    const renewedExpiry = new Date(Date.now() + RETENTION_MS).toISOString();
-    await db.batch([
-      db
-        .prepare(
-          "UPDATE conversation_branches SET status='active',head_message_id=NULL,forked_from_message_id=NULL,last_user_activity_at=?,expires_at=? WHERE id=? AND owner_id=?",
-        )
-        .bind(renewedAt, renewedExpiry, branch.id, ownerId),
-      db
-        .prepare(
-          "UPDATE conversations SET status='active',last_user_activity_at=?,expires_at=? WHERE id=? AND owner_id=?",
-        )
-        .bind(renewedAt, renewedExpiry, id, ownerId),
-    ]);
-    branch = { ...branch, status: 'active', head_message_id: null, expires_at: renewedExpiry };
-    branches = branches.map((item) => (item.id === branch?.id ? branch : item));
-  }
-  const messages = (
-    await all<MessageRow>(
-      db
-        .prepare(
-          `WITH RECURSIVE path(id,parent_message_id,depth) AS (
-             SELECT id,parent_message_id,0 FROM messages WHERE id=? AND conversation_id=? AND owner_id=?
-             UNION ALL
-             SELECT m.id,m.parent_message_id,path.depth+1 FROM messages m JOIN path ON m.id=path.parent_message_id
-             WHERE m.conversation_id=? AND m.owner_id=?
-           )
-           SELECT m.id,m.role,m.content,m.reasoning,m.created_at,m.activity_json,m.incomplete,m.persona_name,
-             COALESCE((SELECT json_group_array(json_object('start',ordered.start,'end',ordered.end,'quote',ordered.quote,'color',ordered.color,'origin',ordered.origin))
-               FROM (SELECT h.start,h.end,h.quote,h.color,h.origin FROM message_highlights h
-                 WHERE h.message_id=m.id AND h.owner_id=m.owner_id AND h.origin='user'
-                 ORDER BY h.updated_at ASC,h.rowid ASC) ordered),'[]') AS highlights_json,
-             COALESCE((SELECT json_group_array(json_object('quote',a.quote,'kind',a.kind,'start',a.start))
-               FROM (SELECT h.quote,h.kind,h.start FROM message_highlights h
-                 WHERE h.message_id=m.id AND h.owner_id=m.owner_id AND h.origin='agent'
-                 ORDER BY h.start ASC) a),'[]') AS agent_highlights_json
-           FROM path JOIN messages m ON m.id=path.id ORDER BY path.depth DESC`,
-        )
-        .bind(branch.head_message_id, id, ownerId, id, ownerId),
-    )
-  ).map<Message>((message) => {
-    const activity = parseJson<{
-      tools?: ToolActivity[];
-      sources?: MessageSource[];
-      contextCompacted?: boolean;
-      learningCheck?: Message['learningCheck'];
-      learningCheckResponse?: Message['learningCheckResponse'];
-    }>(message.activity_json, {});
-    return {
-      id: message.id,
-      role: message.role,
-      content: message.content,
-      ...(message.reasoning ? { reasoning: message.reasoning } : {}),
-      createdAt: message.created_at,
-      ...(message.persona_name ? { personaName: message.persona_name } : {}),
-      annotations: parseJson<Array<{ quote: string; kind: string; start: number }>>(
-        message.agent_highlights_json,
-        [],
-      ).map((row) => ({
-        id: `agent:${message.id}:${row.start}`,
-        quote: row.quote,
-        kind: row.kind as Annotation['kind'],
-        whose: 'assistant' as const,
-      })),
-      highlights: parseJson<MessageHighlight[]>(message.highlights_json, []),
-      ...(activity.tools?.length ? { tools: activity.tools } : {}),
-      ...(activity.sources?.length ? { sources: activity.sources } : {}),
-      ...(activity.contextCompacted ? { contextCompacted: true } : {}),
-      ...(activity.learningCheck ? { learningCheck: activity.learningCheck } : {}),
-      ...(activity.learningCheckResponse
-        ? { learningCheckResponse: activity.learningCheckResponse }
-        : {}),
-      incomplete: Boolean(message.incomplete),
+      },
     };
-  });
+  }
+  return renewConversation(db, ownerId, id, branch, branches);
+}
+
+function mapConversationMessage(message: MessageRow): Message {
+  const activity = parseJson<{
+    tools?: ToolActivity[];
+    sources?: MessageSource[];
+    contextCompacted?: boolean;
+    learningCheck?: Message['learningCheck'];
+    learningCheckResponse?: Message['learningCheckResponse'];
+  }>(message.activity_json, {});
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    ...(message.reasoning ? { reasoning: message.reasoning } : {}),
+    createdAt: message.created_at,
+    ...(message.persona_name ? { personaName: message.persona_name } : {}),
+    annotations: parseJson<Array<{ quote: string; kind: string; start: number }>>(
+      message.agent_highlights_json,
+      [],
+    ).map((row) => ({
+      id: `agent:${message.id}:${row.start}`,
+      quote: row.quote,
+      kind: row.kind as Annotation['kind'],
+      whose: 'assistant' as const,
+    })),
+    highlights: parseJson<MessageHighlight[]>(message.highlights_json, []),
+    ...(activity.tools?.length ? { tools: activity.tools } : {}),
+    ...(activity.sources?.length ? { sources: activity.sources } : {}),
+    ...(activity.contextCompacted ? { contextCompacted: true } : {}),
+    ...(activity.learningCheck ? { learningCheck: activity.learningCheck } : {}),
+    ...(activity.learningCheckResponse
+      ? { learningCheckResponse: activity.learningCheckResponse }
+      : {}),
+    incomplete: Boolean(message.incomplete),
+  };
+}
+
+async function loadConversationMessages(
+  db: D1Database,
+  ownerId: string,
+  id: string,
+  headMessageId: string | null,
+): Promise<Message[]> {
+  const rows = await all<MessageRow>(
+    db
+      .prepare(
+        `WITH RECURSIVE path(id,parent_message_id,depth) AS (
+           SELECT id,parent_message_id,0 FROM messages WHERE id=? AND conversation_id=? AND owner_id=?
+           UNION ALL
+           SELECT m.id,m.parent_message_id,path.depth+1 FROM messages m JOIN path ON m.id=path.parent_message_id
+           WHERE m.conversation_id=? AND m.owner_id=?
+         )
+         SELECT m.id,m.role,m.content,m.reasoning,m.created_at,m.activity_json,m.incomplete,m.persona_name,
+           COALESCE((SELECT json_group_array(json_object('start',ordered.start,'end',ordered.end,'quote',ordered.quote,'color',ordered.color,'origin',ordered.origin))
+             FROM (SELECT h.start,h.end,h.quote,h.color,h.origin FROM message_highlights h
+               WHERE h.message_id=m.id AND h.owner_id=m.owner_id AND h.origin='user'
+               ORDER BY h.updated_at ASC,h.rowid ASC) ordered),'[]') AS highlights_json,
+           COALESCE((SELECT json_group_array(json_object('quote',a.quote,'kind',a.kind,'start',a.start))
+             FROM (SELECT h.quote,h.kind,h.start FROM message_highlights h
+               WHERE h.message_id=m.id AND h.owner_id=m.owner_id AND h.origin='agent'
+               ORDER BY h.start ASC) a),'[]') AS agent_highlights_json
+         FROM path JOIN messages m ON m.id=path.id ORDER BY path.depth DESC`,
+      )
+      .bind(headMessageId, id, ownerId, id, ownerId),
+  );
+  return rows.map(mapConversationMessage);
+}
+
+function buildConversation(
+  row: ConversationRow,
+  branch: BranchRow,
+  branches: BranchRow[],
+  messages: Message[],
+): Conversation {
   return {
     id: row.id,
     title: row.title,
@@ -223,15 +284,33 @@ export async function loadConversation(
     learningChecksEnabled: Boolean(row.learning_checks_enabled),
     webSearchEnabled: row.web_search_enabled !== 0,
     branchId: branch.id,
-    branches: branches
-      .filter(({ status, expires_at }) => status === 'active' && expires_at > nowIso())
-      .map((item) => ({
-        id: item.id,
-        forkedFromMessageId: item.forked_from_message_id,
-        headMessageId: item.head_message_id,
-        expiresAt: item.expires_at,
-      })),
+    branches: branches.filter(isActiveBranch).map((item) => ({
+      id: item.id,
+      forkedFromMessageId: item.forked_from_message_id,
+      headMessageId: item.head_message_id,
+      expiresAt: item.expires_at,
+    })),
   };
+}
+
+export async function loadConversation(
+  db: D1Database,
+  ownerId: string,
+  id: string,
+  options: { renewExpired?: boolean; branchId?: string } = {},
+): Promise<Conversation> {
+  const row = await loadConversationRow(db, ownerId, id);
+  const resolved = await resolveConversationBranch(
+    db,
+    ownerId,
+    id,
+    row,
+    await loadConversationBranches(db, ownerId, id),
+    options,
+  );
+  if (resolved.expiredConversation) return resolved.expiredConversation;
+  const messages = await loadConversationMessages(db, ownerId, id, resolved.branch.head_message_id);
+  return buildConversation(row, resolved.branch, resolved.branches, messages);
 }
 
 export const conversationRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -274,6 +353,121 @@ const captureReplay = (
       )
       .bind(conversationId, ownerId, operationId),
   );
+type CaptureInput = z.infer<typeof captureSchema>;
+type CaptureResult = { conversation: Conversation; note: Note; created: boolean };
+
+async function persistCapturedNote(
+  db: D1Database,
+  ownerId: string,
+  conversationId: string,
+  conversation: Conversation,
+  input: CaptureInput,
+) {
+  const now = nowIso();
+  const noteId = newId();
+  const provenance: ProvenanceSpan[] = [
+    {
+      from: 0,
+      to: input.text.length,
+      origin: input.verbatim ? 'agent' : 'user',
+      verbatim: input.verbatim,
+      ...(input.verbatim ? { captureId: input.operationId } : {}),
+    },
+  ];
+  const provenanceJson = JSON.stringify(provenance);
+  const results = await db.batch([
+    db
+      .prepare(
+        `INSERT INTO notes (id,owner_id,markdown,revision,provenance_json,created_at,updated_at,title)
+         SELECT ?,?,'',0,'[]',?,?,? WHERE EXISTS (
+           SELECT 1 FROM conversations c WHERE c.id=? AND c.owner_id=? AND c.note_id IS NULL
+           AND c.status='active' AND c.expires_at>?
+           AND NOT EXISTS (SELECT 1 FROM turns t WHERE t.conversation_id=c.id AND t.owner_id=c.owner_id AND t.status='streaming')
+         )`,
+      )
+      .bind(noteId, ownerId, now, now, conversation.title, conversationId, ownerId, now),
+    db
+      .prepare(
+        `INSERT INTO note_edits (id,note_id,owner_id,operation_id,base_revision,result_revision,before_title,before_markdown,before_provenance_json,after_title,after_markdown,after_provenance_json,created_at)
+         SELECT ?,id,owner_id,?,0,1,?,'','[]',?,?,?,? FROM notes WHERE id=? AND owner_id=? AND revision=0`,
+      )
+      .bind(
+        newId(),
+        input.operationId,
+        conversation.title,
+        conversation.title,
+        input.text,
+        provenanceJson,
+        now,
+        noteId,
+        ownerId,
+      ),
+    db
+      .prepare(
+        'UPDATE notes SET markdown=?,provenance_json=?,revision=1,updated_at=? WHERE id=? AND owner_id=? AND revision=0 AND EXISTS (SELECT 1 FROM note_edits WHERE note_id=? AND owner_id=? AND operation_id=?)',
+      )
+      .bind(input.text, provenanceJson, now, noteId, ownerId, noteId, ownerId, input.operationId),
+    db
+      .prepare(
+        `UPDATE conversations SET note_id=? WHERE id=? AND owner_id=? AND note_id IS NULL
+         AND status='active' AND expires_at>?
+         AND NOT EXISTS (SELECT 1 FROM turns WHERE conversation_id=conversations.id AND owner_id=conversations.owner_id AND status='streaming')
+         AND EXISTS (SELECT 1 FROM notes WHERE id=? AND owner_id=? AND revision=1)`,
+      )
+      .bind(noteId, conversationId, ownerId, now, noteId, ownerId),
+  ]);
+  return { now, noteId, provenance, results };
+}
+
+async function captureConversation(
+  db: D1Database,
+  ownerId: string,
+  conversationId: string,
+  input: CaptureInput,
+): Promise<CaptureResult> {
+  const replay = await captureReplay(db, conversationId, ownerId, input.operationId);
+  if (replay) {
+    const conversation = await loadConversation(db, ownerId, conversationId);
+    return { conversation, note: capturedNote(replay, conversation.title), created: false };
+  }
+  const conversation = await loadConversation(db, ownerId, conversationId);
+  if (conversation.noteId) throw new HttpError(409, 'Conversation already has a note');
+  const streaming = await first<{ id: string }>(
+    db
+      .prepare("SELECT id FROM turns WHERE conversation_id=? AND owner_id=? AND status='streaming'")
+      .bind(conversationId, ownerId),
+  );
+  if (streaming) throw new HttpError(409, 'Cannot capture while a turn is streaming');
+
+  const persisted = await persistCapturedNote(db, ownerId, conversationId, conversation, input);
+  if (persisted.results.some((result) => result.meta.changes !== 1)) {
+    const racedReplay = await captureReplay(db, conversationId, ownerId, input.operationId);
+    if (racedReplay) {
+      const current = await loadConversation(db, ownerId, conversationId);
+      return {
+        conversation: current,
+        note: capturedNote(racedReplay, current.title),
+        created: false,
+      };
+    }
+    throw new HttpError(409, 'Conversation changed during capture');
+  }
+  conversation.noteId = persisted.noteId;
+  return {
+    conversation,
+    note: {
+      id: persisted.noteId,
+      title: conversation.title,
+      markdown: input.text,
+      revision: 1,
+      provenance: persisted.provenance,
+      createdAt: persisted.now,
+      updatedAt: persisted.now,
+    },
+    created: true,
+  };
+}
+
 async function createConversation(
   db: D1Database,
   ownerId: string,
@@ -399,105 +593,14 @@ conversationRoutes.get('/conversations/:id', async (c) =>
 conversationRoutes.post('/conversations/:id/capture', async (c) => {
   const parsed = captureSchema.safeParse(await jsonBody<unknown>(c));
   if (!parsed.success) throw new HttpError(400, 'Invalid note capture', parsed.error.flatten());
-  const ownerId = c.get('userId');
-  const conversationId = c.req.param('id');
-  const replay = await captureReplay(c.env.DB, conversationId, ownerId, parsed.data.operationId);
-  if (replay) {
-    const conversation = await loadConversation(c.env.DB, ownerId, conversationId);
-    return c.json({ conversation, note: capturedNote(replay, conversation.title) });
-  }
-  const conversation = await loadConversation(c.env.DB, ownerId, conversationId);
-  if (conversation.noteId) throw new HttpError(409, 'Conversation already has a note');
-  const streaming = await first<{ id: string }>(
-    c.env.DB.prepare(
-      "SELECT id FROM turns WHERE conversation_id=? AND owner_id=? AND status='streaming'",
-    ).bind(conversationId, ownerId),
+  const result = await captureConversation(
+    c.env.DB,
+    c.get('userId'),
+    c.req.param('id'),
+    parsed.data,
   );
-  if (streaming) throw new HttpError(409, 'Cannot capture while a turn is streaming');
-
-  const now = nowIso();
-  const noteId = newId();
-  const provenance: ProvenanceSpan[] = [
-    {
-      from: 0,
-      to: parsed.data.text.length,
-      origin: parsed.data.verbatim ? 'agent' : 'user',
-      verbatim: parsed.data.verbatim,
-      ...(parsed.data.verbatim ? { captureId: parsed.data.operationId } : {}),
-    },
-  ];
-  const provenanceJson = JSON.stringify(provenance);
-  const results = await c.env.DB.batch([
-    c.env.DB.prepare(
-      `INSERT INTO notes (id,owner_id,markdown,revision,provenance_json,created_at,updated_at,title)
-       SELECT ?,?,'',0,'[]',?,?,? WHERE EXISTS (
-         SELECT 1 FROM conversations c WHERE c.id=? AND c.owner_id=? AND c.note_id IS NULL
-         AND c.status='active' AND c.expires_at>?
-         AND NOT EXISTS (SELECT 1 FROM turns t WHERE t.conversation_id=c.id AND t.owner_id=c.owner_id AND t.status='streaming')
-       )`,
-    ).bind(noteId, ownerId, now, now, conversation.title, conversationId, ownerId, now),
-    c.env.DB.prepare(
-      `INSERT INTO note_edits (id,note_id,owner_id,operation_id,base_revision,result_revision,before_title,before_markdown,before_provenance_json,after_title,after_markdown,after_provenance_json,created_at)
-       SELECT ?,id,owner_id,?,0,1,?,'','[]',?,?,?,? FROM notes WHERE id=? AND owner_id=? AND revision=0`,
-    ).bind(
-      newId(),
-      parsed.data.operationId,
-      conversation.title,
-      conversation.title,
-      parsed.data.text,
-      provenanceJson,
-      now,
-      noteId,
-      ownerId,
-    ),
-    c.env.DB.prepare(
-      'UPDATE notes SET markdown=?,provenance_json=?,revision=1,updated_at=? WHERE id=? AND owner_id=? AND revision=0 AND EXISTS (SELECT 1 FROM note_edits WHERE note_id=? AND owner_id=? AND operation_id=?)',
-    ).bind(
-      parsed.data.text,
-      provenanceJson,
-      now,
-      noteId,
-      ownerId,
-      noteId,
-      ownerId,
-      parsed.data.operationId,
-    ),
-    c.env.DB.prepare(
-      `UPDATE conversations SET note_id=? WHERE id=? AND owner_id=? AND note_id IS NULL
-       AND status='active' AND expires_at>?
-       AND NOT EXISTS (SELECT 1 FROM turns WHERE conversation_id=conversations.id AND owner_id=conversations.owner_id AND status='streaming')
-       AND EXISTS (SELECT 1 FROM notes WHERE id=? AND owner_id=? AND revision=1)`,
-    ).bind(noteId, conversationId, ownerId, now, noteId, ownerId),
-  ]);
-  if (results.some((result) => result.meta.changes !== 1)) {
-    const racedReplay = await captureReplay(
-      c.env.DB,
-      conversationId,
-      ownerId,
-      parsed.data.operationId,
-    );
-    if (racedReplay) {
-      const current = await loadConversation(c.env.DB, ownerId, conversationId);
-      return c.json({ conversation: current, note: capturedNote(racedReplay, current.title) });
-    }
-    throw new HttpError(409, 'Conversation changed during capture');
-  }
-  conversation.noteId = noteId;
-  return c.json(
-    {
-      conversation,
-      note: {
-        id: noteId,
-        title: conversation.title,
-        markdown: parsed.data.text,
-        revision: 1,
-        provenance,
-        createdAt: now,
-        updatedAt: now,
-      } satisfies Note,
-    },
-    201,
-  );
+  const payload = { conversation: result.conversation, note: result.note };
+  return result.created ? c.json(payload, 201) : c.json(payload);
 });
 conversationRoutes.patch('/conversations/:id', async (c) => {
   const body = await jsonBody<unknown>(c);
