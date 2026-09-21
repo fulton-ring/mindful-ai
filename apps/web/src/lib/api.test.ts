@@ -49,7 +49,9 @@ describe('authenticated API transport', () => {
       }),
     );
   });
+});
 
+describe('authenticated API followups', () => {
   it('requests annotations with the note revision captured for the turn', async () => {
     const annotations = [
       { id: 'annotation-1', quote: 'Clear answer', kind: 'claim', whose: 'assistant' },
@@ -90,7 +92,9 @@ describe('authenticated API transport', () => {
       expect.objectContaining({ method: 'POST', body: '{}', keepalive: true }),
     );
   });
+});
 
+describe('note and annotation API transport', () => {
   it('loads note state and records suggestion decisions against its revision', async () => {
     const state = {
       note: {
@@ -129,7 +133,9 @@ describe('authenticated API transport', () => {
       }),
     );
   });
+});
 
+describe('note persistence API transport', () => {
   it('records typing over a suggestion with the note save and uses durable history routes', async () => {
     const note = {
       id: 'note-1',
@@ -183,7 +189,9 @@ describe('authenticated API transport', () => {
       }),
     );
   });
+});
 
+describe('atomic note persistence API transport', () => {
   it('saves all typed-over suggestion dismissals atomically', async () => {
     const note = {
       id: 'note-1',
@@ -215,7 +223,9 @@ describe('authenticated API transport', () => {
       }),
     );
   });
+});
 
+describe('streaming API transport', () => {
   it('streams note proposal previews through the terminal proposal', async () => {
     const preview = {
       id: 'proposal-1',
@@ -255,7 +265,9 @@ describe('authenticated API transport', () => {
       { type: 'done', proposal: preview },
     ]);
   });
+});
 
+describe('annotation stream transport', () => {
   it('streams annotations individually before the terminal collection', async () => {
     const annotation = {
       id: 'annotation-1',
@@ -294,7 +306,9 @@ describe('authenticated API transport', () => {
       { type: 'done', annotations: [annotation] },
     ]);
   });
+});
 
+describe('stream interruption errors', () => {
   it('reports a note proposal stream that closes before a terminal event', async () => {
     vi.stubGlobal(
       'fetch',
@@ -341,6 +355,9 @@ describe('authenticated API transport', () => {
       ),
     ).rejects.toThrow('A response is still in progress.');
   });
+});
+
+describe('stream cancellation transport', () => {
   it('cancels its turn when the Worker dies before sending stream headers', async () => {
     const fetchMock = vi
       .fn()
@@ -405,6 +422,32 @@ describe('authenticated API transport', () => {
     expect(await result).toBeInstanceOf(Error);
     expect(settled).toBe(true);
   });
+});
+
+describe('stream completion transport', () => {
+  it('does not cancel after a terminal event callback throws', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('data: {"type":"done"}\n\n'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      streamChat(
+        {
+          requestId: 'terminal-callback-error',
+          conversationId: 'conversation-1',
+          branchId: 'branch-1',
+          noteRevision: null,
+          message: 'Synthetic test',
+          personaId: 'thinking-partner',
+          action: 'message',
+        },
+        () => {
+          throw new Error('callback failed');
+        },
+        new AbortController().signal,
+      ),
+    ).rejects.toThrow('callback failed');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 
   it('reports a stream that closes without completion instead of silently succeeding', async () => {
     vi.stubGlobal(
@@ -427,6 +470,9 @@ describe('authenticated API transport', () => {
       ),
     ).rejects.toThrow('response was interrupted');
   });
+});
+
+describe('conversation API transport', () => {
   it('creates note-free conversations and links notes explicitly', async () => {
     const conversation = {
       id: 'conversation-1',
@@ -455,7 +501,9 @@ describe('authenticated API transport', () => {
       expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ noteId: 'note-1' }) }),
     );
   });
+});
 
+describe('conversation history transport', () => {
   it('lists, archives, and deletes conversation history', async () => {
     const fetchMock = vi
       .fn()
@@ -480,7 +528,9 @@ describe('authenticated API transport', () => {
       expect.objectContaining({ method: 'DELETE' }),
     );
   });
+});
 
+describe('authenticated conversation transport', () => {
   it('adds the current Clerk bearer token to JSON requests', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response('[]', {
@@ -525,7 +575,9 @@ describe('authenticated API transport', () => {
       expect(init.credentials).toBeUndefined();
     }
   });
+});
 
+describe('token refresh transport', () => {
   it('retries one unauthorized request only after Clerk supplies a new token', async () => {
     const fetchMock = vi
       .fn()

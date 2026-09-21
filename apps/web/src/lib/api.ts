@@ -71,6 +71,71 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return ((body as { data?: T } | undefined)?.data ?? body) as T;
 }
 
+type StreamEventHandler<T> = (event: T) => void;
+
+function parseStreamFrame<T>(
+  frame: string,
+  onEvent: StreamEventHandler<T>,
+  isTerminal: (event: T) => boolean,
+  onError?: (event: T) => void,
+) {
+  let terminal = false;
+  for (const line of frame.split('\n')) {
+    if (!line.startsWith('data:')) continue;
+    const data = line.slice(5).trim();
+    if (data === '[DONE]') {
+      terminal = true;
+      continue;
+    }
+    if (!data) continue;
+    const event = JSON.parse(data) as T;
+    if (isTerminal(event)) terminal = true;
+    onEvent(event);
+    onError?.(event);
+  }
+  return terminal;
+}
+
+async function consumeEventStream<T>(
+  response: Response,
+  onEvent: StreamEventHandler<T>,
+  isTerminal: (event: T) => boolean,
+  signal: AbortSignal,
+  interruptionMessage: string,
+  onError?: (event: T) => void,
+) {
+  const reader = response.body?.getReader();
+  if (!reader) return false;
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let terminal = false;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const frames = buffer.split(/\n\n/);
+      buffer = frames.pop() ?? '';
+      for (const frame of frames) {
+        terminal = parseStreamFrame(frame, onEvent, isTerminal, onError) || terminal;
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  if (!terminal && !signal.aborted) throw new Error(interruptionMessage);
+  return terminal;
+}
+
+async function streamError(response: Response, fallback: string): Promise<never> {
+  const body = await response.json().catch(() => undefined);
+  throw new ApiError(
+    response.status,
+    typeof body?.error === 'string' ? body.error : fallback,
+    body,
+  );
+}
+
 export const api = {
   accountPrivacy: () =>
     request<{ enabled: boolean; acknowledged: boolean; version: string }>('/api/account/privacy'),
@@ -233,7 +298,6 @@ export async function streamChat(
   signal: AbortSignal,
 ) {
   let receivedTerminalEvent = false;
-  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   try {
     const response = await fetchWithFreshAuth('/api/chat/turns', {
       method: 'POST',
@@ -252,32 +316,18 @@ export async function streamChat(
         body,
       );
     }
-    reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const frames = buffer.split(/\n\n/);
-      buffer = frames.pop() ?? '';
-      for (const frame of frames) {
-        for (const line of frame.split('\n')) {
-          if (!line.startsWith('data:')) continue;
-          const data = line.slice(5).trim();
-          if (data === '[DONE]') receivedTerminalEvent = true;
-          else if (data) {
-            const event = JSON.parse(data) as ChatEvent;
-            if (event.type === 'done' || event.type === 'error') receivedTerminalEvent = true;
-            onEvent(event);
-          }
-        }
-      }
-    }
-    if (!receivedTerminalEvent && !signal.aborted)
-      throw new Error('The response was interrupted. Please try again.');
+    receivedTerminalEvent =
+      (await consumeEventStream(
+        response,
+        (event) => {
+          if (event.type === 'done' || event.type === 'error') receivedTerminalEvent = true;
+          onEvent(event);
+        },
+        (event) => event.type === 'done' || event.type === 'error',
+        signal,
+        'The response was interrupted. Please try again.',
+      )) || receivedTerminalEvent;
   } finally {
-    reader?.releaseLock();
     // The Worker may outlive a broken connection. Release its database turn
     // before the caller unlocks the composer, including failed regeneration.
     if (!receivedTerminalEvent && !signal.aborted) {
@@ -298,41 +348,15 @@ export async function streamNoteProposal(
     headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
     body: JSON.stringify(input),
   });
-  if (!response.ok || !response.body) {
-    const body = await response.json().catch(() => undefined);
-    throw new ApiError(
-      response.status,
-      typeof body?.error === 'string'
-        ? body.error
-        : 'The note suggestion could not start. Please try again.',
-      body,
-    );
-  }
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let receivedTerminalEvent = false;
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const frames = buffer.split(/\n\n/);
-    buffer = frames.pop() ?? '';
-    for (const frame of frames) {
-      for (const line of frame.split('\n')) {
-        if (!line.startsWith('data:')) continue;
-        const data = line.slice(5).trim();
-        if (data === '[DONE]') receivedTerminalEvent = true;
-        else if (data) {
-          const event = JSON.parse(data) as NoteProposalEvent;
-          if (event.type === 'done' || event.type === 'error') receivedTerminalEvent = true;
-          onEvent(event);
-        }
-      }
-    }
-  }
-  if (!receivedTerminalEvent && !signal.aborted)
-    throw new Error('The response was interrupted. Please try again.');
+  if (!response.ok || !response.body)
+    await streamError(response, 'The note suggestion could not start. Please try again.');
+  await consumeEventStream(
+    response,
+    onEvent,
+    (event) => event.type === 'done' || event.type === 'error',
+    signal,
+    'The response was interrupted. Please try again.',
+  );
 }
 
 export async function streamMessageAnnotations(
@@ -352,28 +376,14 @@ export async function streamMessageAnnotations(
   );
   if (!response.ok || !response.body)
     throw new ApiError(response.status, 'Highlights could not be added.');
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let terminal = false;
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const frames = buffer.split(/\n\n/);
-    buffer = frames.pop() ?? '';
-    for (const frame of frames) {
-      for (const line of frame.split('\n')) {
-        if (!line.startsWith('data:')) continue;
-        const data = line.slice(5).trim();
-        if (!data) continue;
-        const event = JSON.parse(data) as AnnotationEvent;
-        onEvent(event);
-        if (event.type === 'done') terminal = true;
-        if (event.type === 'error') throw new Error(event.message);
-      }
-    }
-  }
-  if (!terminal && !signal.aborted)
-    throw new Error('Highlights were interrupted. Please try again.');
+  await consumeEventStream(
+    response,
+    onEvent,
+    (event) => event.type === 'done',
+    signal,
+    'Highlights were interrupted. Please try again.',
+    (event) => {
+      if (event.type === 'error') throw new Error(event.message);
+    },
+  );
 }
