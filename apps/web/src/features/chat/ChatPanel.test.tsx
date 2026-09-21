@@ -636,6 +636,51 @@ it('keeps the streamed response visible until saved message adoption', async () 
 });
 
 describe('ChatPanel annotation recovery', () => {
+  it('replaces a streamed multiple-choice reply with the completed learning check', async () => {
+    const question = 'Where does the Calvin cycle occur?';
+    const rawQuiz = `${question}\nA) Thylakoid\nB) Stroma`;
+    transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
+      onEvent({ type: 'text', text: rawQuiz });
+      onEvent({
+        type: 'intervention',
+        intervention: {
+          id: 'check',
+          kind: 'learning_check',
+          question,
+          options: ['Thylakoid', 'Stroma'],
+        },
+      });
+      onEvent({
+        type: 'done',
+        annotationsHandled: true,
+        message: { id: 'answer', role: 'assistant', content: '', createdAt: '' },
+        conversationId: 'conversation-1',
+        branchId: 'branch-1',
+        title: 'Conversation',
+        expiresAt: '2026-09-25T00:00:00.000Z',
+      });
+    });
+    const values = props();
+    const view = render(<ChatPanel {...values} />);
+    values.onConversation.mockImplementation((next: Conversation) => {
+      view.rerender(<ChatPanel {...values} conversation={next} />);
+    });
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Quiz me' } });
+    fireEvent.click(screen.getByLabelText('Send message'));
+
+    await waitFor(() =>
+      expect(values.onConversation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messages: expect.arrayContaining([
+            expect.objectContaining({ id: 'answer', content: '' }),
+          ]),
+        }),
+      ),
+    );
+    expect(screen.queryByText(rawQuiz)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Capture intervention' })).not.toBeNull();
+  });
+
   it('shows primary-stream highlights before completion without classifying twice', async () => {
     let emit: ((event: ChatEvent) => void) | undefined;
     let finish: (() => void) | undefined;
@@ -1865,7 +1910,9 @@ it('can enable and disable learning checks before any quiz without sending a mes
   fireEvent.click(screen.getByRole('button', { name: 'Chat tools' }));
   const toggle = screen.getByRole('checkbox', { name: 'Learning checks' });
   expect((toggle as HTMLInputElement).checked).toBe(false);
-  fireEvent.click(toggle);
+  await act(async () => {
+    fireEvent.click(toggle);
+  });
   await waitFor(() =>
     expect(callbacks.onConversation).toHaveBeenCalledWith(
       expect.objectContaining({ learningChecksEnabled: true }),
@@ -1874,7 +1921,9 @@ it('can enable and disable learning checks before any quiz without sending a mes
   view.rerender(
     <ChatPanel {...callbacks} conversation={{ ...value, learningChecksEnabled: true }} />,
   );
-  fireEvent.click(screen.getByRole('checkbox', { name: 'Learning checks' }));
+  await act(async () => {
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Learning checks' }));
+  });
   await waitFor(() =>
     expect(transport.setLearningChecks).toHaveBeenLastCalledWith(value.id, false),
   );
@@ -1892,14 +1941,18 @@ it('toggles web search without sending a message', async () => {
   expect((screen.getByRole('checkbox', { name: 'Web search' }) as HTMLInputElement).checked).toBe(
     true,
   );
-  fireEvent.click(screen.getByRole('checkbox', { name: 'Web search' }));
+  await act(async () => {
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Web search' }));
+  });
   await waitFor(() =>
     expect(callbacks.onConversation).toHaveBeenCalledWith(
       expect.objectContaining({ webSearchEnabled: false }),
     ),
   );
   view.rerender(<ChatPanel {...callbacks} conversation={{ ...value, webSearchEnabled: false }} />);
-  fireEvent.click(screen.getByRole('checkbox', { name: 'Web search' }));
+  await act(async () => {
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Web search' }));
+  });
   await waitFor(() => expect(transport.setWebSearch).toHaveBeenLastCalledWith(value.id, true));
   expect(transport.streamChat).not.toHaveBeenCalled();
 });

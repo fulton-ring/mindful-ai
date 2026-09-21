@@ -181,7 +181,11 @@ export async function* streamWithEarlyAnnotations(
     await pump;
     if (pumpFailure) throw pumpFailure;
     if (doneEvent) {
-      const annotations = mergeAnnotationsPreservingExisting([], finalized, fullText);
+      const annotations = mergeAnnotationsPreservingExisting(
+        [],
+        finalized,
+        doneEvent.message.content,
+      );
       yield {
         ...doneEvent,
         annotationsHandled: allSucceeded && coveredUpTo >= fullText.length,

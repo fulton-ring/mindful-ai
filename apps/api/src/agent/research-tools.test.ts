@@ -325,7 +325,7 @@ describe('research tools in a Mastra turn', () => {
   });
 });
 
-function silentModel(calls: LanguageModelV3CallOptions[]): LanguageModelV3 {
+function silentModel(calls: LanguageModelV3CallOptions[], text = 'Noted.'): LanguageModelV3 {
   return {
     specificationVersion: 'v3',
     provider: 'test',
@@ -341,7 +341,7 @@ function silentModel(calls: LanguageModelV3CallOptions[]): LanguageModelV3 {
           start(controller) {
             controller.enqueue({ type: 'stream-start', warnings: [] });
             controller.enqueue({ type: 'text-start', id: 'a' });
-            controller.enqueue({ type: 'text-delta', id: 'a', delta: 'Noted.' });
+            controller.enqueue({ type: 'text-delta', id: 'a', delta: text });
             controller.enqueue({ type: 'text-end', id: 'a' });
             controller.enqueue({
               type: 'finish',
@@ -447,6 +447,40 @@ it('ends the model loop once a learning check is ready for the user', async () =
   );
   expect(events.at(-1)?.type).toBe('done');
 });
+
+it.each(['study-partner', 'account-override'])(
+  'turns a standalone %s multiple-choice reply into a learning check',
+  async (personaId) => {
+    const input = turnInput();
+    input.conversation.learningChecksEnabled = true;
+    input.persona = {
+      ...DEFAULT_PERSONAS.find((persona) => persona.id === 'study-partner')!,
+      id: personaId,
+    };
+    const events: ChatEvent[] = [];
+    for await (const event of streamMastraTurn(
+      input,
+      silentModel(
+        [],
+        'Where does the Calvin cycle occur?\n\nA) Thylakoid membrane\nB) Stroma\nC) Lumen\nD) Outer membrane',
+      ),
+      new AbortController().signal,
+    ))
+      events.push(event);
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: 'intervention',
+        intervention: expect.objectContaining({
+          kind: 'learning_check',
+          question: 'Where does the Calvin cycle occur?',
+          options: ['Thylakoid membrane', 'Stroma', 'Lumen', 'Outer membrane'],
+        }),
+      }),
+    );
+    expect(events.at(-1)).toMatchObject({ type: 'done', message: { content: '' } });
+  },
+);
 
 it('removes web search from the model tools when disabled for the conversation', async () => {
   const calls: LanguageModelV3CallOptions[] = [];

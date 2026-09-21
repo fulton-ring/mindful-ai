@@ -191,4 +191,20 @@ describe('early annotations', () => {
       }),
     ]);
   });
+
+  it('does not attach provisional annotations when the final visible reply is empty', async () => {
+    const primary = (async function* () {
+      yield { type: 'text', text } as const;
+      yield done('');
+    })();
+    const events = await collect(
+      streamWithEarlyAnnotations(primary, async () =>
+        (async function* (): AsyncIterable<AnnotationEvent> {
+          yield { type: 'annotation', annotation };
+          yield { type: 'done', annotations: [annotation] };
+        })(),
+      ),
+    );
+    expect(events.at(-1)).toMatchObject({ type: 'done', message: { annotations: [] } });
+  });
 });

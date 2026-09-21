@@ -276,6 +276,28 @@ export function recoveredFrontendIntervention(
   };
 }
 
+/** Recover only a complete quiz-shaped reply; this does not decide when to quiz. */
+function standaloneLearningCheck(text: string, turnId: string): Intervention | null {
+  const lines = text
+    .trim()
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length < 3 || lines.length > 5 || !lines[0]?.endsWith('?')) return null;
+  const options = lines.slice(1).map((line, index) => {
+    const match = /^([A-D])[).]\s+(.+)$/u.exec(line);
+    return match?.[1] === String.fromCharCode(65 + index) ? match[2] : null;
+  });
+  if (options.some((option) => !option)) return null;
+  const parsed = learningCheckInputSchema.safeParse({ question: lines[0], options });
+  if (!parsed.success) return null;
+  return {
+    id: stableId('check', turnId, parsed.data.question),
+    kind: 'learning_check',
+    ...parsed.data,
+  };
+}
+
 export function visibleStreamEvent(chunk: {
   type: string;
   payload?: unknown;
@@ -1247,7 +1269,7 @@ export async function* streamMastraTurn(
     proposeLearningCheck: createTool({
       id: 'propose_learning_check',
       description:
-        'Propose one specific, skippable learning check only when explicit learning consent is active.',
+        'Show one skippable learning-check card when checks are enabled and you choose to quiz. Put the question and possible answers here, not in assistant text. Do not reveal the answer before the user responds.',
       inputSchema: learningCheckInputSchema,
       execute: async (context) =>
         input.conversation.learningChecksEnabled
@@ -1535,14 +1557,25 @@ export async function* streamMastraTurn(
     usage: { inputTokens: usage.inputTokens ?? 0, outputTokens: usage.outputTokens ?? 0 },
   };
   const collected = proposals.drain();
+  let intervention = collected.intervention;
+  let visibleText = text;
+  if (
+    !intervention &&
+    input.conversation.learningChecksEnabled &&
+    !input.pendingIntervention &&
+    input.action !== 'stop_checks'
+  ) {
+    intervention = standaloneLearningCheck(text, input.turnId) ?? undefined;
+    if (intervention) visibleText = '';
+  }
   if (lengthLimited) throw new Error('The response reached its output limit. Please try again.');
-  if (!text.trim() && !collected.intervention)
+  if (!visibleText.trim() && !intervention)
     throw new Error('The model completed without a visible response. Please try again.');
-  if (collected.intervention) yield { type: 'intervention', intervention: collected.intervention };
+  if (intervention) yield { type: 'intervention', intervention };
   const message: Message = {
     id: input.turnId,
     role: 'assistant',
-    content: text,
+    content: visibleText,
     ...(reasoning ? { reasoning } : {}),
     createdAt: new Date().toISOString(),
     annotations: [],

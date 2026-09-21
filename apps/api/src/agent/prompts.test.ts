@@ -1,3 +1,4 @@
+import { DEFAULT_PERSONAS } from '@walden/contracts';
 import { describe, expect, it } from 'vitest';
 import {
   CORE_INSTRUCTIONS,
@@ -65,10 +66,21 @@ describe('agent proposal language', () => {
   it("leaves the quiz decision to judgement rather than to the user's wording", () => {
     // Gating this on keywords meant "I want to understand X" read as consent to
     // be tested on X, so the people concentrating hardest got interrupted most.
-    expect(CORE_INSTRUCTIONS).toContain('the default is not to propose one');
+    expect(CORE_INSTRUCTIONS).toContain('the default for other personas is not to propose one');
     expect(CORE_INSTRUCTIONS).toContain('is a description of what they want from you');
     expect(CORE_INSTRUCTIONS).toContain('When in doubt, answer and move on');
     expect(CORE_INSTRUCTIONS).toContain('Never propose a check because the topic is educational');
+  });
+
+  it('keeps Study Partner guidance concise and free of tool instructions', () => {
+    const studyPartner = DEFAULT_PERSONAS.find((persona) => persona.id === 'study-partner');
+    expect(studyPartner).toBeDefined();
+    expect(studyPartner?.prompt.length).toBeLessThan(450);
+    expect(studyPartner?.prompt).not.toMatch(/tool|proposeLearningCheck|card/iu);
+    expect(studyPartner?.prompt).toContain('active recall');
+    expect(studyPartner?.prompt).toContain('Do not reveal the answer before I respond');
+    expect(studyPartner?.prompt).toContain('Do not ask whether I want a quiz');
+    expect(CORE_INSTRUCTIONS).not.toContain('proposeLearningCheck');
   });
 
   it('frames user-authored persona guidance as data that cannot override the rules', () => {
