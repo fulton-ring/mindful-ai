@@ -431,7 +431,22 @@ export class D1ObservationalMemory extends MemoryStorageD1 {
       'createdAt',
       'updatedAt',
     ];
-    const values = [
+    const verb = ignoreConflict ? 'INSERT OR IGNORE' : 'INSERT';
+    const result = await this.#binding
+      .prepare(
+        `${verb} INTO "${this.#table}" (${columns.join(',')})
+         SELECT ${columns.map(() => '?').join(',')}
+         WHERE ? IS NULL OR EXISTS (
+           SELECT 1 FROM "${this.#threadsTable}" WHERE id = ? AND resourceId = ?
+         )`,
+      )
+      .bind(...this.#insertValues(record), record.threadId, record.threadId, record.resourceId)
+      .run();
+    return Boolean(result.meta.changes);
+  }
+
+  #insertValues(record: ObservationalMemoryRecord): unknown[] {
+    return [
       record.id,
       this.#key(record.threadId, record.resourceId),
       record.scope,
@@ -462,18 +477,6 @@ export class D1ObservationalMemory extends MemoryStorageD1 {
       record.createdAt.toISOString(),
       record.updatedAt.toISOString(),
     ];
-    const verb = ignoreConflict ? 'INSERT OR IGNORE' : 'INSERT';
-    const result = await this.#binding
-      .prepare(
-        `${verb} INTO "${this.#table}" (${columns.join(',')})
-         SELECT ${columns.map(() => '?').join(',')}
-         WHERE ? IS NULL OR EXISTS (
-           SELECT 1 FROM "${this.#threadsTable}" WHERE id = ? AND resourceId = ?
-         )`,
-      )
-      .bind(...values, record.threadId, record.threadId, record.resourceId)
-      .run();
-    return Boolean(result.meta.changes);
   }
 
   async #createGeneration(
