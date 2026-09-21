@@ -1,0 +1,28 @@
+.conversation-link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-block: 0.65rem;
+}
+.conversation-title {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.conversation-timestamp,
+.conversation-retention {
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+.account-retention-note {
+  margin: 0.5rem 0 1.25rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.notes-section-heading {
+  margin-top: 1.5rem;
+}

@@ -34,6 +34,15 @@ it('strips query strings and private thread or note identifiers from automatic S
   expect(event.properties.$current_url).toBe('https://walden.test/conversations/:id');
   expect(JSON.stringify(event)).not.toContain('private');
 
+  const malformed = sanitize({
+    properties: {
+      $set: null,
+      $set_once: 'not-an-object',
+    },
+  });
+  expect(malformed.properties.$set).toBeNull();
+  expect(malformed.properties.$set_once).toBe('not-an-object');
+
   vi.stubGlobal('location', {
     origin: 'https://walden.test',
     pathname: '/notes/private-note',

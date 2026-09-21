@@ -1,0 +1,42 @@
+@layer components {
+  .composer-footer .send-button {
+    flex-shrink: 0;
+  }
+  .primary,
+  .open-chat,
+  .send-button {
+    background: var(--ink);
+    color: var(--card);
+    border-color: var(--ink);
+  }
+  .danger {
+    color: var(--danger) !important;
+  }
+  .icon-button {
+    @apply inline-flex size-9 shrink-0 items-center justify-center p-0;
+    border-color: transparent;
+    background: transparent;
+  }
+  .icon-button svg,
+  .new-note svg,
+  .note-sidebar footer svg,
+  .open-chat svg,
+  .popover svg {
+    width: 17px;
+    height: 17px;
+  }
+  .text-button {
+    border: 0;
+    background: transparent;
+    color: var(--accent);
+    padding: 0.25rem;
+  }
+  .eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.11em;
+    font-size: 0.68rem !important;
+    color: var(--muted);
+    font-weight: 600;
+    margin: 0 0 0.5rem;
+  }
+}

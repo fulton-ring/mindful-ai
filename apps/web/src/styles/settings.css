@@ -1,0 +1,121 @@
+@layer components {
+  .settings-header {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 1.5rem;
+  }
+  .settings-header h1 {
+    font: 500 2.2rem "Source Serif 4";
+    margin: 0;
+  }
+  .settings-header h2 {
+    font: 500 2.2rem "Source Serif 4";
+    margin: 0;
+  }
+  .settings-layout {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 190px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: clamp(2rem, 8vw, 7rem);
+    padding-top: 2rem;
+  }
+  .settings-layout nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+  .settings-layout nav button {
+    text-align: left;
+    border: 0;
+    background: transparent;
+    text-transform: capitalize;
+  }
+  .settings-layout nav button.active {
+    background: var(--card);
+    border: 1px solid var(--line);
+  }
+  .settings-layout main {
+    min-height: 0;
+    min-width: 0;
+    max-width: 610px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+  .settings-layout main h2 {
+    font: 500 1.65rem "Source Serif 4";
+  }
+  .settings-layout main p {
+    line-height: 1.6;
+  }
+  .notice,
+  .empty-box,
+  .connection {
+    border: 1px solid var(--line);
+    background: var(--card);
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+  }
+  .connection {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .connection p {
+    margin: 0.25rem 0;
+    color: var(--muted);
+  }
+  .connection > span {
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+  .meter {
+    height: 7px;
+    background: var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 1rem 0 2rem;
+  }
+  .meter span {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+  }
+  .settings-layout dl > div {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--line);
+    padding: 0.65rem 0;
+  }
+  .settings-layout dd {
+    margin: 0;
+  }
+  .radio {
+    display: block;
+    margin: 0.65rem 0;
+  }
+  .auth-view {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: 4rem;
+    max-width: 980px;
+    margin: auto;
+    padding: 3rem;
+  }
+  .auth-copy h1 {
+    font: 500 clamp(2.5rem, 5vw, 4.2rem) / 1.04 "Source Serif 4";
+  }
+  .auth-copy p {
+    font: 1.2rem / 1.6 "Source Serif 4";
+    color: var(--muted);
+    max-width: 42ch;
+  }
+}

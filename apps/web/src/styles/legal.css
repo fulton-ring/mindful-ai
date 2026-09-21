@@ -1,0 +1,13 @@
+.legal-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem;
+  line-height: 1.7;
+}
+.legal-page h1 {
+  font: 500 2.5rem "Source Serif 4";
+}
+.legal-page h2 {
+  margin-top: 2rem;
+  font-size: 1.15rem;
+}

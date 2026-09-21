@@ -1,10 +1,8 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
-test('chat starts without notes, and creating a note preserves the conversation', async ({
-  page,
-}) => {
-  const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.message));
+const firstMessage = 'Record this thought: A short walk after lunch helps me reset.';
+
+async function openEmptyChat(page: Page) {
   await page.goto('/');
   await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeVisible();
   const sidebar = page.getByRole('complementary', { name: 'Conversations', exact: true });
@@ -17,8 +15,9 @@ test('chat starts without notes, and creating a note preserves the conversation'
   await expect(page.getByRole('heading', { name: 'What’s on your mind?' })).toBeVisible();
   expect(await (await page.request.get('/api/notes')).json()).toEqual([]);
   await expect(page.getByRole('textbox', { name: 'Note title' })).toHaveCount(0);
+}
 
-  const firstMessage = 'Record this thought: A short walk after lunch helps me reset.';
+async function sendFirstMessage(page: Page) {
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill(firstMessage);
   const turn = page.waitForResponse((response) => response.url().endsWith('/api/chat/turns'));
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
@@ -34,7 +33,9 @@ test('chat starts without notes, and creating a note preserves the conversation'
       .first(),
   ).toBeVisible();
   expect(await (await page.request.get('/api/notes')).json()).toEqual([]);
+}
 
+async function captureAndReopenNote(page: Page) {
   await page.getByRole('button', { name: 'Record as-is', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Note title' })).toBeVisible();
   await expect(
@@ -64,6 +65,9 @@ test('chat starts without notes, and creating a note preserves the conversation'
     .getByRole('button', { name: `Open conversation: ${history[0].title}`, exact: true })
     .click();
   await expect(page.locator('.cm-content')).toContainText('I will try a short walk after lunch.');
+}
+
+async function verifyHighlightsAndSettings(page: Page) {
   await page
     .getByRole('textbox', { name: 'Message', exact: true })
     .fill('Ask one follow-up question.');
@@ -99,8 +103,9 @@ test('chat starts without notes, and creating a note preserves the conversation'
   await page.getByRole('button', { name: 'Edit Mentor', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Edit persona' })).toBeVisible();
   await page.getByRole('button', { name: 'Close', exact: true }).click();
-  expect(errors).toEqual([]);
-  await page.screenshot({ path: '/tmp/walden-chat-first.png', fullPage: true });
+}
+
+async function deleteConversation(page: Page) {
   const summaries = await (await page.request.get('/api/conversations')).json();
   expect(summaries).toHaveLength(1);
   await page
@@ -116,6 +121,20 @@ test('chat starts without notes, and creating a note preserves the conversation'
   expect(await (await page.request.get('/api/conversations')).json()).toEqual([]);
   expect(await (await page.request.get('/api/notes')).json()).toHaveLength(1);
   await page.request.delete('/api/account');
+}
+
+test('chat starts without notes, and creating a note preserves the conversation', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await openEmptyChat(page);
+  await sendFirstMessage(page);
+  await captureAndReopenNote(page);
+  await verifyHighlightsAndSettings(page);
+  expect(errors).toEqual([]);
+  await page.screenshot({ path: '/tmp/walden-chat-first.png', fullPage: true });
+  await deleteConversation(page);
 });
 
 test('accepting a capture creates the first note without losing chat', async ({ page }) => {

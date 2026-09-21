@@ -1,0 +1,199 @@
+@layer components {
+  .mobile-header,
+  .sidebar-scrim {
+    display: none;
+  }
+  @media (max-width: 760px) {
+    .open-note-button {
+      display: none !important;
+    }
+    .app-workspace,
+    .app-workspace.with-chat {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .chat-panel {
+      position: fixed;
+      inset: 0 0 0 210px;
+      z-index: 15;
+    }
+    .note-surface {
+      grid-column: 1 !important;
+    }
+    .app-workspace.mobile-chat .note-surface {
+      visibility: hidden;
+    }
+    .auth-view {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+    .auth-copy {
+      text-align: center;
+    }
+    .auth-copy p {
+      margin: auto;
+    }
+    .settings-layout {
+      gap: 2rem;
+    }
+  }
+  @media (max-width: 760px) {
+    .app-shell {
+      display: block !important;
+    }
+    .conversation-panels {
+      display: block !important;
+      height: calc(100dvh - 52px) !important;
+      min-height: 0;
+    }
+    .note-resizable-panel,
+    .chat-resizable-panel {
+      width: 100% !important;
+      max-width: none !important;
+      height: 100%;
+    }
+    .mobile-note .note-resizable-panel {
+      flex: 1 1 100% !important;
+      height: 100% !important;
+      min-height: 0;
+    }
+    .mobile-note .conversation-panels > :has(> .note-resizable-panel) {
+      width: 100% !important;
+      flex: 1 1 100% !important;
+      height: 100% !important;
+      min-height: 0;
+      max-height: none !important;
+    }
+    .mobile-chat .note-resizable-panel,
+    .mobile-note .chat-resizable-panel {
+      display: none;
+    }
+    .sidebar-panel {
+      width: 0 !important;
+      height: 0 !important;
+      flex: 0 0 0 !important;
+      overflow: visible !important;
+    }
+    .workspace-panel {
+      width: 100% !important;
+      min-width: 0 !important;
+      max-width: none !important;
+      flex: 1 1 100% !important;
+    }
+    .resizable-handle {
+      display: none;
+    }
+  }
+  @media (max-width: 760px) {
+    .app-workspace,
+    .app-workspace.with-chat {
+      display: block;
+      padding-top: 52px;
+    }
+    .mobile-header {
+      display: flex;
+      position: fixed;
+      z-index: 18;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 52px;
+      background: var(--card);
+      border-bottom: 1px solid var(--line);
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 0.6rem;
+    }
+    .mobile-header > span {
+      font-weight: 500;
+      max-width: 60%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .note-sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+      width: min(84vw, 290px);
+      transform: translateX(-102%);
+      transition: transform 0.2s ease;
+      box-shadow: var(--shadow);
+    }
+    .note-sidebar.open {
+      transform: translateX(0);
+    }
+    .sidebar-close {
+      display: grid;
+    }
+    .sidebar-scrim {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: 19;
+      border: 0;
+      border-radius: 0;
+      background: rgba(27, 40, 56, 0.35);
+    }
+    .note-toolbar {
+      height: 58px;
+      padding: 0 1rem;
+    }
+    .editor-wrap {
+      padding: 1rem;
+      min-height: 0;
+    }
+    .notes-editor__suggestion-actions button {
+      min-height: 44px;
+      padding: 0.55rem 0.75rem;
+      font-size: 0.84rem;
+    }
+    .notes-editor__suggestion-actions kbd {
+      display: none;
+    }
+    .chat-panel {
+      inset: 52px 0 0 0;
+      height: calc(100dvh - 52px);
+      z-index: 14;
+    }
+    .app-workspace.mobile-note .chat-panel {
+      display: none;
+    }
+    .chat-scroll {
+      padding: 4rem 1rem 1.25rem;
+    }
+    .settings-modal {
+      width: calc(100% - 1rem);
+      max-height: calc(100dvh - 1rem);
+      height: min(640px, calc(100dvh - 1rem));
+      padding: 1rem;
+    }
+    .settings-layout {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 0.75rem;
+      padding-top: 1rem;
+    }
+    .settings-layout nav {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      padding-bottom: 0.6rem;
+    }
+    .settings-layout nav button {
+      min-height: 44px;
+      white-space: nowrap;
+    }
+    .icon-button {
+      width: 44px;
+      height: 44px;
+    }
+    .field-grid {
+      grid-template-columns: 1fr;
+    }
+    .auth-view {
+      padding: 1.25rem;
+    }
+    .auth-copy h1 {
+      font-size: 2.4rem;
+    }
+  }
+}

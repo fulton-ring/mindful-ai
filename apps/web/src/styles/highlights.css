@@ -1,0 +1,161 @@
+@layer components {
+  .selection-actions {
+    flex-direction: column;
+    display: flex;
+    gap: 0.25rem;
+    width: max-content;
+    max-width: calc(100vw - 16px);
+    background: var(--ink);
+    padding: 0.3rem;
+    border-radius: 7px;
+    box-shadow: var(--shadow);
+  }
+  .selection-actions button {
+    background: transparent;
+    color: var(--card);
+    border: 0;
+    font-size: 0.75rem;
+  }
+  /* Running tool steps carry the only motion during a tool call: the icon
+     spins and its summary breathes, so the reader can tell work is happening
+     rather than stalled. */
+  @keyframes activity-step-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes activity-step-breathe {
+    50% {
+      opacity: 0.55;
+    }
+  }
+  .activity-step-running > div:first-child > svg {
+    animation: activity-step-spin 1.4s linear infinite;
+  }
+  .activity-step-running > div:last-child > div:last-child {
+    animation: activity-step-breathe 1.8s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .activity-step-running > div:first-child > svg,
+    .activity-step-running > div:last-child > div:last-child {
+      animation: none;
+    }
+  }
+  .selection-actions-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.2rem 0.3rem 0 0.55rem;
+  }
+  .selection-actions-label {
+    color: var(--card);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  .selection-actions .selection-actions-close {
+    display: grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    opacity: 0.7;
+  }
+  .selection-actions .selection-actions-close:hover {
+    opacity: 1;
+  }
+  .selection-actions-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    /* Left-aligned with the action labels rather than the popover edge: the
+       base button padding is 0.55rem 0.75rem, so their text starts 0.75rem in.
+       Same size as those labels, so this reads as part of the menu. */
+    padding: 0.25rem 0.75rem;
+    color: color-mix(in srgb, var(--card) 78%, transparent);
+    font-size: 0.75rem;
+  }
+  .selection-actions-status-alert {
+    color: var(--danger-on-ink);
+  }
+  .selection-actions .selection-actions-status button {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-size: 0.75rem;
+    text-decoration: underline;
+  }
+  .selection-actions-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  .selection-actions-highlights {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0;
+  }
+  /* The only destructive action in this popover. Set below the others and
+     separated, so it cannot be hit while reaching for a colour. */
+  .selection-actions .selection-actions-remove {
+    width: 100%;
+    margin-top: 0.35rem;
+    padding-top: 0.45rem;
+    border-top: 1px solid color-mix(in srgb, var(--card) 22%, transparent);
+    border-radius: 0;
+    background: none;
+    color: var(--danger-on-ink);
+    font-size: 0.8125rem;
+    text-align: left;
+  }
+  .selection-actions .selection-actions-remove:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--danger-on-ink) 14%, transparent);
+    color: var(--danger-on-ink);
+  }
+  .selection-actions .highlight-swatch {
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    background: var(--highlight-color);
+    border: 1px solid color-mix(in srgb, var(--card) 25%, transparent);
+    border-radius: 999px;
+  }
+  .highlight-swatch-yellow {
+    --highlight-color: #e7c85c;
+  }
+  .highlight-swatch-green {
+    --highlight-color: #86b98b;
+  }
+  .highlight-swatch-blue {
+    --highlight-color: #83aeca;
+  }
+  .highlight-swatch-pink {
+    --highlight-color: #d998b0;
+  }
+  .highlight-swatch-purple {
+    --highlight-color: #aa91c6;
+  }
+  .selection-actions-error {
+    color: var(--danger);
+    font-size: 0.75rem;
+  }
+  .annotation-tooltip {
+    z-index: 70;
+    border-radius: 5px;
+    background: var(--ink);
+    color: var(--card);
+    padding: 0.3rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+    box-shadow: var(--shadow);
+  }
+  mark[role="button"] {
+    cursor: pointer;
+  }
+  mark[role="button"]:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
+}

@@ -51,6 +51,31 @@ function analyticsPath(path: string): string {
     );
 }
 
+type AnalyticsProperties = Record<string, unknown>;
+
+function sanitizeAnalyticsProperties(properties: unknown) {
+  if (!properties || typeof properties !== 'object') return;
+  const record = properties as AnalyticsProperties;
+  for (const key of Object.keys(record)) {
+    if (key.includes('referrer') || key.startsWith('$initial_')) {
+      delete record[key];
+      continue;
+    }
+    if (key.endsWith('pathname') && typeof record[key] === 'string') {
+      record[key] = analyticsPath(record[key]);
+    }
+  }
+}
+
+function prepareAnalyticsEvent(event: { properties: AnalyticsProperties }) {
+  const path = analyticsPath(location.pathname);
+  event.properties.$current_url = `${location.origin}${path}`;
+  event.properties.$pathname = path;
+  sanitizeAnalyticsProperties(event.properties);
+  sanitizeAnalyticsProperties(event.properties.$set);
+  sanitizeAnalyticsProperties(event.properties.$set_once);
+}
+
 export function initializeTelemetry(config?: { key: string; host: string }): Promise<void> {
   if (loading) return loading;
   const key = config?.key || import.meta.env.VITE_POSTHOG_KEY;
@@ -68,23 +93,7 @@ export function initializeTelemetry(config?: { key: string; host: string }): Pro
         person_profiles: 'identified_only',
         before_send: (event) => {
           if (!browserAnalyticsEnabled()) return null;
-          if (event) {
-            const path = analyticsPath(location.pathname);
-            event.properties.$current_url = `${location.origin}${path}`;
-            event.properties.$pathname = path;
-            for (const properties of [
-              event.properties,
-              event.properties.$set,
-              event.properties.$set_once,
-            ]) {
-              if (!properties || typeof properties !== 'object') continue;
-              for (const key of Object.keys(properties)) {
-                if (key.includes('referrer') || key.startsWith('$initial_')) delete properties[key];
-                else if (key.endsWith('pathname') && typeof properties[key] === 'string')
-                  properties[key] = analyticsPath(properties[key]);
-              }
-            }
-          }
+          if (event) prepareAnalyticsEvent(event);
           return event;
         },
       });

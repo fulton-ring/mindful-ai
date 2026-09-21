@@ -1,0 +1,54 @@
+@layer components {
+  .sidebar-auth-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    padding: 0.75rem 0.45rem 0.25rem;
+    border-top: 1px solid var(--line);
+  }
+
+  .persona-settings-heading,
+  .persona-actions,
+  .persona-settings-heading .text-button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .persona-settings-heading {
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+  .persona-settings-heading h2 {
+    margin: 0;
+  }
+  .persona-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .persona-description {
+    flex: 1;
+    min-width: 0;
+  }
+  .persona-description h3 {
+    margin: 0 0 0.3rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .persona-description p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .persona-actions {
+    flex-shrink: 0;
+  }
+}

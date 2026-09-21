@@ -1,0 +1,112 @@
+@layer components {
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(27, 40, 56, 0.38);
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+  }
+  .modal {
+    position: fixed;
+    z-index: 51;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    padding: 1.4rem;
+    width: min(540px, calc(100% - 2rem));
+  }
+  .modal header,
+  .modal footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .modal h2 {
+    font: 500 1.6rem "Source Serif 4";
+    margin: 0;
+  }
+  .modal > label,
+  .field-grid label {
+    display: flex;
+    flex-direction: column;
+    text-transform: capitalize;
+    gap: 0.35rem;
+    margin-top: 1rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .delete-thread-dialog .button-row {
+    justify-content: flex-end;
+    margin-top: 1.25rem;
+  }
+  .modal input,
+  .modal textarea,
+  .modal select,
+  .modal [role="combobox"] {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0.65rem;
+    background: var(--ground);
+    color: var(--ink);
+  }
+  .persona-icon-picker {
+    border: 0;
+    padding: 0;
+    margin: 1rem 0 0;
+  }
+  .persona-icon-picker legend {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-bottom: 0.35rem;
+  }
+  .persona-icon-picker > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .persona-icon-picker button {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+  }
+  .persona-icon-picker button[aria-pressed="true"] {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--card);
+  }
+  .field-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.6rem;
+  }
+  .modal [role="combobox"] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    text-align: left;
+    gap: 0.5rem;
+  }
+  .modal footer {
+    margin-top: 1.3rem;
+  }
+  .modal footer span {
+    flex: 1;
+  }
+  .settings-modal {
+    width: min(860px, calc(100% - 2rem));
+    height: min(640px, calc(100dvh - 2rem));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+}
