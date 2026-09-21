@@ -9,7 +9,7 @@ import {
   turnTracingOptions,
 } from './observability';
 
-describe('API telemetry', () => {
+describe('API telemetry configuration', () => {
   it('is disabled when no PostHog key is configured', () => {
     expect(createApiTelemetry({})).toBeNull();
   });
@@ -34,7 +34,9 @@ describe('API telemetry', () => {
       enablePrivacyMode: true,
     });
   });
+});
 
+describe('API telemetry tracing metadata', () => {
   it('builds private tracing metadata from an allowlist', () => {
     expect(
       turnTracingOptions({
@@ -58,7 +60,9 @@ describe('API telemetry', () => {
       tags: ['chat'],
     });
   });
+});
 
+describe('API telemetry scrubbing', () => {
   it('scrubs content, request context, and raw errors before export', () => {
     expect(
       scrubTelemetrySpan({
@@ -110,7 +114,9 @@ describe('API telemetry', () => {
       },
     });
   });
+});
 
+describe('API telemetry lifecycle', () => {
   it('preserves the live span lifecycle while exporting scrubbed events', async () => {
     const events: TracingEvent[] = [];
     const instance = new DefaultObservabilityInstance({

@@ -3,7 +3,7 @@ import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Hono } from 'hono';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { sqliteD1Binding } from '../agent/d1-test-binding';
 import { HttpError } from '../http';
 import type { Bindings, Variables } from '../types';
@@ -23,41 +23,42 @@ const request = (path: string, body: unknown) =>
     { DB: db } as Bindings,
   );
 
-describe('typing over multiple suggestions', () => {
-  beforeEach(async () => {
-    const file = join(mkdtempSync(join(tmpdir(), 'walden-multi-dismiss-')), 'notes.sqlite');
-    const migrations = new URL('../../migrations/', import.meta.url);
-    execFileSync('sqlite3', [file], {
-      input: readdirSync(migrations)
-        .filter((name) => name.endsWith('.sql'))
-        .sort()
-        .map((name) => readFileSync(new URL(name, migrations), 'utf8'))
-        .join('\n'),
-    });
-    db = sqliteD1Binding(file);
-    await db.prepare("INSERT INTO users VALUES ('owner','subject','now','now',0)").run();
-    await db
-      .prepare(
-        "INSERT INTO notes (id,owner_id,markdown,revision,provenance_json,created_at,updated_at) VALUES ('note','owner','Base',0,'[]','now','now')",
-      )
-      .run();
-    await db
-      .prepare(
-        "INSERT INTO note_suggestions (id,note_id,owner_id,base_revision,base_markdown,old_text,new_text,reason,status,created_at,updated_at) VALUES ('a','note','owner',0,'Base','Base','Base A','A','pending','1','1'),('b','note','owner',0,'Base','Base','Base B','B','pending','2','2')",
-      )
-      .run();
-    app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
-    app.use('*', async (c, next) => {
-      c.set('userId', 'owner');
-      await next();
-    });
-    app.route('/api/notes', notesRoutes);
-    app.onError((error, c) =>
-      c.json({ error: error.message }, error instanceof HttpError ? error.status : 500),
-    );
+async function setupTest() {
+  const file = join(mkdtempSync(join(tmpdir(), 'walden-multi-dismiss-')), 'notes.sqlite');
+  const migrations = new URL('../../migrations/', import.meta.url);
+  execFileSync('sqlite3', [file], {
+    input: readdirSync(migrations)
+      .filter((name) => name.endsWith('.sql'))
+      .sort()
+      .map((name) => readFileSync(new URL(name, migrations), 'utf8'))
+      .join('\n'),
   });
+  db = sqliteD1Binding(file);
+  await db.prepare("INSERT INTO users VALUES ('owner','subject','now','now',0)").run();
+  await db
+    .prepare(
+      "INSERT INTO notes (id,owner_id,markdown,revision,provenance_json,created_at,updated_at) VALUES ('note','owner','Base',0,'[]','now','now')",
+    )
+    .run();
+  await db
+    .prepare(
+      "INSERT INTO note_suggestions (id,note_id,owner_id,base_revision,base_markdown,old_text,new_text,reason,status,created_at,updated_at) VALUES ('a','note','owner',0,'Base','Base','Base A','A','pending','1','1'),('b','note','owner',0,'Base','Base','Base B','B','pending','2','2')",
+    )
+    .run();
+  app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+  app.use('*', async (c, next) => {
+    c.set('userId', 'owner');
+    await next();
+  });
+  app.route('/api/notes', notesRoutes);
+  app.onError((error, c) =>
+    c.json({ error: error.message }, error instanceof HttpError ? error.status : 500),
+  );
+}
 
+describe('typing over multiple suggestions', () => {
   it('dismisses both with the edit and restores both through undo and redo', async () => {
+    await setupTest();
     const save = await request('', {
       operationId: 'save',
       baseRevision: 0,
@@ -97,6 +98,7 @@ describe('typing over multiple suggestions', () => {
   });
 
   it('changes neither note nor suggestions when one ID is stale', async () => {
+    await setupTest();
     await db.prepare("UPDATE note_suggestions SET status='dismissed' WHERE id='b'").run();
 
     const save = await request('', {
