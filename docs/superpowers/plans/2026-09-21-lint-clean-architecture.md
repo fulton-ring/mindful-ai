@@ -157,7 +157,7 @@ Expected: PASS with no relevant complexity diagnostics.
 - Modify: `apps/api/src/agent/index.ts`
 - Create: `apps/api/src/agent/tool-schemas.ts`
 - Create: `apps/api/src/agent/learning-checks.ts`
-- Create: `apps/api/src/agent/note-proposals.ts`
+- Create: `apps/api/src/agent/note-proposals/note-proposals.ts`
 - Create: `apps/api/src/agent/stream-events.ts`
 - Create: `apps/api/src/agent/mastra-turn.ts`
 - Modify: `apps/api/src/agent/*.test.ts`

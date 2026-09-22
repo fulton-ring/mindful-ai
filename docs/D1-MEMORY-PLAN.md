@@ -9,7 +9,7 @@ Approved direction: keep Cloudflare D1 for native Mastra observational memory an
 - [x] Exercise the real native memory engine with controlled model output and D1-compatible SQL, including reload/second-instance retrieval, conflicts, regeneration and deletion.
 - [x] Run focused checks and a local chat smoke test. Keep local services running. Document any remaining workspace/search configuration and background-execution limits.
 
-Files: apps/api/src/agent/d1-observational-memory.ts (adapter), memory.ts (native engine integration), services/agent.ts (model/deadline integration), chat/conversations.ts (retention), corresponding tests and docs/AGENT-CONTEXT.md.
+Files: apps/api/src/agent/memory/d1-observational-memory.ts (adapter), apps/api/src/agent/memory/memory.ts (native engine integration), services/agent.ts (model/deadline integration), chat/conversations.ts (retention), corresponding tests and docs/AGENT-CONTEXT.md.
 
 Verification: native engine test forced observation and reflection, reconstructed Memory/D1Store, and confirmed an actual agent prompt contains the persisted observation. Opt-in Cloudflare Gemma test passed with parseable observations persisted into a fresh instance. Chrome recall check on the synthetic reading-habit thread returned the correct habit, duration and time; note remained an unaccepted proposal. Adapter tests exercise CAS contention across instances, buffered reflection preservation, duplicate activation, and deletion. No deployment.
 

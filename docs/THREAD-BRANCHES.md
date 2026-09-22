@@ -166,7 +166,7 @@ The conversation owns the seven-day inactivity window. Any user action on any br
 
 ### Task 3: Branch-scoped memory and follow-ups
 
-**Files:** `apps/api/src/agent/memory.ts`, `apps/api/src/agent/memory.test.ts`, `apps/api/src/chat/followups.ts`, `apps/api/src/chat/followups.test.ts`, `apps/api/src/notes/suggestions.ts`
+**Files:** `apps/api/src/agent/memory/memory.ts`, `apps/api/src/agent/memory/memory.test.ts`, `apps/api/src/chat/followups.ts`, `apps/api/src/chat/followups.test.ts`, `apps/api/src/notes/suggestions.ts`
 
 - [ ] Test that sibling branches write distinct Mastra thread IDs while sharing the resource ID.
 - [ ] Pass `branchId` through memory preparation/deletion and reconcile only the selected path.

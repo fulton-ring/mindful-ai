@@ -41,11 +41,11 @@
       },
       "complexity": {
         "noExcessiveCognitiveComplexity": {
-          "level": "warn",
+          "level": "error",
           "options": { "maxAllowedComplexity": 20 }
         },
         "noExcessiveLinesPerFunction": {
-          "level": "warn",
+          "level": "error",
           "options": { "maxLines": 60 }
         }
       },
@@ -57,7 +57,7 @@
       },
       "style": {
         "noExcessiveLinesPerFile": {
-          "level": "warn",
+          "level": "error",
           "options": { "maxLines": 800 }
         }
       }
