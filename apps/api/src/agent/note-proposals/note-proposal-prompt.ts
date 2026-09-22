@@ -1,4 +1,4 @@
-import type { AgentTurnInput } from '../services/types';
+import type { AgentTurnInput } from '../../services/types';
 
 export function noteProposalInstructions(input: AgentTurnInput, preferenceInstruction: string) {
   return `Trusted requested action: ${input.action ?? 'message'}.

@@ -7,7 +7,7 @@ import type {
   streamMastraTurn,
 } from '../agent';
 import { createR2Filesystem } from '../agent/filesystem';
-import { type MemoryLifecycleEvent, prepareAgentMemory } from '../agent/memory';
+import { type MemoryLifecycleEvent, prepareAgentMemory } from '../agent/memory/memory';
 import { captureConversation, contentPreference } from '../content-telemetry';
 import { type ApiTelemetry, createApiTelemetry } from '../observability';
 import { streamMemoryPreparation } from './agent-memory-stream';

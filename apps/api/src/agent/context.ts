@@ -1,6 +1,6 @@
 import { type ProcessInputStepArgs, TokenLimiter } from '@mastra/core/processors';
 import type { Message, Note } from '@walden/contracts';
-import { noteOutline } from './note-access';
+import { noteOutline } from './note-proposals/note-access';
 
 export const HISTORY_CHAR_BUDGET = 32_000;
 export const NOTE_CHAR_BUDGET = 48_000;

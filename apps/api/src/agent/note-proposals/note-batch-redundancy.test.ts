@@ -16,8 +16,8 @@ vi.mock('@mastra/core/agent', () => ({
 }));
 
 import type { Message } from '@walden/contracts';
-import type { AgentTurnInput } from '../services/types';
-import { streamNoteProposal } from './index';
+import type { AgentTurnInput } from '../../services/types';
+import { streamNoteProposal } from '../index';
 
 const model = {} as Parameters<typeof streamNoteProposal>[2];
 const assistantMessage: Message = {

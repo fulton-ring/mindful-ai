@@ -3,20 +3,20 @@ import { noopLogger } from '@mastra/core/logger';
 import type { EditProposal, Message, NoteProposalEvent } from '@walden/contracts';
 import { isRedundantAddition } from '@walden/domain';
 import { z } from 'zod';
-import { aiProviderErrorMessage } from '../services/ai-errors';
-import type { AgentTurnInput } from '../services/types';
-import { stableId } from './interventions';
-import { noteOutline, noteTools } from './note-access';
-import { noteProposalStreamError } from './note-proposal-errors';
-import { noteProposalInstructions } from './note-proposal-prompt';
-import { noteProposalFromCandidate, noteProposalValidationDiagnostics } from './note-proposals';
-import type { AgentTraceContext } from './stream-events';
+import { aiProviderErrorMessage } from '../../services/ai-errors';
+import type { AgentTurnInput } from '../../services/types';
+import { stableId } from '../interventions';
+import type { AgentTraceContext } from '../stream-events';
 import {
   type NoteProposalCandidate,
   noteProposalBatchOutputSchema,
   noteProposalNoopSchema,
   noteProposalOutputSchema,
-} from './tool-schemas';
+} from '../tool-schemas';
+import { noteOutline, noteTools } from './note-access';
+import { noteProposalStreamError } from './note-proposal-errors';
+import { noteProposalInstructions } from './note-proposal-prompt';
+import { noteProposalFromCandidate, noteProposalValidationDiagnostics } from './note-proposals';
 
 function noteProposalNoopReason(reason: unknown): string | undefined {
   if (typeof reason !== 'string') return undefined;

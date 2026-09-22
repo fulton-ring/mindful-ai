@@ -3,7 +3,7 @@ import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { sqliteD1Binding } from '../agent/d1-test-binding';
+import { sqliteD1Binding } from '../agent/memory/d1-test-binding';
 import { loadNoteState } from './history';
 
 async function fixture() {

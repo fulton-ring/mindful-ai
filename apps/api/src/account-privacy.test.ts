@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { Hono } from 'hono';
 import { expect, it, vi } from 'vitest';
 import { accountRoutes } from './account';
-import { sqliteD1Binding } from './agent/d1-test-binding';
+import { sqliteD1Binding } from './agent/memory/d1-test-binding';
 import { contentPreference, PRIVACY_VERSION, purgeTelemetry } from './content-telemetry';
 import type { Bindings, Variables } from './types';
 

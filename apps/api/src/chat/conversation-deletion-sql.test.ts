@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ deleteAgentMemoryThread: vi.fn() }));
-vi.mock('../agent/memory', () => ({
+vi.mock('../agent/memory/memory', () => ({
   deleteAgentMemoryThread: mocks.deleteAgentMemoryThread,
 }));
 

@@ -3,11 +3,11 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it, vi } from 'vitest';
-import { sqliteD1Binding } from '../agent/d1-test-binding';
-import { deleteAgentMemoryThread } from '../agent/memory';
+import { sqliteD1Binding } from '../agent/memory/d1-test-binding';
+import { deleteAgentMemoryThread } from '../agent/memory/memory';
 import { loadConversation, purgeExpiredConversations } from './conversations';
 
-vi.mock('../agent/memory', () => ({ deleteAgentMemoryThread: vi.fn() }));
+vi.mock('../agent/memory/memory', () => ({ deleteAgentMemoryThread: vi.fn() }));
 
 async function createRetentionFixture() {
   const directory = mkdtempSync(join(tmpdir(), 'walden-retention-'));

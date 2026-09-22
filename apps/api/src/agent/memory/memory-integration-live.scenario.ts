@@ -5,7 +5,7 @@ import { Agent } from '@mastra/core/agent';
 import { Memory } from '@mastra/memory';
 import { describe, expect, it } from 'vitest';
 
-import { createCloudflareModel, DEFAULT_AI_MODEL } from '../services/agent';
+import { createCloudflareModel, DEFAULT_AI_MODEL } from '../../services/agent';
 import { sqliteD1Binding } from './d1-test-binding';
 import { storageFor } from './memory-integration-fixtures';
 

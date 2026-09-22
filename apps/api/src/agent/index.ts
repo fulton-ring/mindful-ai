@@ -1,11 +1,11 @@
 export { GemmaToolLeakDecoder, recoveredFrontendIntervention } from './learning-checks';
 export type { AgentRuntime } from './mastra-turn';
 export { streamMastraTurn } from './mastra-turn';
-export { streamNoteProposal } from './note-proposal-stream';
+export { streamNoteProposal } from './note-proposals/note-proposal-stream';
 export {
   noteProposalFromCandidate,
   noteProposalValidationDiagnostics,
-} from './note-proposals';
+} from './note-proposals/note-proposals';
 export type { AgentTraceContext } from './stream-events';
 export {
   AnnotationGenerationError,

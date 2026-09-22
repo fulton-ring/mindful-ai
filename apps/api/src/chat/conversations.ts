@@ -10,7 +10,7 @@ import type {
 } from '@walden/contracts';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { deleteAgentMemoryThread } from '../agent/memory';
+import { deleteAgentMemoryThread } from '../agent/memory/memory';
 import { all, first, parseJson } from '../db/client';
 import { HttpError, jsonBody, newId, nowIso } from '../http';
 import type { Bindings, Variables } from '../types';

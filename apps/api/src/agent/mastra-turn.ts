@@ -22,7 +22,7 @@ import {
   standaloneLearningCheck,
   standaloneShortAnswerCheck,
 } from './learning-checks';
-import { noteTools } from './note-access';
+import { noteTools } from './note-proposals/note-access';
 import {
   CORE_INSTRUCTIONS,
   NO_RESEARCH_INSTRUCTIONS,

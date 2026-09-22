@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { sqliteD1Binding } from '../agent/d1-test-binding';
+import { sqliteD1Binding } from '../agent/memory/d1-test-binding';
 import { HttpError } from '../http';
 import type { Bindings, Variables } from '../types';
 import { loadConversation } from './conversations';

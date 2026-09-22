@@ -1,9 +1,9 @@
 import type { EditProposal, Note } from '@walden/contracts';
 import { isRedundantAddition, markdownBlocks } from '@walden/domain';
-import { stableId } from './interventions';
-import type { NoteProposalCandidate } from './tool-schemas';
+import { stableId } from '../interventions';
+import type { NoteProposalCandidate } from '../tool-schemas';
 
-export { noteProposalBatchOutputSchema } from './tool-schemas';
+export { noteProposalBatchOutputSchema } from '../tool-schemas';
 
 type NoteProposalPolicy = {
   explicitCapture?: boolean;

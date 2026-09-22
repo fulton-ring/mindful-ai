@@ -1,5 +1,5 @@
 import type { ChatEvent } from '@walden/contracts';
-import type { MemoryLifecycleEvent } from '../agent/memory';
+import type { MemoryLifecycleEvent } from '../agent/memory/memory';
 
 export async function* streamMemoryPreparation<T>(
   prepare: (emit: (event: MemoryLifecycleEvent) => void) => Promise<T>,

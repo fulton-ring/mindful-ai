@@ -1,6 +1,6 @@
 import type { NoteProposalEvent } from '@walden/contracts';
 import { z } from 'zod';
-import { aiProviderErrorMessage } from '../services/ai-errors';
+import { aiProviderErrorMessage } from '../../services/ai-errors';
 
 export function noteProposalStreamError(error: unknown): NoteProposalEvent {
   console.warn('Note proposal stream failed', {
