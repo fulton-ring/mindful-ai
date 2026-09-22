@@ -7,7 +7,7 @@ import {
   eventToEntitlement,
   stripeEventObject,
   verifyStripeWebhook,
-} from '../services/billing';
+} from '../services/billing/billing';
 import type { Bindings, Variables } from '../types';
 
 const requireBilling = (enabled: string | undefined) => {

@@ -9,11 +9,11 @@ import { z } from 'zod';
 import { all } from '../db/client';
 import { HttpError, jsonBody, newId, nowIso } from '../http';
 import type { Bindings, Variables } from '../types';
-import { loadNoteState } from './history';
-import { moveNoteHistory } from './history-actions';
+import { loadNoteState } from './history/history';
+import { moveNoteHistory } from './history/history-actions';
 import { type NoteRow, selectNote, toNote } from './repository';
 import { saveNote } from './save-note';
-import { decideSuggestion } from './suggestion-decisions';
+import { decideSuggestion } from './suggestions/suggestion-decisions';
 
 const createNoteSchema = z.object({ markdown: z.string().max(200_000).optional() }).strict();
 const renameNoteSchema = z.object({ title: z.string().min(1).max(120) }).strict();

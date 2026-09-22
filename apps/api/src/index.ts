@@ -1,17 +1,17 @@
 import { Hono } from 'hono';
-import { accountRoutes } from './account';
 import { authMiddleware } from './auth';
 import { billingRoutes, billingWebhookRoutes } from './billing/routes';
-import { capturePlacementRoutes } from './chat/capture-placement';
-import { conversationRoutes, purgeExpiredConversations } from './chat/conversations';
-import { followupRoutes } from './chat/followups';
-import { highlightRoutes } from './chat/highlights';
-import { chatRoutes } from './chat/routes';
-import { purgeTelemetry } from './content-telemetry';
+import { capturePlacementRoutes } from './chat/capture/capture-placement';
+import { conversationRoutes, purgeExpiredConversations } from './chat/conversations/conversations';
+import { followupRoutes } from './chat/followups/followups';
+import { highlightRoutes } from './chat/highlights/highlights';
+import { chatRoutes } from './chat/turns/routes';
 import { HttpError } from './http';
 import { metricsRoutes } from './metrics/routes';
 import { notesRoutes } from './notes/routes';
 import { personaRoutes } from './personas/routes';
+import { accountRoutes } from './privacy/account';
+import { purgeTelemetry } from './privacy/content-telemetry';
 import type { Bindings, Variables } from './types';
 
 export const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();

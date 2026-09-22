@@ -3,8 +3,8 @@ import { noopLogger } from '@mastra/core/logger';
 import type { ChunkType } from '@mastra/core/stream';
 import type { Annotation, AnnotationEvent, ChatEvent } from '@walden/contracts';
 import type { ApiTelemetry } from '../observability';
-import { aiProviderErrorMessage } from '../services/ai-errors';
-import { annotationBudget } from '../services/early-annotations';
+import { aiProviderErrorMessage } from '../services/ai-errors/ai-errors';
+import { annotationBudget } from '../services/annotations/early-annotations';
 import { stableId } from './interventions';
 import {
   type AnnotationCandidate,

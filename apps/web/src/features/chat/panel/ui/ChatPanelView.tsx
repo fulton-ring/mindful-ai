@@ -1,0 +1,232 @@
+import { FileText, X } from 'lucide-react';
+
+import { InterventionCard } from '../../../capture/InterventionCard';
+import { BranchSelector } from '../../BranchSelector';
+import type { ChatPanelProps } from '../chat-panel-types';
+import type { ChatPanelController } from '../hooks/controller/use-chat-panel-controller';
+import { ChatComposer } from './ChatComposer';
+import { ChatMessage } from './ChatMessage';
+import { ChatTranscript } from './ChatTranscript';
+import type { ChatPanelViewModel } from './use-chat-panel-view-model';
+
+type ViewProps = {
+  props: ChatPanelProps;
+  controller: ChatPanelController;
+  model: ChatPanelViewModel;
+};
+
+function OpenNoteButton({ onOpenNote }: { onOpenNote(): void }) {
+  return (
+    <button
+      type="button"
+      className="open-note-button inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm"
+      onClick={onOpenNote}
+    >
+      <FileText size={16} aria-hidden /> Open note
+    </button>
+  );
+}
+
+function ThinkingIndicator({ status }: { status: string }) {
+  return (
+    <div className="thinking" role="status" aria-live="polite" aria-atomic="true">
+      <span />
+      <span />
+      <span /> {status}
+    </div>
+  );
+}
+
+function ErrorNotice({ message, onDismiss }: { message: string; onDismiss(): void }) {
+  return (
+    <div className="chat-error" role="alert">
+      <p>{message}</p>
+      <button
+        type="button"
+        className="icon-button"
+        aria-label="Dismiss error"
+        title="Dismiss error"
+        onClick={onDismiss}
+      >
+        <X size={14} aria-hidden />
+      </button>
+    </div>
+  );
+}
+
+function InterventionPanel({ controller, model }: ViewProps) {
+  const intervention = controller.intervention;
+  if (!intervention) return null;
+  return (
+    <InterventionCard
+      intervention={intervention}
+      onResolve={(value) => {
+        controller.setIntervention(null);
+        if (typeof value === 'string') void controller.send(value, 'feedback');
+      }}
+      onCapture={(value) => {
+        if (!model.latestCompletedAssistantId) {
+          controller.setError('Finish a response before adding this to your note.');
+          return;
+        }
+        void controller.proposeNote(model.latestCompletedAssistantId, { text: value });
+        controller.setIntervention(null);
+      }}
+      onDismiss={() => controller.setIntervention(null)}
+    />
+  );
+}
+
+function TranscriptMessage({
+  props,
+  controller,
+  model,
+  message,
+  index,
+}: ViewProps & { message: ChatPanelViewModel['renderedMessages'][number]; index: number }) {
+  const isLive = model.hasLiveResponse && message.id === model.liveResponseId;
+  return (
+    <ChatMessage
+      message={message}
+      index={index}
+      messages={model.renderedMessages}
+      isLive={isLive}
+      selectedPersonaName={controller.selectedPersona?.name}
+      sending={controller.sending}
+      streamed={controller.streamed}
+      visible={props.visible !== false}
+      learningCheckResponse={model.learningResponse(model.renderedMessages, index)}
+      answeredCheck={model.answeredLearningCheck(model.renderedMessages, index)}
+      editing={controller.editingMessageId === message.id}
+      editedMessage={controller.editedMessage}
+      input={controller.input}
+      recentAnimation={controller.recentAnimation}
+      liveAnnotations={controller.liveAnnotations}
+      toolbar={
+        !isLive && !message.incomplete && !message.learningCheck
+          ? model.messageToolbar(message)
+          : null
+      }
+      captureStatus={model.captureStatus(message.id)}
+      messageAnimation={(messageId) =>
+        messageId === controller.recentAnimation?.messageId
+          ? controller.recentAnimation.annotationIds
+          : undefined
+      }
+      onLearningCheck={(value) =>
+        void controller.send(
+          model.learningCheckResponseText(message.learningCheck!, value),
+          'feedback',
+          undefined,
+          value,
+        )
+      }
+      onDismissLearningCheck={() =>
+        void controller.send('Skip this learning check.', 'feedback', undefined, {
+          checkId: message.learningCheck!.id,
+          answers: {},
+        })
+      }
+      onHighlight={(value) => controller.saveHighlight(message.id, value)}
+      onAction={(action, quote) => model.contextual(isLive ? null : message.id, action, quote)}
+      onEdit={() => {
+        controller.setEditingMessageId(message.id);
+        controller.setEditedMessage(message.content);
+      }}
+      onEditedMessage={controller.setEditedMessage}
+      onCancelEdit={() => {
+        controller.setEditingMessageId(null);
+        controller.setEditedMessage('');
+      }}
+      onSendEdit={() => {
+        controller.setEditingMessageId(null);
+        void controller.send(controller.editedMessage, 'message', message.id);
+      }}
+      onRetry={() => controller.retryIncomplete(message)}
+    />
+  );
+}
+
+function TranscriptArea({ props, controller, model }: ViewProps) {
+  return (
+    <div
+      ref={controller.scroller}
+      className={`chat-scroll ${model.hasConversationActivity ? '' : 'is-empty'}`}
+      aria-live="polite"
+      onWheel={(event) => {
+        if (event.deltaY < 0) controller.followingResponse.current = false;
+      }}
+      onScroll={(event) => {
+        const panel = event.currentTarget;
+        controller.followingResponse.current =
+          panel.scrollHeight - panel.scrollTop - panel.clientHeight <= 2;
+      }}
+    >
+      <div className="chat-content">
+        {props.conversation && (
+          <BranchSelector
+            branches={props.conversation.branches}
+            selectedId={props.conversation.branchId}
+            onSelect={(id) => props.onBranch?.(id)}
+          />
+        )}
+        {!model.hasConversationActivity && (
+          <div className="chat-empty">
+            <h2>What’s on your mind?</h2>
+          </div>
+        )}
+        <ChatTranscript
+          messages={model.renderedMessages}
+          renderKey={(message) =>
+            controller.responseRenderKeys.current.get(message.id) ?? message.id
+          }
+          renderMessage={(message, index) => (
+            <TranscriptMessage
+              props={props}
+              controller={controller}
+              model={model}
+              message={message}
+              index={index}
+            />
+          )}
+        />
+        {controller.sending && !controller.streamed && !controller.reasoning && (
+          <ThinkingIndicator status={controller.status} />
+        )}
+        <InterventionPanel props={props} controller={controller} model={model} />
+      </div>
+    </div>
+  );
+}
+
+export function ChatPanelView({ props, controller, model }: ViewProps) {
+  return (
+    <aside
+      className={`chat-panel ${model.hasConversationActivity ? '' : 'empty-conversation'}`}
+      aria-label="Thread"
+    >
+      {!props.noteOpen && <OpenNoteButton onOpenNote={props.onOpenNote} />}
+      <TranscriptArea props={props} controller={controller} model={model} />
+      {controller.error && (
+        <ErrorNotice message={controller.error} onDismiss={() => controller.setError('')} />
+      )}
+      <ChatComposer
+        input={controller.input}
+        sending={controller.sending}
+        savingChatPreference={controller.savingChatPreference}
+        webSearch={props.conversation?.webSearchEnabled ?? true}
+        learningChecks={props.conversation?.learningChecksEnabled ?? true}
+        autoHighlights={controller.autoHighlights}
+        personas={props.personas}
+        personaId={controller.effectivePersonaId}
+        messageInput={controller.messageInput}
+        onInput={controller.setInput}
+        onSend={() => void controller.send()}
+        onStop={controller.stopMainTurn}
+        onPersona={props.onPersona}
+        onPreference={(setting, enabled) => void controller.changeChatPreference(setting, enabled)}
+        onAutoHighlights={controller.setAutoHighlights}
+      />
+    </aside>
+  );
+}

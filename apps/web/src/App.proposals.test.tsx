@@ -5,7 +5,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { App } from './App';
 import type { ChatPanel } from './features/chat/ChatPanel';
-import type { NotesEditorProps } from './features/notes/NotesEditor';
+import type { NotesEditorProps } from './features/notes/editor/NotesEditor';
 import { api } from './lib/api';
 
 let chat: ComponentProps<typeof ChatPanel>;
@@ -22,7 +22,7 @@ vi.mock('./features/chat/ChatPanel', () => ({
     return null;
   },
 }));
-vi.mock('./features/notes/NotesEditor', () => ({
+vi.mock('./features/notes/editor/NotesEditor', () => ({
   NotesEditor: (props: NotesEditorProps) => {
     editor = props;
     return <div>Test editor</div>;

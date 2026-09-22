@@ -1,8 +1,8 @@
 import type { AppConfig } from '@walden/contracts';
 import type { ReactNode } from 'react';
-import { AppRoutes } from './app/AppRoutes';
-import { useConversationData } from './app/use-conversation-data';
-import { usePersonaData } from './app/use-persona-data';
+import { useConversationData } from './app/data/use-conversation-data';
+import { usePersonaData } from './app/data/use-persona-data';
+import { AppRoutes } from './app/views/AppRoutes';
 
 export function App({
   config,

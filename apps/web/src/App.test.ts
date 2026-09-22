@@ -15,7 +15,7 @@ import {
   visiblePendingSuggestions,
   waitForPendingCapture,
   writeDismissedNotePanels,
-} from './app/workspace-helpers';
+} from './app/lifecycle/workspace-helpers';
 
 describe('retained note workspace', () => {
   it('opens an expired note-backed conversation in note-only mode', () => {

@@ -3,7 +3,7 @@ import { noopLogger } from '@mastra/core/logger';
 import type { EditProposal, Message, NoteProposalEvent } from '@walden/contracts';
 import { isRedundantAddition } from '@walden/domain';
 import { z } from 'zod';
-import { aiProviderErrorMessage } from '../../services/ai-errors';
+import { aiProviderErrorMessage } from '../../services/ai-errors/ai-errors';
 import type { AgentTurnInput } from '../../services/types';
 import { stableId } from '../interventions';
 import type { AgentTraceContext } from '../stream-events';
