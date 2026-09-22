@@ -1,7 +1,7 @@
 import { ArrowUp, Square } from 'lucide-react';
 import type { ComponentProps, RefObject } from 'react';
 
-import { effectivePersona, PersonaPicker } from '../personas/PersonaPicker';
+import { effectivePersona, PersonaPicker } from '../../personas/PersonaPicker';
 import { ChatToolsMenu } from './ChatToolsMenu';
 
 type ComposerProps = {

@@ -5,7 +5,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '../../components/ui/tooltip';
+} from '../../../components/ui/tooltip';
 import { MessageStatus, type MessageStatusRow } from './ChatTranscript';
 
 type Props = {

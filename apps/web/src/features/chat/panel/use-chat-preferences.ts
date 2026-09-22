@@ -1,4 +1,4 @@
-import { api } from '../../lib/api';
+import { api } from '../../../lib/api';
 import type { ChatPanelProps } from './chat-panel-types';
 import type { ChatDisplayState } from './use-chat-display-state';
 import type { ChatRuntimeState } from './use-chat-runtime-state';

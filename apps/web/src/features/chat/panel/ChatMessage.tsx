@@ -12,12 +12,12 @@ import {
   Reasoning,
   ReasoningContent,
   ReasoningTrigger,
-} from '../../components/ai-elements/reasoning';
-import { InterventionCard } from '../capture/InterventionCard';
-import { AnnotatedText } from '../highlights/AnnotatedText';
-import type { ContextualActionId } from '../highlights/contextual-actions';
-import { ContextCheckpoint } from './ContextCheckpoint';
-import { ResponseActivity, ResponseSources } from './ResponseActivity';
+} from '../../../components/ai-elements/reasoning';
+import { InterventionCard } from '../../capture/InterventionCard';
+import { AnnotatedText } from '../../highlights/AnnotatedText';
+import type { ContextualActionId } from '../../highlights/contextual-actions';
+import { ContextCheckpoint } from '../ContextCheckpoint';
+import { ResponseActivity, ResponseSources } from '../ResponseActivity';
 
 type ActionStatus = {
   pending: boolean;

@@ -1,7 +1,7 @@
 import type { Annotation, MessageHighlight } from '@walden/contracts';
 import { useEffect } from 'react';
 
-import { api, type MessageFollowupRequest, streamMessageAnnotations } from '../../lib/api';
+import { api, type MessageFollowupRequest, streamMessageAnnotations } from '../../../lib/api';
 import type { ChatPanelProps } from './chat-panel-types';
 import type { ChatDisplayState } from './use-chat-display-state';
 import type { ChatRuntimeState } from './use-chat-runtime-state';

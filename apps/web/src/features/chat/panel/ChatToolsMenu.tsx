@@ -1,6 +1,6 @@
 import { Paperclip, SlidersHorizontal } from 'lucide-react';
 
-import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '../../../components/ui/popover';
 
 type Props = {
   webSearch: boolean;

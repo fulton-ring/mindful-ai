@@ -19,7 +19,7 @@ export function getTransport() {
   return transport;
 }
 
-vi.mock('../../lib/api', () => ({
+vi.mock('../../../lib/api', () => ({
   api: {
     setWebSearch: transport.setWebSearch,
     setLearningChecks: transport.setLearningChecks,
@@ -32,8 +32,8 @@ vi.mock('../../lib/api', () => ({
   streamMessageAnnotations: transport.streamMessageAnnotations,
   streamNoteProposal: transport.streamNoteProposal,
 }));
-vi.mock('../../lib/telemetry', () => ({ track: vi.fn() }));
-vi.mock('../highlights/AnnotatedText', () => ({
+vi.mock('../../../lib/telemetry', () => ({ track: vi.fn() }));
+vi.mock('../../highlights/AnnotatedText', () => ({
   AnnotatedText: ({
     text,
     annotations,
@@ -95,21 +95,21 @@ vi.mock('../highlights/AnnotatedText', () => ({
     </div>
   ),
 }));
-vi.mock('../personas/PersonaPicker', () => ({
+vi.mock('../../personas/PersonaPicker', () => ({
   PersonaPicker: () => null,
   effectivePersona: (personas: Array<{ id: string }>, value: string) =>
     personas.find((persona) => persona.id === value) ??
     personas.find((persona) => persona.id === 'thinking-partner') ??
     personas[0],
 }));
-vi.mock('../capture/InterventionCard', () => ({
+vi.mock('../../capture/InterventionCard', () => ({
   InterventionCard: ({ onCapture }: { onCapture(value: string, verbatim: boolean): void }) => (
     <button type="button" onClick={() => onCapture('Intervention exact text', true)}>
       Capture intervention
     </button>
   ),
 }));
-vi.mock('../../components/ai-elements/reasoning', () => ({
+vi.mock('../../../components/ai-elements/reasoning', () => ({
   Reasoning: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   ReasoningContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   ReasoningTrigger: () => null,

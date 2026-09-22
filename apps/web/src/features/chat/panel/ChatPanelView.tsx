@@ -1,7 +1,7 @@
 import { FileText, X } from 'lucide-react';
 
-import { InterventionCard } from '../capture/InterventionCard';
-import { BranchSelector } from './BranchSelector';
+import { InterventionCard } from '../../capture/InterventionCard';
+import { BranchSelector } from '../BranchSelector';
 import { ChatComposer } from './ChatComposer';
 import { ChatMessage } from './ChatMessage';
 import { ChatTranscript } from './ChatTranscript';

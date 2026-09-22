@@ -1,9 +1,9 @@
 import type { ChatEvent, Conversation, LearningCheckResponse, Message } from '@walden/contracts';
 import { conversationTitle } from '@walden/domain';
 
-import { streamChat } from '../../lib/api';
-import { id } from '../../lib/ids';
-import { track } from '../../lib/telemetry';
+import { streamChat } from '../../../lib/api';
+import { id } from '../../../lib/ids';
+import { track } from '../../../lib/telemetry';
 import type { ChatAction, ChatPanelProps } from './chat-panel-types';
 import { upsertActivity } from './chat-panel-utils';
 import type { ChatDisplayState } from './use-chat-display-state';

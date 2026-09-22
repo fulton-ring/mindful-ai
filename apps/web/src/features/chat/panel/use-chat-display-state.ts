@@ -6,7 +6,7 @@ import type {
   ToolActivity,
 } from '@walden/contracts';
 import { useRef, useState } from 'react';
-import type { MessageFollowupRequest } from '../../lib/api';
+import type { MessageFollowupRequest } from '../../../lib/api';
 
 export type ProposalNotice = {
   message: string;

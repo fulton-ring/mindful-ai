@@ -1,4 +1,4 @@
-import { effectivePersona } from '../personas/PersonaPicker';
+import { effectivePersona } from '../../personas/PersonaPicker';
 import type { ChatPanelProps } from './chat-panel-types';
 import { resetAnnotationRetries, useChatAnnotations } from './use-chat-annotations';
 import { useChatDisplayState } from './use-chat-display-state';

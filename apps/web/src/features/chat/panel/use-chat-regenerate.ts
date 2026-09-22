@@ -1,7 +1,7 @@
 import type { ChatEvent, Conversation, Message } from '@walden/contracts';
 
-import { streamChat } from '../../lib/api';
-import { id } from '../../lib/ids';
+import { streamChat } from '../../../lib/api';
+import { id } from '../../../lib/ids';
 import type { ChatPanelProps } from './chat-panel-types';
 import { upsertActivity } from './chat-panel-utils';
 import type { ChatDisplayState } from './use-chat-display-state';

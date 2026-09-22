@@ -1,8 +1,8 @@
 import type { Conversation, Message } from '@walden/contracts';
 import { useEffect } from 'react';
 
-import { api } from '../../lib/api';
-import { id } from '../../lib/ids';
+import { api } from '../../../lib/api';
+import { id } from '../../../lib/ids';
 import type { ChatPanelProps } from './chat-panel-types';
 import type { ChatDisplayState } from './use-chat-display-state';
 import type { ChatRuntimeState } from './use-chat-runtime-state';

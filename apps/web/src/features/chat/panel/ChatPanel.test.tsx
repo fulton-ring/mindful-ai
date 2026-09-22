@@ -3,8 +3,8 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ChatEvent } from '@walden/contracts';
 import { describe, expect, it } from 'vitest';
+import { ChatPanel } from '../ChatPanel';
 import { conversation, getTransport, props } from './_ChatPanel.test-helpers';
-import { ChatPanel } from './ChatPanel';
 
 const transport = getTransport();
 
@@ -117,6 +117,7 @@ it('can enable and disable learning checks before any quiz without sending a mes
     expect(transport.setLearningChecks).toHaveBeenLastCalledWith(value.id, false),
   );
   expect(transport.streamChat).not.toHaveBeenCalled();
+  view.unmount();
 });
 
 it('toggles web search without sending a message', async () => {
@@ -144,4 +145,5 @@ it('toggles web search without sending a message', async () => {
   });
   await waitFor(() => expect(transport.setWebSearch).toHaveBeenLastCalledWith(value.id, true));
   expect(transport.streamChat).not.toHaveBeenCalled();
+  view.unmount();
 });

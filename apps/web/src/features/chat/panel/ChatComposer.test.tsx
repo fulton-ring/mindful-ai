@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ChatComposer } from './ChatComposer';
 
-vi.mock('../personas/PersonaPicker', () => ({
+vi.mock('../../personas/PersonaPicker', () => ({
   PersonaPicker: () => null,
   effectivePersona: () => undefined,
 }));

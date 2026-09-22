@@ -3,8 +3,8 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { Annotation, AnnotationEvent, ChatEvent, Conversation } from '@walden/contracts';
 import { expect, it } from 'vitest';
+import { ChatPanel } from '../ChatPanel';
 import { getTransport, props } from './_ChatPanel.test-helpers';
-import { ChatPanel } from './ChatPanel';
 
 const transport = getTransport();
 

@@ -1,7 +1,7 @@
 import type { EditProposal, NoteProposalEvent, NoteState } from '@walden/contracts';
 
-import { api, type MessageFollowupRequest, streamNoteProposal } from '../../lib/api';
-import { id } from '../../lib/ids';
+import { api, type MessageFollowupRequest, streamNoteProposal } from '../../../lib/api';
+import { id } from '../../../lib/ids';
 import type { ChatPanelProps } from './chat-panel-types';
 import type { ChatDisplayState, ProposalNotice } from './use-chat-display-state';
 import type { ChatRuntimeState } from './use-chat-runtime-state';

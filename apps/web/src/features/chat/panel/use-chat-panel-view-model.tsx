@@ -1,8 +1,11 @@
 import type { LearningCheck, LearningCheckResponse, Message } from '@walden/contracts';
 import type { ReactNode } from 'react';
 
-import type { MessageFollowupRequest as ApiMessageFollowupRequest } from '../../lib/api';
-import { type ContextualActionId, contextualActionRequest } from '../highlights/contextual-actions';
+import type { MessageFollowupRequest as ApiMessageFollowupRequest } from '../../../lib/api';
+import {
+  type ContextualActionId,
+  contextualActionRequest,
+} from '../../highlights/contextual-actions';
 import type { ChatPanelProps } from './chat-panel-types';
 import { MessageToolbar } from './MessageToolbar';
 import type { ChatPanelController } from './use-chat-panel-controller';
