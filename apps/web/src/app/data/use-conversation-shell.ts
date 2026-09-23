@@ -20,6 +20,7 @@ const NO_PREVIEWS: ReadonlySet<string> = new Set();
 export type ProposalRequest = {
   sourceId: string;
   noteId: string;
+  capturedText?: string;
   phase: 'streaming' | 'loading';
   previewIds: ReadonlySet<string>;
 };
@@ -138,7 +139,9 @@ function useProposalState() {
   proposalRef.current = proposal;
   const [proposals, setProposalsValue] = useState<EditProposal[]>([]);
   const proposalsRef = useRef<EditProposal[]>([]);
-  const queueOrderRef = useRef<Array<{ id: string; text: string; accepted: boolean }>>([]);
+  const queueOrderRef = useRef<Array<{ id: string; text: string; accepted: boolean; at?: number }>>(
+    [],
+  );
   const setProposals = useCallback(
     (value: EditProposal[] | ((current: EditProposal[]) => EditProposal[])) => {
       const next = typeof value === 'function' ? value(proposalsRef.current) : value;

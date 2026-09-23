@@ -1,42 +1,20 @@
 import type { Note, NoteState } from '@walden/contracts';
 import { applyProposal } from '@walden/domain';
-import { all, first, parseJson } from '../../db/client';
+import { all, first } from '../../db/client';
 import { HttpError } from '../../http';
+import { selectNote, toNote } from '../repository';
 import {
   SELECT_SUGGESTION,
   type SuggestionRow,
   toNoteSuggestion,
 } from '../suggestions/suggestions';
 
-type NoteStateRow = {
-  id: string;
-  title: string;
-  markdown: string;
-  revision: number;
-  provenance_json: string;
-  created_at: string;
-  updated_at: string;
-};
-
 export async function loadNoteState(
   db: D1Database,
   ownerId: string,
   noteId: string,
 ): Promise<NoteState> {
-  const row = await first<NoteStateRow>(
-    db
-      .prepare(
-        // The note owns its name. The conversation subquery is only a fallback
-        // for notes created before the title column existed.
-        `SELECT n.id,COALESCE(NULLIF(TRIM(n.title),''),
-           (SELECT NULLIF(TRIM(c.title),'') FROM conversations c
-             WHERE c.note_id=n.id AND c.owner_id=n.owner_id
-             ORDER BY c.last_user_activity_at DESC LIMIT 1),
-           'Untitled note') AS title,n.markdown,n.revision,n.provenance_json,n.created_at,n.updated_at
-       FROM notes n WHERE n.id=? AND n.owner_id=?`,
-      )
-      .bind(noteId, ownerId),
-  );
+  const row = await selectNote(db, ownerId, noteId);
   if (!row) throw new HttpError(404, 'Note not found');
   const [suggestions, undo, redo] = await Promise.all([
     all<SuggestionRow>(
@@ -59,15 +37,7 @@ export async function loadNoteState(
         .bind(noteId, ownerId),
     ),
   ]);
-  const note: Note = {
-    id: row.id,
-    title: row.title,
-    markdown: row.markdown,
-    revision: row.revision,
-    provenance: parseJson(row.provenance_json, []),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
+  const note = toNote(row);
   return {
     note,
     suggestions: suggestions.map((suggestion) => {

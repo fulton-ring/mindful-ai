@@ -12,6 +12,7 @@ import type {
   ToolActivity,
 } from '@walden/contracts';
 import type { McpTools } from '../services/mcp';
+import { publicUrl } from '../services/research/research';
 import type { AgentTurnInput } from '../services/types';
 import { buildTurnContext, contextBudgetProcessor } from './context';
 import { stableId, TurnProposals } from './interventions';
@@ -80,27 +81,7 @@ function publicSource(
 ): MessageSource | null {
   if (typeof value !== 'string' || sources.size >= 20) return null;
   try {
-    const url = new URL(value);
-    const hostname = url.hostname
-      .replace(/^\[|\]$/g, '')
-      .replace(/\.$/, '')
-      .toLowerCase();
-    const privateHost =
-      !hostname.includes('.') ||
-      hostname === 'localhost' ||
-      hostname.endsWith('.localhost') ||
-      hostname.endsWith('.local') ||
-      hostname.endsWith('.internal') ||
-      hostname.includes(':') ||
-      /^\d+\.\d+\.\d+\.\d+$/.test(hostname);
-    if (
-      (url.protocol !== 'http:' && url.protocol !== 'https:') ||
-      url.username ||
-      url.password ||
-      privateHost
-    )
-      return null;
-    url.hash = '';
+    const url = publicUrl(value);
     return {
       id: id.slice(0, 200),
       url: url.toString(),

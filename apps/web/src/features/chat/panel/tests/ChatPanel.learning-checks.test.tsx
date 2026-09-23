@@ -3,8 +3,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { Annotation, AnnotationEvent, ChatEvent, Conversation } from '@walden/contracts';
 import { expect, it } from 'vitest';
-import { getTransport, props } from '../../_ChatPanel.test-helpers';
-import { ChatPanel } from '../../ChatPanel';
+import { getTransport, props } from '../../tests/_ChatPanel.test-helpers';
+
+const { ChatPanel } = await import('../../ChatPanel');
 
 const transport = getTransport();
 

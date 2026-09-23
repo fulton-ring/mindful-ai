@@ -10,7 +10,7 @@ type DecisionInput = z.infer<typeof noteDecisionSchema>;
 type DecisionContext = {
   input: DecisionInput;
   state: NoteState;
-  suggestion: SuggestionRow & { base_markdown: string };
+  suggestion: SuggestionRow;
   after: { markdown: string; provenance: NoteState['note']['provenance'] };
 };
 
@@ -54,7 +54,7 @@ async function loadPendingSuggestion(
   noteId: string,
   suggestionId: string,
 ) {
-  const suggestion = await first<SuggestionRow & { base_markdown: string }>(
+  const suggestion = await first<SuggestionRow>(
     db
       .prepare(`${SELECT_SUGGESTION} WHERE id=? AND note_id=? AND owner_id=?`)
       .bind(suggestionId, noteId, ownerId),
@@ -133,22 +133,18 @@ const buildDecisionCreates = (
       ),
     db
       .prepare(
-        `INSERT INTO note_edits (id,note_id,owner_id,operation_id,base_revision,result_revision,before_title,before_markdown,before_provenance_json,after_title,after_markdown,after_provenance_json,kind,suggestion_id,before_suggestion_status,after_suggestion_status,created_at)
-       SELECT ?,n.id,n.owner_id,?,n.revision,n.revision+1,?,n.markdown,n.provenance_json,?,?,?,?,?,'pending',?,? FROM notes n JOIN note_suggestions s ON s.note_id=n.id AND s.owner_id=n.owner_id
+        `INSERT INTO note_edits (id,note_id,owner_id,operation_id,base_revision,result_revision,before_markdown,before_provenance_json,after_markdown,after_provenance_json,created_at,suggestion_changes_json)
+       SELECT ?,n.id,n.owner_id,?,n.revision,n.revision+1,n.markdown,n.provenance_json,?,?,?,? FROM notes n JOIN note_suggestions s ON s.note_id=n.id AND s.owner_id=n.owner_id
        WHERE n.id=? AND n.owner_id=? AND n.revision=? AND n.markdown=? AND s.id=? AND s.status='pending'
        AND EXISTS (SELECT 1 FROM note_history_requests WHERE owner_id=n.owner_id AND note_id=n.id AND operation_id=? AND edit_id=?)`,
       )
       .bind(
         editId,
         input.operationId,
-        state.note.title,
-        state.note.title,
         after.markdown,
         afterProvenance,
-        `suggestion_${input.decision}`,
-        suggestion.id,
-        status,
         now,
+        JSON.stringify([{ id: suggestion.id, beforeStatus: 'pending', afterStatus: status }]),
         noteId,
         ownerId,
         state.note.revision,
@@ -187,9 +183,9 @@ const buildDecisionUpdates = (
       ),
     db
       .prepare(
-        "UPDATE note_suggestions SET status=?,decision_edit_id=?,decided_at=?,updated_at=? WHERE id=? AND note_id=? AND owner_id=? AND status='pending' AND EXISTS (SELECT 1 FROM note_edits WHERE id=? AND owner_id=?)",
+        "UPDATE note_suggestions SET status=?,decided_at=?,updated_at=? WHERE id=? AND note_id=? AND owner_id=? AND status='pending' AND EXISTS (SELECT 1 FROM note_edits WHERE id=? AND owner_id=?)",
       )
-      .bind(status, editId, now, now, suggestion.id, noteId, ownerId, editId, ownerId),
+      .bind(status, now, now, suggestion.id, noteId, ownerId, editId, ownerId),
     db
       .prepare(
         'UPDATE note_edits SET discarded=1 WHERE note_id=? AND owner_id=? AND undone=1 AND discarded=0 AND id<>? AND EXISTS (SELECT 1 FROM note_edits WHERE id=? AND owner_id=?)',

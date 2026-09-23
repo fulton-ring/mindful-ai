@@ -32,7 +32,7 @@ capturePlacementRoutes.post('/conversations/:id/capture-placement', async (c) =>
     );
   const ownerId = c.get('userId');
   const conversation = await loadConversation(c.env.DB, ownerId, c.req.param('id'));
-  const note = await loadNote(c.env.DB, ownerId, conversation.noteId, conversation.title);
+  const note = await loadNote(c.env.DB, ownerId, conversation.noteId);
   lookupMs = performance.now() - startedAt;
   if ((note?.revision ?? null) !== parsed.data.noteRevision) {
     recordTiming();

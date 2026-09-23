@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import type { Conversation, ConversationSummary, Note, NoteState } from '@walden/contracts';
 import { useRef } from 'react';
+import { additionQueueOrder } from '../../features/notes/proposals/pending-projection';
 import { api } from '../../lib/api';
 import { productSessionId, track } from '../../lib/telemetry';
 import type { ConversationContext } from '../data/conversation-context';
@@ -77,7 +78,7 @@ function removeConversationFromCaches(context: ActionContext, thread: Conversati
   );
   void context.queryClient.invalidateQueries({ queryKey: ['conversations'] });
   void context.queryClient.invalidateQueries({ queryKey: ['notes'] });
-  context.queryClient.removeQueries({ queryKey: ['conversation', thread.id], exact: true });
+  context.queryClient.removeQueries({ queryKey: ['conversation', thread.id] });
 }
 
 function handleDeletedConversation(
@@ -214,9 +215,11 @@ function applyNoteState(context: ActionContext, state: NoteState, authoritative 
     context.dismissedSuggestionIds.current,
   );
   context.setProposals(pending);
-  context.queueOrderRef.current = state.suggestions
-    .filter((item) => item.oldText === '' && item.status !== 'invalidated')
-    .map((item) => ({ id: item.id, text: item.newText, accepted: item.status === 'accepted' }));
+  context.queueOrderRef.current = additionQueueOrder(
+    state.suggestions,
+    state.note.provenance,
+    context.queueOrderRef.current,
+  );
   if (
     context.proposalRef.current &&
     !pending.some((item) => item.id === context.proposalRef.current?.id)

@@ -54,18 +54,13 @@ const buildSaveStatements = (
     ? ` AND (SELECT COUNT(*) FROM note_suggestions WHERE note_id=notes.id AND owner_id=notes.owner_id AND status='pending' AND id IN (${dismissedIds.map(() => '?').join(',')}))=?`
     : '';
   const edit = db.prepare(
-    `INSERT INTO note_edits (id,note_id,owner_id,operation_id,base_revision,result_revision,before_title,before_markdown,before_provenance_json,after_title,after_markdown,after_provenance_json,kind,suggestion_id,before_suggestion_status,after_suggestion_status,created_at,suggestion_changes_json) SELECT ?,id,owner_id,?,revision,revision+1,?,markdown,provenance_json,?,?,?,'user_edit',? ,?,?,?,? FROM notes WHERE id=? AND owner_id=? AND revision=?${pendingIdsCondition}`,
+    `INSERT INTO note_edits (id,note_id,owner_id,operation_id,base_revision,result_revision,before_markdown,before_provenance_json,after_markdown,after_provenance_json,created_at,suggestion_changes_json) SELECT ?,id,owner_id,?,revision,revision+1,markdown,provenance_json,?,?,?,? FROM notes WHERE id=? AND owner_id=? AND revision=?${pendingIdsCondition}`,
   );
   const editValues = [
     newId(),
     input.operationId,
-    current.title,
-    current.title,
     input.markdown,
     provenanceJson,
-    dismissedIds.length === 1 ? dismissedIds[0] : null,
-    dismissedIds.length === 1 ? 'pending' : null,
-    dismissedIds.length === 1 ? 'dismissed' : null,
     now,
     changes.length ? JSON.stringify(changes) : null,
     noteId,

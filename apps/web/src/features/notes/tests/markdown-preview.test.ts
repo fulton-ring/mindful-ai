@@ -49,3 +49,27 @@ describe('Markdown links', () => {
     expect(container.textContent).toContain('[Unsafe](javascript:alert(1))');
   });
 });
+
+describe('Markdown equations', () => {
+  it('renders inline LaTeX while preserving the source range for editing', () => {
+    const source = 'Water is $H_2O$ and protons are $H^+$.';
+    expect(markdownSyntax(source)).toEqual(
+      expect.arrayContaining([
+        { from: 9, to: 15, kind: 'math' },
+        { from: 32, to: 37, kind: 'math' },
+      ]),
+    );
+    const container = document.createElement('div');
+    renderMarkdownPreview(container, source);
+    expect(container.querySelectorAll('.katex')).toHaveLength(2);
+    expect(container.textContent).not.toContain('$H_2O$');
+  });
+
+  it('leaves currency and code samples as text', () => {
+    const container = document.createElement('div');
+    renderMarkdownPreview(container, 'Costs $5 and $10; code: `$H_2O$`.');
+    expect(container.querySelector('.katex')).toBeNull();
+    expect(container.textContent).toContain('$5 and $10');
+    expect(container.textContent).toContain('$H_2O$');
+  });
+});

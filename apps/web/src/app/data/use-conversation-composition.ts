@@ -25,16 +25,6 @@ export function useConversationComposition(identity?: string) {
     query,
     adoptingConversationId: navigation.adoptingConversationId,
   });
-  const baseContext = {
-    identity,
-    ...route,
-    ...panel,
-    ...themeState,
-    ...editor,
-    ...sidebar,
-    ...query,
-    ...navigation,
-  };
   const { doSave } = useNoteSaveActions({
     queryClient: sidebar.queryClient,
     activeRoute: route.activeRoute,
@@ -48,5 +38,5 @@ export function useConversationComposition(identity?: string) {
     dismissedSuggestionIds: editor.dismissedSuggestionIds,
     deletedNoteIds: editor.deletedNoteIds,
   });
-  return { route, panel, themeState, editor, sidebar, query, navigation, baseContext, doSave };
+  return { identity, route, panel, themeState, editor, sidebar, query, navigation, doSave };
 }

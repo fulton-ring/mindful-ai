@@ -7,7 +7,6 @@ type SuggestionRow = {
   note_id: string;
   conversation_id: string | null;
   source_message_id: string | null;
-  base_markdown: string;
   base_revision: number;
   old_text: string;
   new_text: string;
@@ -32,7 +31,7 @@ export const toNoteSuggestion = (row: SuggestionRow): NoteSuggestion => ({
 });
 
 const SELECT_SUGGESTION =
-  'SELECT id,note_id,conversation_id,source_message_id,base_revision,base_markdown,old_text,new_text,reason,status,created_at,updated_at FROM note_suggestions';
+  'SELECT id,note_id,conversation_id,source_message_id,base_revision,old_text,new_text,reason,status,created_at,updated_at FROM note_suggestions';
 
 type PersistNoteSuggestionInput = {
   ownerId: string;
@@ -53,8 +52,8 @@ type SuggestionBaseline = {
   revision: number | null;
 };
 
-const INSERT_SUGGESTION = `INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,base_revision,base_markdown,old_text,new_text,reason,status,created_at,updated_at,branch_id,generation_key)
-     SELECT ?,?,?,?,?,?,?,?,?,?,'pending',?,?,?,? WHERE NOT EXISTS (
+const INSERT_SUGGESTION = `INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,base_revision,old_text,new_text,reason,status,created_at,updated_at,branch_id,generation_key)
+     SELECT ?,?,?,?,?,?,?,?,?,'pending',?,?,?,? WHERE NOT EXISTS (
        SELECT 1 FROM note_suggestion_cancellations WHERE owner_id=? AND attempt_id=?
      ) AND EXISTS (
        SELECT 1 FROM notes n JOIN conversations c ON c.note_id=n.id AND c.owner_id=n.owner_id
@@ -182,7 +181,6 @@ function prepareSuggestionInsert(
       input.conversationId,
       input.sourceMessageId,
       baseline.revision ?? 0,
-      baseline.markdown ?? '',
       input.proposal.oldText,
       input.proposal.newText,
       input.proposal.reason,
@@ -405,8 +403,8 @@ async function loadPendingSuggestions(
 }
 
 const INSERT_CANCELLATION_EDIT = (ids: string[]) => `INSERT INTO note_edits
-       (id,note_id,owner_id,operation_id,base_revision,result_revision,before_title,before_markdown,before_provenance_json,after_title,after_markdown,after_provenance_json,kind,suggestion_id,before_suggestion_status,after_suggestion_status,created_at,suggestion_changes_json)
-       SELECT ?,n.id,n.owner_id,?,n.revision,n.revision+1,c.title,n.markdown,n.provenance_json,c.title,n.markdown,n.provenance_json,'user_edit',NULL,NULL,NULL,?,?
+       (id,note_id,owner_id,operation_id,base_revision,result_revision,before_markdown,before_provenance_json,after_markdown,after_provenance_json,created_at,suggestion_changes_json)
+       SELECT ?,n.id,n.owner_id,?,n.revision,n.revision+1,n.markdown,n.provenance_json,n.markdown,n.provenance_json,?,?
        FROM notes n JOIN conversations c ON c.note_id=n.id AND c.owner_id=n.owner_id
        WHERE n.id=? AND n.owner_id=? AND c.id=?
          AND (SELECT COUNT(*) FROM note_suggestions WHERE note_id=n.id AND owner_id=n.owner_id AND status='pending' AND id IN (${ids.map(() => '?').join(',')}))=?`;
@@ -444,9 +442,9 @@ async function applySuggestionCancellation(
     ...ids.map((id) =>
       db
         .prepare(
-          "UPDATE note_suggestions SET status='dismissed',decision_edit_id=?,decided_at=?,updated_at=? WHERE id=? AND note_id=? AND owner_id=? AND status='pending' AND EXISTS (SELECT 1 FROM note_edits WHERE id=? AND owner_id=?)",
+          "UPDATE note_suggestions SET status='dismissed',decided_at=?,updated_at=? WHERE id=? AND note_id=? AND owner_id=? AND status='pending' AND EXISTS (SELECT 1 FROM note_edits WHERE id=? AND owner_id=?)",
         )
-        .bind(editId, now, now, id, noteId, input.ownerId, editId, input.ownerId),
+        .bind(now, now, id, noteId, input.ownerId, editId, input.ownerId),
     ),
     db
       .prepare(

@@ -5,6 +5,8 @@ export type QueuedAddition = {
   text: string;
   /** Already part of the note. Kept in the queue so the order the reader saw survives. */
   accepted?: boolean;
+  /** Saved-note offset chosen when a streaming addition first appears. */
+  at?: number;
 };
 
 /** Where one queued addition landed in the rendered note. */
@@ -45,6 +47,7 @@ type Entry = {
   from: number;
   to: number;
   editFrom: number;
+  sourceFrom: number;
   insert: string;
   text: string;
 };
@@ -62,6 +65,42 @@ function chunkAt(document: string, at: number, text: string): string {
   const lead = before.trim() && !before.endsWith('\n\n') ? '\n\n' : '';
   const tail = after.trim() && !after.startsWith('\n') ? '\n\n' : '';
   return `${lead}${text}${tail}`;
+}
+
+function renderedOffset(source: number, markdownLength: number, entries: readonly Entry[]): number {
+  const at = Math.max(0, Math.min(source, markdownLength));
+  return (
+    at +
+    entries
+      .filter((entry) => entry.sourceFrom <= at)
+      .reduce((total, entry) => total + entry.insert.length, 0)
+  );
+}
+
+function savedOffset(rendered: number, markdownLength: number, entries: readonly Entry[]): number {
+  const insertedBefore = entries
+    .filter((entry) => entry.editFrom <= rendered)
+    .reduce((total, entry) => total + entry.insert.length, 0);
+  return Math.max(0, Math.min(rendered - insertedBefore, markdownLength));
+}
+
+function shiftLaterEntries(
+  positions: Map<string, { start: number; end: number }>,
+  entries: Entry[],
+  at: number,
+  length: number,
+) {
+  for (const [, position] of positions)
+    if (position.start >= at) {
+      position.start += length;
+      position.end += length;
+    }
+  for (const entry of entries)
+    if (entry.editFrom >= at) {
+      entry.editFrom += length;
+      entry.from += length;
+      entry.to += length;
+    }
 }
 
 /**
@@ -109,21 +148,14 @@ function render(
     const upper = after?.start ?? document.length;
 
     const placed = additionEdit(document, item.text);
-    const at = Math.min(Math.max(placed.from, lower), Math.max(upper, lower));
+    const pinned =
+      item.at === undefined ? placed.from : renderedOffset(item.at, markdown.length, entries);
+    const at = Math.min(Math.max(pinned, lower), Math.max(upper, lower));
+    const sourceFrom = savedOffset(at, markdown.length, entries);
     const insert = item.text ? chunkAt(document, at, item.text) : '';
     const length = insert.length;
 
-    for (const [, position] of positions)
-      if (position.start >= at) {
-        position.start += length;
-        position.end += length;
-      }
-    for (const entry of entries)
-      if (entry.editFrom >= at) {
-        entry.editFrom += length;
-        entry.from += length;
-        entry.to += length;
-      }
+    shiftLaterEntries(positions, entries, at, length);
 
     // Find the text inside the chunk rather than assuming where it sits: the
     // blank line goes before it when it follows something and after it when it
@@ -135,6 +167,7 @@ function render(
       from: textFrom,
       to: textFrom + item.text.length,
       editFrom: at,
+      sourceFrom,
       insert,
       text: item.text,
     });
@@ -154,11 +187,7 @@ export function renderWithQueue(markdown: string, queue: readonly QueuedAddition
       to: entry.to,
       insert: entry.insert,
       // Back to saved-note coordinates: drop the chunks inserted before it.
-      sourceFrom:
-        entry.editFrom -
-        entries
-          .filter((other) => other.id !== entry.id && other.editFrom < entry.editFrom)
-          .reduce((total, other) => total + other.insert.length, 0),
+      sourceFrom: entry.sourceFrom,
     })),
   };
 }
@@ -212,6 +241,25 @@ export function soleInsertion(
     suffix += 1;
   if (prefix + suffix !== before.length) return null;
   return { from: prefix, to: prefix, insert: after.slice(prefix, after.length - suffix) };
+}
+
+/** Shift pending saved-note anchors past an accepted insertion. */
+export function rebaseQueueAfterAcceptance<T extends QueuedAddition>(
+  before: string,
+  after: string,
+  queue: readonly T[],
+  acceptedId: string,
+): T[] {
+  const insertion = soleInsertion(before, after);
+  if (!insertion) return [...queue];
+  const acceptedIndex = queue.findIndex((item) => item.id === acceptedId);
+  return queue.map((item, index) => {
+    if (item.accepted || item.id === acceptedId || item.at === undefined) return item;
+    const followsInsertion =
+      item.at > insertion.from ||
+      (item.at === insertion.from && acceptedIndex >= 0 && index > acceptedIndex);
+    return followsInsertion ? { ...item, at: item.at + insertion.insert.length } : item;
+  });
 }
 
 /**

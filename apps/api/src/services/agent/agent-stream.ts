@@ -89,7 +89,7 @@ async function* prepareTurnMemory(
   return next.value;
 }
 
-function createTurnWorkspace(env: ServiceEnv, input: AgentTurnInput): Workspace | undefined {
+export function createTurnWorkspace(env: ServiceEnv, input: AgentTurnInput): Workspace | undefined {
   if (!input.ownerId) return undefined;
   const filesystem = createR2Filesystem({
     ownerId: input.ownerId,
@@ -101,6 +101,7 @@ function createTurnWorkspace(env: ServiceEnv, input: AgentTurnInput): Workspace 
       secretAccessKey: env.R2_SECRET_ACCESS_KEY,
     },
   });
+  if (!filesystem) return undefined;
   return new Workspace({ filesystem });
 }
 

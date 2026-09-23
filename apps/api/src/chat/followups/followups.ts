@@ -182,9 +182,7 @@ async function buildAgentInput(
   if (!userMessage || userMessage.role !== 'user')
     throw new HttpError(409, 'Response context unavailable');
   const note =
-    operation === 'note-proposal'
-      ? await loadNote(c.env.DB, ownerId, conversation.noteId, conversation.title)
-      : null;
+    operation === 'note-proposal' ? await loadNote(c.env.DB, ownerId, conversation.noteId) : null;
   if (operation === 'note-proposal' && (note?.revision ?? null) !== request.noteRevision)
     throw new HttpError(409, 'Note changed');
   const turn = await first<{ turn_id: string }>(

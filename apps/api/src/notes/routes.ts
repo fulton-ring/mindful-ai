@@ -11,7 +11,7 @@ import { HttpError, jsonBody, newId, nowIso } from '../http';
 import type { Bindings, Variables } from '../types';
 import { loadNoteState } from './history/history';
 import { moveNoteHistory } from './history/history-actions';
-import { type NoteRow, selectNote, toNote } from './repository';
+import { NOTE_PROJECTION, type NoteRow, selectNote, toNote } from './repository';
 import { saveNote } from './save-note';
 import { decideSuggestion } from './suggestions/suggestion-decisions';
 
@@ -40,7 +40,7 @@ notesRoutes.get('/', async (c) =>
     (
       await all<NoteRow>(
         c.env.DB.prepare(
-          `SELECT n.id,COALESCE(NULLIF(TRIM(n.title),''),(SELECT c.title FROM conversations c WHERE c.note_id=n.id AND c.owner_id=n.owner_id ORDER BY c.last_user_activity_at DESC LIMIT 1),'Untitled note') AS title,n.markdown,n.revision,n.provenance_json,n.created_at,n.updated_at FROM notes n WHERE n.owner_id=? ORDER BY n.updated_at DESC`,
+          `SELECT ${NOTE_PROJECTION} FROM notes n WHERE n.owner_id=? ORDER BY n.updated_at DESC`,
         ).bind(c.get('userId')),
       )
     ).map(toNote),

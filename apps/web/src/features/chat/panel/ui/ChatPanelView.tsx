@@ -100,7 +100,6 @@ function TranscriptMessage({
       editing={controller.editingMessageId === message.id}
       editedMessage={controller.editedMessage}
       input={controller.input}
-      recentAnimation={controller.recentAnimation}
       liveAnnotations={controller.liveAnnotations}
       toolbar={
         !isLive && !message.incomplete && !message.learningCheck

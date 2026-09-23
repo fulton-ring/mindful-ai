@@ -1,4 +1,4 @@
-import type { EditProposal } from '@walden/contracts';
+import type { EditProposal, NoteSuggestion, ProvenanceSpan } from '@walden/contracts';
 import { acceptQueueEdit, type QueuedAddition, renderWithQueue, resolveEdit } from '@walden/domain';
 
 export type PendingRange = {
@@ -24,6 +24,8 @@ export type PendingProjection = {
   ranges: PendingRange[];
   issues: ProjectionIssue[];
 };
+
+export type NoteAddition = { id: string; text: string; accepted: boolean; at?: number };
 
 type ResolvedReplacement = {
   proposalId: string;
@@ -157,7 +159,7 @@ function shiftReplacementRanges(
  */
 export function additionQueue(
   proposals: readonly EditProposal[],
-  queueOrder: readonly { id: string; text: string; accepted: boolean }[] = [],
+  queueOrder: readonly NoteAddition[] = [],
   visibleInserts: ReadonlyMap<string, string> = new Map(),
 ): QueuedAddition[] {
   const pending = new Map(
@@ -172,6 +174,7 @@ export function additionQueue(
       id: item.id,
       text: item.accepted ? item.text : (pending.get(item.id) ?? item.text),
       accepted: item.accepted,
+      ...(item.at === undefined ? {} : { at: item.at }),
     })),
     // A proposal that has not been persisted yet has no place in the order, so
     // it keeps its own at the end.
@@ -181,11 +184,56 @@ export function additionQueue(
   ];
 }
 
+/** Keep currently displayed pending additions at their reviewed positions. */
+export function pinAdditionQueue(
+  markdown: string,
+  proposals: readonly EditProposal[],
+  queueOrder: readonly NoteAddition[],
+): NoteAddition[] {
+  const spans = renderWithQueue(markdown, additionQueue(proposals, queueOrder)).spans;
+  const positions = new Map(spans.map((span) => [span.id, span.sourceFrom]));
+  return queueOrder.map((item) => {
+    const at = positions.get(item.id);
+    return item.accepted || item.at !== undefined || at === undefined ? item : { ...item, at };
+  });
+}
+
+/** The API lists recent suggestions first; only accepted text still in the note can anchor placement. */
+export function additionQueueOrder(
+  suggestions: readonly Pick<
+    NoteSuggestion,
+    'id' | 'oldText' | 'newText' | 'status' | 'createdAt'
+  >[],
+  provenance: readonly ProvenanceSpan[],
+  previous: readonly NoteAddition[] = [],
+) {
+  const positions = new Map(previous.map((item) => [item.id, item.at]));
+  const presentAcceptedIds = new Set(provenance.map((span) => span.captureId));
+  return [...suggestions]
+    .filter(
+      (item) =>
+        item.oldText === '' &&
+        item.status !== 'invalidated' &&
+        (item.status !== 'accepted' || presentAcceptedIds.has(item.id)),
+    )
+    .sort((a, b) =>
+      a.createdAt === b.createdAt
+        ? a.id.localeCompare(b.id)
+        : a.createdAt.localeCompare(b.createdAt),
+    )
+    .map((item) => ({
+      id: item.id,
+      text: item.newText,
+      accepted: item.status === 'accepted',
+      ...(positions.get(item.id) === undefined ? {} : { at: positions.get(item.id) }),
+    }));
+}
+
 export function acceptedProposalMarkdown(
   markdown: string,
   proposal: EditProposal,
   proposals: readonly EditProposal[],
-  queueOrder: readonly { id: string; text: string; accepted: boolean }[] = [],
+  queueOrder: readonly NoteAddition[] = [],
 ): string | null {
   try {
     const edit = proposal.oldText
@@ -208,7 +256,7 @@ export function projectPendingEdits(
    * under the reader. Proposals missing from this list — one that has not been
    * persisted yet — keep their own order at the end.
    */
-  queueOrder: readonly { id: string; text: string; accepted: boolean }[] = [],
+  queueOrder: readonly NoteAddition[] = [],
 ): PendingProjection {
   const { replacements, issues } = resolveReplacements(markdown, proposals);
   const overlapIssues = findOverlaps(replacements);

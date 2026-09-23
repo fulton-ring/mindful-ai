@@ -41,7 +41,6 @@ type Props = {
   editing: boolean;
   editedMessage: string;
   input: string;
-  recentAnimation?: { messageId: string; annotationIds: ReadonlySet<string> } | null;
   liveAnnotations: Annotation[];
   toolbar: ReactNode;
   messageAnimation(messageId: string): ReadonlySet<string> | undefined;

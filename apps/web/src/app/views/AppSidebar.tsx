@@ -170,10 +170,7 @@ async function handleOpenThread(
 ) {
   if ((await data.flush(true)) === false) return;
   data.setRetainedNoteChatStarted(false);
-  await data.queryClient.invalidateQueries({
-    queryKey: ['conversation', thread.id],
-    exact: true,
-  });
+  await data.queryClient.invalidateQueries({ queryKey: ['conversation', thread.id] });
   data.setSidebar(false);
   void data.navigate({
     to: '/conversations/$conversationId',

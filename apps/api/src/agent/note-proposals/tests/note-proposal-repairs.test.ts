@@ -16,7 +16,7 @@ vi.mock('@mastra/core/agent', () => ({
 }));
 
 import { streamNoteProposal } from '../../index';
-import { assistantMessage, input, model, objectStream } from '../note-proposal-generation-fixtures';
+import { assistantMessage, input, model, objectStream } from './note-proposal-generation-fixtures';
 
 beforeEach(() => {
   mocks.stream.mockReset();

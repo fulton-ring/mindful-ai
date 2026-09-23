@@ -5,12 +5,12 @@
 ## Change the schema
 
 1. Edit the Drizzle schema.
-2. Run `pnpm db:generate` and review the generated SQL and snapshot.
+2. Run `pnpm db:generate` and review the generated SQL and snapshot. If existing rows need conversion before a column is removed, add the backfill SQL before the generated drop statements.
 3. Run `pnpm db:check`, then `pnpm db:migrate` for local development.
 4. Run `pnpm --filter @walden/api db:migrate:test` for the local end-to-end test database.
 5. Test before deploying. For an authorized production release, run `pnpm --filter @walden/api db:migrate:remote` before deploying code that needs the new schema.
 
-Commit the schema, generated SQL, and metadata together. Do not edit generated SQL or use Drizzle push against production. Subsequent changes add incremental migrations; do not squash a live database's migration history again.
+Commit the schema, migration SQL, and metadata together. Verify any hand-written backfill against existing rows and a fresh database. Do not use Drizzle push against production. Subsequent changes add incremental migrations; do not squash a live database's migration history again.
 
 ## September 2026 reset
 

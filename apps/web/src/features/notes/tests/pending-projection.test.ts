@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 import {
   acceptedProposalMarkdown,
   additionQueue,
+  additionQueueOrder,
   candidateOnLine,
+  pinAdditionQueue,
   projectPendingEdits,
 } from '../proposals/pending-projection';
 
@@ -162,6 +164,43 @@ describe('pending note projection', () => {
   describe('candidate ranges', describeCandidateProjection);
 });
 
+it('keeps a streamed addition in place when the newest-first note state arrives', () => {
+  const markdown = 'Photosynthesis overview.\n\nCalvin cycle details.';
+  const earlier = {
+    ...proposal('earlier', '', 'Photosynthesis overview.'),
+    status: 'accepted' as const,
+    createdAt: '2026-09-23T01:00:00.000Z',
+  };
+  const later = {
+    ...proposal('later', '', 'Calvin cycle uses carbon dioxide.'),
+    createdAt: '2026-09-23T02:00:00.000Z',
+  };
+  const provenance = [
+    {
+      from: 0,
+      to: earlier.newText.length,
+      origin: 'agent' as const,
+      verbatim: true,
+      captureId: earlier.id,
+    },
+  ];
+  const before = projectPendingEdits(markdown, [later], new Map(), [
+    { id: earlier.id, text: earlier.newText, accepted: true },
+  ]);
+  const after = projectPendingEdits(
+    markdown,
+    [later],
+    new Map(),
+    additionQueueOrder([later, earlier], provenance),
+  );
+  expect(after.text).toBe(before.text);
+  expect(after.ranges).toEqual(before.ranges);
+  const anchored = additionQueueOrder([later, earlier], provenance, [
+    { id: later.id, text: later.newText, accepted: false, at: 5 },
+  ]);
+  expect(anchored.find((item) => item.id === later.id)?.at).toBe(5);
+});
+
 /** The note as it reads once `id` is kept and the other ghosts are taken out. */
 const accepted = (
   markdown: string,
@@ -237,6 +276,26 @@ function describeQueueAgreement(): void {
 }
 
 function describeOutOfOrderAcceptance(): void {
+  it('pins a loaded pending addition before accepting a newer one', () => {
+    const markdown = 'Alpha topic.\n\nBeta topic.\n\nGamma topic.';
+    const proposals = [
+      proposal('first', '', 'Alpha topic detail.'),
+      proposal('second', '', 'Beta topic detail.'),
+    ];
+    const order = proposals.map((item) => ({
+      id: item.id,
+      text: item.newText,
+      accepted: false,
+    }));
+    const preview = projectPendingEdits(markdown, proposals, new Map(), order);
+    const pinned = pinAdditionQueue(markdown, proposals, order);
+    const saved = accepted(markdown, proposals, pinned, 'second');
+    const settled = projectPendingEdits(saved, [proposals[0]!], new Map(), [
+      pinned[0]!,
+      { ...pinned[1]!, accepted: true },
+    ]);
+    expect(settled.text).toBe(preview.text);
+  });
   it('accepting out of order leaves the note reading as it was previewed', () => {
     const markdown = 'Budget is fixed at 40k.';
     const proposals = [

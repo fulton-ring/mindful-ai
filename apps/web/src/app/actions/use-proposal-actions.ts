@@ -1,6 +1,9 @@
 import type { EditProposal, Note } from '@walden/contracts';
-import { resolveEdit } from '@walden/domain';
-import { acceptedProposalMarkdown } from '../../features/notes/proposals/pending-projection';
+import { additionEdit, rebaseQueueAfterAcceptance, resolveEdit } from '@walden/domain';
+import {
+  acceptedProposalMarkdown,
+  pinAdditionQueue,
+} from '../../features/notes/proposals/pending-projection';
 import { proposalStillApplies } from '../../features/notes/proposals/proposal-scope';
 import { api } from '../../lib/api';
 import { id } from '../../lib/ids';
@@ -70,6 +73,13 @@ async function runDecision(
         context.proposalRef.current = null;
         context.setProposal(null);
       }
+      if (decision === 'accept')
+        context.queueOrderRef.current = rebaseQueueAfterAcceptance(
+          current.markdown,
+          state.note.markdown,
+          context.queueOrderRef.current,
+          value.id,
+        );
       dependencies.applyNoteState(state, true);
       return true;
     })
@@ -99,6 +109,12 @@ async function decideSuggestion(
   context.setDecisionPending(true);
   const current = await prepareDecision(context, dependencies, value);
   if (!current) return resetDecision(context);
+  if (decision === 'accept' && !value.oldText)
+    context.queueOrderRef.current = pinAdditionQueue(
+      current.markdown,
+      context.proposalsRef.current,
+      context.queueOrderRef.current,
+    );
   const reviewedMarkdown =
     decision === 'accept'
       ? acceptedProposalMarkdown(
@@ -152,6 +168,21 @@ function resolveProposals(current: Note | null, request: ProposalRequest, values
   });
 }
 
+function rememberAdditionPlacement(context: ProposalContext, value: EditProposal) {
+  const placementText = context.proposalRequestRef.current?.capturedText ?? value.newText;
+  if (value.oldText || !placementText.trim()) return;
+  const queue = context.queueOrderRef.current;
+  if (queue.some((item) => item.id === value.id && item.at !== undefined)) return;
+  const markdown = context.draftRef.current?.markdown ?? context.unsavedDraftRef.current.markdown;
+  const at = additionEdit(markdown, placementText).from;
+  const existing = queue.findIndex((item) => item.id === value.id);
+  const placed = { id: value.id, text: value.newText, accepted: false, at };
+  context.queueOrderRef.current =
+    existing < 0
+      ? [...queue, placed]
+      : queue.map((item, index) => (index === existing ? placed : item));
+}
+
 async function loadCompletedProposals(
   context: ProposalContext,
   dependencies: ProposalDependencies,
@@ -198,6 +229,7 @@ function completeProposals(
   if (request?.sourceId !== sourceId || request.phase !== 'streaming') return;
   const resolved = resolveProposals(context.draftRef.current, request, values);
   const active = resolved.at(-1) ?? null;
+  if (active) rememberAdditionPlacement(context, active);
   context.setProposal(active);
   context.setProposals((items) => [
     ...resolved,
@@ -250,6 +282,7 @@ export function useProposalActions(context: ProposalContext) {
       !proposalStillApplies(request, context.draftRef.current)
     )
       return;
+    rememberAdditionPlacement(context, value);
     context.setProposalRequest({
       ...request,
       previewIds: new Set([...request.previewIds, value.id]),

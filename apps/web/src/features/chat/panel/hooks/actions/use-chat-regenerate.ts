@@ -3,10 +3,10 @@ import type { ChatEvent, Conversation, Message } from '@walden/contracts';
 import { streamChat } from '../../../../../lib/api';
 import { id } from '../../../../../lib/ids';
 import type { ChatPanelProps } from '../../chat-panel-types';
-import { upsertActivity } from '../../chat-panel-utils';
 import type { ChatDisplayState } from '../state/use-chat-display-state';
 import type { ChatRuntimeState } from '../state/use-chat-runtime-state';
 import type { ChatTurnState } from '../state/use-chat-turn';
+import { handleLiveChatEvent } from './live-chat-event';
 
 type RegenerateArgs = {
   props: ChatPanelProps;
@@ -172,18 +172,8 @@ function handleRegenerationDone(
 
 function handleRegenerationEvent(args: RegenerateArgs, run: Regeneration, event: ChatEvent) {
   if (!isCurrent(args, run)) return;
-  if (event.type === 'text')
-    args.turn.displayStreamTarget(args.turn.streamTarget.current + event.text);
-  else if (event.type === 'reasoning') args.display.setReasoning((current) => current + event.text);
-  else if (event.type === 'tool')
-    args.display.setLiveTools((current) => upsertActivity(current, event.tool));
-  else if (event.type === 'source')
-    args.display.setLiveSources((current) => upsertActivity(current, event.source));
-  else if (event.type === 'status') args.display.setStatus(event.text);
-  else if (event.type === 'context-compacted') args.display.setLiveContextCompacted(true);
-  else if (event.type === 'annotation')
-    args.display.setLiveAnnotations((current) => [...current, event.annotation]);
-  else if (event.type === 'done') handleRegenerationDone(args, run, event);
+  if (handleLiveChatEvent(args, event)) return;
+  if (event.type === 'done') handleRegenerationDone(args, run, event);
   else if (event.type === 'error') args.display.setError(event.message);
 }
 

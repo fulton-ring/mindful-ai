@@ -23,8 +23,8 @@ If content changes, validate the stored patch against the new note. A uniquely r
 - The durable product object is a thread: one title and at most one exclusively owned note. A new thread may start without a note. Its transcript is temporary child state; expiring a transcript does not delete its note, suggestions, or note history.
 - Explicit thread deletion removes the thread, its note, suggestions, note history, and transcript atomically. This is distinct from seven days of inactivity, which removes only transcript state and permits a new line of questioning with the retained note in context.
 - `notes` remains committed content plus optimistic revision.
-- `note_suggestions` stores finalized patches, source identifiers, lifecycle status, and the original note basis. Source transcript identifiers must not cascade-delete permanent note state.
-- Extend `note_edits` as one ordered history of user edits, acceptance, and dismissal, with before/after content and suggestion status. Avoid a second competing history journal.
+- `note_suggestions` stores finalized patches, source identifiers, base revision, and lifecycle status. Source transcript identifiers must not cascade-delete permanent note state.
+- `note_edits` records one ordered history of user edits, acceptance, and dismissal, with before/after content and suggestion status changes in `suggestion_changes_json`.
 - Revisions increase on durable state changes. Undo/Redo validate current state and move through the history branch rather than requiring current revision to equal an old edit's original result revision.
 - A first finalized suggestion may create and link an empty note resource. This does not commit proposed text or cause an empty panel to open before there is a suggestion worth displaying.
 - Generation writes only finalized suggestions before sending its terminal event. Streaming previews remain provisional. Retries reuse the stored generation result.

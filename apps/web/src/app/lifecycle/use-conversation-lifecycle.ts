@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { additionQueueOrder } from '../../features/notes/proposals/pending-projection';
 import type {
   useConversationQueries,
   useEditorState,
@@ -190,9 +191,11 @@ function useNoteStateLifecycle({
       dismissedSuggestionIds.current,
     );
     setProposals(pending);
-    queueOrderRef.current = state.suggestions
-      .filter((item) => item.oldText === '' && item.status !== 'invalidated')
-      .map((item) => ({ id: item.id, text: item.newText, accepted: item.status === 'accepted' }));
+    queueOrderRef.current = additionQueueOrder(
+      state.suggestions,
+      state.note.provenance,
+      queueOrderRef.current,
+    );
     if (pending.length && !dismissedNoteConversations.has(noteConversationKey)) {
       setNoteOpen(true);
       setMobilePane('note');

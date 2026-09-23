@@ -22,9 +22,6 @@ export type Bindings = {
   R2_SECRET_ACCESS_KEY?: string;
   CLOUDFLARE_ACCOUNT_ID?: string;
   CLOUDFLARE_API_TOKEN?: string;
-  OPENAI_API_KEY?: string;
-  ANTHROPIC_API_KEY?: string;
-  GOOGLE_API_KEY?: string;
   MCP_SERVER_URL?: string;
   MCP_SERVER_TOKEN?: string;
   MCP_ALLOWED_TOOLS?: string;

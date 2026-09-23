@@ -4,6 +4,7 @@ import { RouterProvider } from '@tanstack/react-router';
 import type { AppConfig } from '@walden/contracts';
 import { type ReactNode, StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import 'katex/dist/katex.min.css';
 import { LegalLinks, LegalPage } from './features/legal/LegalPage';
 import { setTokenProvider } from './lib/api';
 import { identifyTelemetry, initializeTelemetry, track } from './lib/telemetry';

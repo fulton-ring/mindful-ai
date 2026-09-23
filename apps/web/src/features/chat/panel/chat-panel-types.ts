@@ -22,7 +22,7 @@ export type ChatPanelProps = {
   onAdvance?(): void;
   onConversation(value: Conversation): void | Promise<void>;
   onFlush(): Promise<number | null | false>;
-  onProposalStart(sourceId: string): void;
+  onProposalStart(sourceId: string, capturedText?: string): void;
   onProposalCancelable(cancel: (() => Promise<NoteState | null>) | null): void;
   onProposalCancelled?(
     state: NoteState,

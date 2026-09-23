@@ -4,7 +4,7 @@ import { EditorView } from '@codemirror/view';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import NotesEditor from '../editor/NotesEditor';
-import { note } from '../editor/NotesEditor.test-fixtures';
+import { note } from './NotesEditor.test-fixtures';
 
 Object.defineProperty(Range.prototype, 'getClientRects', {
   configurable: true,

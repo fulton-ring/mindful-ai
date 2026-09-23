@@ -104,7 +104,7 @@ The default branch may omit the query parameter for short stable links. Selectin
 
 ## Regeneration transaction
 
-Replace the current latest-only `regenerationContext` and in-place `REGENERATE_ASSISTANT_SQL` behavior.
+Regeneration creates a sibling branch from the selected assistant's user parent, preserving the original path.
 
 1. Load the requested branch and verify the target is a completed assistant on its path with a user parent.
 2. Reject if that branch is expired or already has a streaming turn.

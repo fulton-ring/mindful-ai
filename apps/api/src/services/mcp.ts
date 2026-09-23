@@ -1,45 +1,7 @@
 import { MCPClient } from '@mastra/mcp';
 import type { ServiceEnv } from './types';
 
-export type ToolEffect = 'read-only' | 'reversible' | 'irreversible' | 'unknown';
-export type ToolDecision = {
-  effect: ToolEffect;
-  confirmationRequired: boolean;
-  allowed: boolean;
-  reason: string;
-};
 export type McpTools = Awaited<ReturnType<MCPClient['listTools']>>;
-
-export function classifyTool(
-  toolName: string,
-  configured: Record<string, ToolEffect>,
-): ToolDecision {
-  const effect = configured[toolName] ?? 'unknown';
-  if (effect === 'read-only')
-    return {
-      effect,
-      confirmationRequired: false,
-      allowed: true,
-      reason: 'Operator-classified read-only tool.',
-    };
-  if (effect === 'reversible')
-    return {
-      effect,
-      confirmationRequired: false,
-      allowed: false,
-      reason:
-        'Reversible execution is not supported in V1 because compensation is not implemented.',
-    };
-  return {
-    effect,
-    confirmationRequired: true,
-    allowed: false,
-    reason:
-      effect === 'unknown'
-        ? 'Unknown-effect execution is not supported in V1.'
-        : 'Irreversible execution is not supported in V1.',
-  };
-}
 
 function endpoint(value: string): URL {
   const url = new URL(value);
@@ -58,10 +20,10 @@ function endpoint(value: string): URL {
     throw new Error('Private-network MCP endpoints are not allowed.');
   return url;
 }
-function effects(env: ServiceEnv): Record<string, ToolEffect> {
+function effects(env: ServiceEnv): Record<string, string> {
   if (!env.MCP_TOOL_EFFECTS) return {};
   try {
-    return JSON.parse(env.MCP_TOOL_EFFECTS) as Record<string, ToolEffect>;
+    return JSON.parse(env.MCP_TOOL_EFFECTS) as Record<string, string>;
   } catch {
     throw new Error('MCP_TOOL_EFFECTS must be a JSON object.');
   }
@@ -77,7 +39,6 @@ export function createMcpService(env: ServiceEnv) {
   const configuredEffects = effects(env);
   return {
     configured: Boolean(env.MCP_SERVER_URL),
-    classify: (toolName: string) => classifyTool(toolName, configuredEffects),
     async tools(): Promise<McpTools> {
       if (!env.MCP_SERVER_URL) return {};
       const serverUrl = endpoint(env.MCP_SERVER_URL);
@@ -101,8 +62,7 @@ export function createMcpService(env: ServiceEnv) {
       const tools = await client.listTools();
       return Object.fromEntries(
         Object.entries(tools).filter(
-          ([name]) =>
-            allowed.has(name) && classifyTool(name, configuredEffects).effect === 'read-only',
+          ([name]) => allowed.has(name) && configuredEffects[name] === 'read-only',
         ),
       );
     },

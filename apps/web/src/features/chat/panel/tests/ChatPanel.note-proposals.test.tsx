@@ -3,8 +3,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ChatEvent, Conversation, NoteProposalEvent } from '@walden/contracts';
 import { expect, it, vi } from 'vitest';
-import { conversation, getTransport, props } from '../../_ChatPanel.test-helpers';
-import { ChatPanel } from '../../ChatPanel';
+import { conversation, getTransport, props } from '../../tests/_ChatPanel.test-helpers';
+
+const { ChatPanel } = await import('../../ChatPanel');
 
 const transport = getTransport();
 
@@ -410,9 +411,8 @@ it('routes Add to note through the streamed proposal pipeline, leaving it pendin
     expect.any(Function),
     expect.any(AbortSignal),
   );
-  // No second argument: a capture is a proposal the reader still has to
-  // accept, exactly like one made from a whole response.
-  expect(values.onProposalStart).toHaveBeenCalledWith(expect.any(String));
+  // The selected text fixes placement while the proposed wording streams.
+  expect(values.onProposalStart).toHaveBeenCalledWith(expect.any(String), 'Selected exact text');
   expect(values.onOpenNote).toHaveBeenCalledOnce();
 });
 
@@ -510,7 +510,10 @@ it('preserves capture text when retrying a failed Add to note', async () => {
   expect(transport.streamNoteProposal.mock.calls[1]?.[1]).toEqual(
     expect.objectContaining({ action: 'capture', captureText: 'Selected exact text' }),
   );
-  expect(values.onProposalStart).toHaveBeenLastCalledWith(expect.any(String));
+  expect(values.onProposalStart).toHaveBeenLastCalledWith(
+    expect.any(String),
+    'Selected exact text',
+  );
 });
 
 it('routes intervention capture through the same streamed proposal pipeline', async () => {
@@ -557,5 +560,8 @@ it('routes intervention capture through the same streamed proposal pipeline', as
     expect.any(Function),
     expect.any(AbortSignal),
   );
-  expect(values.onProposalStart).toHaveBeenCalledWith(expect.any(String));
+  expect(values.onProposalStart).toHaveBeenCalledWith(
+    expect.any(String),
+    'Intervention exact text',
+  );
 });

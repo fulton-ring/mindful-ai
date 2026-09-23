@@ -21,13 +21,16 @@ export const toNote = (row: NoteRow): Note => ({
   updatedAt: row.updated_at,
 });
 
+// Keep owner-scoped note reads on the same title and field projection.
+export const NOTE_PROJECTION = `n.id,COALESCE(NULLIF(TRIM(n.title),''),
+  (SELECT NULLIF(TRIM(c.title),'') FROM conversations c
+   WHERE c.note_id=n.id AND c.owner_id=n.owner_id
+   ORDER BY c.last_user_activity_at DESC LIMIT 1),
+  'Untitled note') AS title,n.markdown,n.revision,n.provenance_json,n.created_at,n.updated_at`;
+
 export const selectNote = (db: D1Database, ownerId: string, id: string) =>
   first<NoteRow>(
     db
-      .prepare(
-        // The note title is authoritative. The conversation title is a fallback
-        // for notes created before notes had titles of their own.
-        `SELECT n.id,COALESCE(NULLIF(TRIM(n.title),''),(SELECT c.title FROM conversations c WHERE c.note_id=n.id AND c.owner_id=n.owner_id ORDER BY c.last_user_activity_at DESC LIMIT 1),'Untitled note') AS title,n.markdown,n.revision,n.provenance_json,n.created_at,n.updated_at FROM notes n WHERE n.id=? AND n.owner_id=?`,
-      )
+      .prepare(`SELECT ${NOTE_PROJECTION} FROM notes n WHERE n.id=? AND n.owner_id=?`)
       .bind(id, ownerId),
   );

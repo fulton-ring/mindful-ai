@@ -107,7 +107,7 @@ function prepareProposal(
     : prepareReplacement(note, candidate, final);
 }
 
-function proposalDiff(oldText: string, newText: string) {
+export function proposalDiff(oldText: string, newText: string) {
   let prefix = 0;
   let suffix = 0;
   while (prefix < oldText.length && prefix < newText.length && oldText[prefix] === newText[prefix])

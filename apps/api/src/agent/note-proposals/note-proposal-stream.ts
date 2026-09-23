@@ -16,7 +16,11 @@ import {
 import { noteOutline, noteTools } from './note-access';
 import { noteProposalStreamError } from './note-proposal-errors';
 import { noteProposalInstructions } from './note-proposal-prompt';
-import { noteProposalFromCandidate, noteProposalValidationDiagnostics } from './note-proposals';
+import {
+  noteProposalFromCandidate,
+  noteProposalValidationDiagnostics,
+  proposalDiff,
+} from './note-proposals';
 
 function noteProposalNoopReason(reason: unknown): string | undefined {
   if (typeof reason !== 'string') return undefined;
@@ -29,7 +33,7 @@ function withoutRedundantOperations(proposals: Array<EditProposal | null>): Edit
   const insertions: string[] = [];
   for (const proposal of proposals) {
     if (!proposal) continue;
-    const insertion = proposalInsertion(proposal).trim();
+    const insertion = proposalDiff(proposal.oldText, proposal.newText).insertedText.trim();
     if (insertion) {
       if (insertions.some((earlier) => isRedundantAddition(earlier, insertion))) continue;
       insertions.push(insertion);
@@ -39,20 +43,6 @@ function withoutRedundantOperations(proposals: Array<EditProposal | null>): Edit
   return kept;
 }
 
-/** The text a proposal actually introduces, ignoring its untouched prefix and suffix. */
-function proposalInsertion({ oldText, newText }: EditProposal): string {
-  let prefix = 0;
-  while (prefix < oldText.length && prefix < newText.length && oldText[prefix] === newText[prefix])
-    prefix += 1;
-  let suffix = 0;
-  while (
-    suffix < oldText.length - prefix &&
-    suffix < newText.length - prefix &&
-    oldText[oldText.length - suffix - 1] === newText[newText.length - suffix - 1]
-  )
-    suffix += 1;
-  return newText.slice(prefix, newText.length - suffix);
-}
 type ProposalResponse = {
   objectStream: AsyncIterable<unknown>;
   object: Promise<unknown>;
@@ -114,7 +104,7 @@ ${JSON.stringify({
     : { currentNoteMarkdown: input.note?.markdown ?? '' }),
   pendingProposals: (input.pendingProposals ?? []).map((pending) => ({
     id: pending.id,
-    text: proposalInsertion(pending),
+    text: proposalDiff(pending.oldText, pending.newText).insertedText,
     reason: pending.reason,
   })),
   originalUserMessage: input.message,
@@ -247,6 +237,23 @@ function previewCandidate(
   return { ...proposal, id: stableId('edit', input.turnId, String(operationIndex)) };
 }
 
+function previewEvent(
+  proposal: EditProposal | null,
+  operationIndex: number,
+  omitOperationIndex: boolean,
+  previousPreviews: Map<number, string>,
+): NoteProposalEvent | undefined {
+  if (!proposal) return undefined;
+  const signature = proposal.oldText + '\u0000' + proposal.newText + '\u0000' + proposal.reason;
+  if (signature === previousPreviews.get(operationIndex)) return undefined;
+  previousPreviews.set(operationIndex, signature);
+  return {
+    type: 'preview',
+    proposal,
+    ...(omitOperationIndex ? {} : { operationIndex }),
+  };
+}
+
 async function* partialPreviewEvents(
   partial: unknown,
   input: AgentTurnInput,
@@ -261,15 +268,13 @@ async function* partialPreviewEvents(
       (partialRecord.shouldPropose === undefined ? [] : [partialRecord]));
   for (const [operationIndex, partialCandidate] of candidates.entries()) {
     const proposal = previewCandidate(partialCandidate, input, proposalPolicy, operationIndex);
-    if (!proposal) continue;
-    const signature = proposal.oldText + '\u0000' + proposal.newText + '\u0000' + proposal.reason;
-    if (signature === previousPreviews.get(operationIndex)) continue;
-    previousPreviews.set(operationIndex, signature);
-    yield {
-      type: 'preview',
+    const event = previewEvent(
       proposal,
-      ...(proposalPolicy.explicitCapture ? {} : { operationIndex }),
-    };
+      operationIndex,
+      proposalPolicy.explicitCapture,
+      previousPreviews,
+    );
+    if (event) yield event;
   }
 }
 
@@ -370,10 +375,12 @@ function batchRepairPrompt(
   ].join('\n');
 }
 
-function repairOptions(signal: AbortSignal) {
+function repairOptions<
+  Schema extends typeof noteProposalBatchOutputSchema | typeof noteProposalOutputSchema,
+>(signal: AbortSignal, schema: Schema) {
   return {
     abortSignal: signal,
-    structuredOutput: { schema: noteProposalBatchOutputSchema, jsonPromptInjection: true },
+    structuredOutput: { schema, jsonPromptInjection: true },
     modelSettings: {
       maxOutputTokens: 800,
       temperature: 0,
@@ -408,15 +415,8 @@ async function* batchRepairPreviews(
         ...preview,
         id: stableId('edit', input.turnId, String(operationIndex)),
       };
-      const signature =
-        indexedPreview.oldText +
-        '\u0000' +
-        indexedPreview.newText +
-        '\u0000' +
-        indexedPreview.reason;
-      if (signature === previousPreviews.get(operationIndex)) continue;
-      previousPreviews.set(operationIndex, signature);
-      yield { type: 'preview', proposal: indexedPreview, operationIndex };
+      const event = previewEvent(indexedPreview, operationIndex, false, previousPreviews);
+      if (event) yield event;
     }
   }
 }
@@ -477,7 +477,7 @@ async function* repairBatchProposal(
   try {
     const repair = await noteAgent.stream(
       batchRepairPrompt(finalOutput, invalidIndexes, noteMaterial),
-      repairOptions(signal),
+      repairOptions(signal, noteProposalBatchOutputSchema),
     );
     yield* batchRepairPreviews(repair, invalidIndexes, input, proposalPolicy, previousPreviews);
     return {
@@ -549,7 +549,7 @@ async function* streamBatchProposal(
         ),
       ),
     });
-    const repairStream = repairBatchProposal(
+    const { declineReason } = yield* repairBatchProposal(
       finalOutput,
       state,
       input,
@@ -559,12 +559,7 @@ async function* streamBatchProposal(
       proposalPolicy,
       previousPreviews,
     );
-    let repairStep = await repairStream.next();
-    while (!repairStep.done) {
-      yield repairStep.value;
-      repairStep = await repairStream.next();
-    }
-    repairDeclineReason = repairStep.value.declineReason;
+    repairDeclineReason = declineReason;
   }
   if (state.invalidIndexes.some((index) => !state.proposals[index])) {
     if (repairDeclineReason) {
@@ -607,18 +602,6 @@ function singleRepairPrompt(
   ].join('\n');
 }
 
-function singleRepairOptions(signal: AbortSignal) {
-  return {
-    abortSignal: signal,
-    structuredOutput: { schema: noteProposalOutputSchema, jsonPromptInjection: true },
-    modelSettings: {
-      maxOutputTokens: 800,
-      temperature: 0,
-      timeout: { totalMs: 15_000, stepMs: 15_000 },
-    },
-  };
-}
-
 async function* singleRepairPreviews(
   repair: ProposalResponse,
   input: AgentTurnInput,
@@ -633,11 +616,8 @@ async function* singleRepairPreviews(
       false,
       proposalPolicy,
     );
-    if (!preview) continue;
-    const signature = preview.oldText + '\u0000' + preview.newText + '\u0000' + preview.reason;
-    if (signature === previousPreviews.get(0)) continue;
-    previousPreviews.set(0, signature);
-    yield { type: 'preview', proposal: preview };
+    const event = previewEvent(preview, 0, true, previousPreviews);
+    if (event) yield event;
   }
 }
 
@@ -656,7 +636,7 @@ async function* repairSingleProposal(
   try {
     const repair = await noteAgent.stream(
       singleRepairPrompt(finalCandidateInput, input, noteMaterial),
-      singleRepairOptions(signal),
+      repairOptions(signal, noteProposalOutputSchema),
     );
     yield* singleRepairPreviews(repair, input, proposalPolicy, previousPreviews);
     const repairedCandidate = (await repair.object) as Partial<NoteProposalCandidate>;
@@ -711,7 +691,7 @@ async function* streamSingleProposal(
     finalCandidate.shouldPropose === true &&
     Boolean(finalCandidate.captureBasis && finalCandidate.captureBasis !== 'none');
   if (!proposal && warrantsRepair) {
-    const repairStream = repairSingleProposal(
+    ({ finalCandidate, proposal } = yield* repairSingleProposal(
       finalCandidate,
       input,
       noteAgent,
@@ -719,14 +699,7 @@ async function* streamSingleProposal(
       signal,
       proposalPolicy,
       previousPreviews,
-    );
-    let repairStep = await repairStream.next();
-    while (!repairStep.done) {
-      yield repairStep.value;
-      repairStep = await repairStream.next();
-    }
-    finalCandidate = repairStep.value.finalCandidate;
-    proposal = repairStep.value.proposal;
+    ));
   }
   if (!proposal) {
     if (finalCandidate.shouldPropose !== true || finalCandidate.captureBasis === 'none') {

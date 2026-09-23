@@ -1,10 +1,11 @@
 import { markdownLanguage } from '@codemirror/lang-markdown';
 import { Decoration, type DecorationSet, EditorView, WidgetType } from '@codemirror/view';
+import katex from 'katex';
 
 export type MarkdownSyntax = {
   from: number;
   to: number;
-  kind: 'heading' | 'bullet' | 'strong' | 'emphasis' | 'code' | 'fence' | 'link';
+  kind: 'heading' | 'bullet' | 'strong' | 'emphasis' | 'code' | 'fence' | 'link' | 'math';
   replacement?: string;
   href?: string;
 };
@@ -33,6 +34,32 @@ class TextMarker extends WidgetType {
   ignoreEvent() {
     return true;
   }
+}
+
+class MathMarker extends WidgetType {
+  constructor(
+    private readonly source: string,
+    private readonly from: number,
+  ) {
+    super();
+  }
+  toDOM(view: EditorView) {
+    const element = document.createElement('span');
+    element.className = 'cm-markdown-math';
+    renderMath(element, this.source);
+    element.addEventListener('click', () => {
+      view.dispatch({ selection: { anchor: this.from + 1 } });
+      view.focus();
+    });
+    return element;
+  }
+  ignoreEvent() {
+    return true;
+  }
+}
+
+function renderMath(element: HTMLElement, source: string): void {
+  katex.render(source.slice(1, -1), element, { throwOnError: false, trust: false });
 }
 
 function lineStarts(markdown: string): number[] {
@@ -125,11 +152,32 @@ function linkSyntax(markdown: string): MarkdownSyntax[] {
   return links;
 }
 
+function mathSyntax(markdown: string, excluded: MarkdownSyntax[], fenced: FenceRange[]) {
+  const equations: MarkdownSyntax[] = [];
+  for (const match of markdown.matchAll(/\$([^$\n]+)\$/g)) {
+    const from = match.index ?? 0;
+    const to = from + match[0].length;
+    const expression = match[1];
+    if (
+      markdown[from - 1] === '\\' ||
+      markdown[from - 1] === '$' ||
+      markdown[to] === '$' ||
+      /^\s|\s$/.test(expression) ||
+      excluded.some((item) => from < item.to && to > item.from) ||
+      fenced.some((range) => from < range.to && to > range.from)
+    )
+      continue;
+    equations.push({ from, to, kind: 'math' });
+  }
+  return equations;
+}
+
 /** Return source ranges that receive a visual Markdown treatment. */
 export function markdownSyntax(markdown: string): MarkdownSyntax[] {
   const { syntax, fenced } = blockSyntax(markdown);
   syntax.push(...inlineSyntax(markdown, fenced));
   const links = linkSyntax(markdown);
+  const equations = mathSyntax(markdown, [...syntax, ...links], fenced);
   const visibleSyntax = syntax.filter(
     (item) =>
       item.kind === 'fence' ||
@@ -140,6 +188,7 @@ export function markdownSyntax(markdown: string): MarkdownSyntax[] {
       (item) => !links.some((link) => item.from >= link.from && item.to <= link.to),
     ),
     ...links,
+    ...equations,
   ];
 }
 
@@ -152,9 +201,14 @@ export const markdownPreviewTheme = EditorView.baseTheme({
     backgroundColor: 'color-mix(in srgb, currentColor 8%, transparent)',
   },
   '.cm-markdown-marker': { color: 'currentColor', fontWeight: '600' },
+  '.cm-markdown-math': { cursor: 'text' },
 });
 
 function syntaxDecorations(markdown: string, item: MarkdownSyntax) {
+  if (item.kind === 'math')
+    return Decoration.replace({
+      widget: new MathMarker(markdown.slice(item.from, item.to), item.from),
+    }).range(item.from, item.to);
   if (item.kind === 'bullet') {
     return Decoration.replace({ widget: new TextMarker(item.replacement ?? '• ') }).range(
       item.from,
@@ -187,15 +241,21 @@ function syntaxDecorations(markdown: string, item: MarkdownSyntax) {
   ];
 }
 
-export function markdownPreviewDecorations(markdown: string): DecorationSet {
+export function markdownPreviewDecorations(markdown: string, cursor = -1): DecorationSet {
   const decorations = markdownSyntax(markdown)
+    .filter((item) => item.kind !== 'math' || cursor <= item.from || cursor >= item.to)
     .map((item) => syntaxDecorations(markdown, item))
     .flat();
   return Decoration.set(decorations, true);
 }
 
 function appendRenderedSyntax(container: HTMLElement, value: string, item: MarkdownSyntax): void {
-  if (item.kind === 'link' && item.replacement !== undefined && item.href) {
+  if (item.kind === 'math') {
+    const math = document.createElement('span');
+    math.className = 'cm-markdown-math';
+    renderMath(math, value.slice(item.from, item.to));
+    container.append(math);
+  } else if (item.kind === 'link' && item.replacement !== undefined && item.href) {
     const link = document.createElement('a');
     link.href = item.href;
     link.target = '_blank';

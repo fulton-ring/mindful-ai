@@ -147,11 +147,12 @@ function ChatReady({ data }: { data: WorkspaceData }) {
       onAdvance={() => advanceConversation(data)}
       onConversation={setConversation}
       onFlush={flush}
-      onProposalStart={(sourceId) => {
+      onProposalStart={(sourceId, capturedText) => {
         setProposal(null);
         setProposalRequest({
           sourceId,
           noteId: draftRef.current?.id ?? 'unsaved-note',
+          ...(capturedText ? { capturedText } : {}),
           phase: 'streaming',
           previewIds: NO_PREVIEWS,
         });

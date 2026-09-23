@@ -4,7 +4,7 @@ import { EditorView } from '@codemirror/view';
 import { fireEvent, render, waitFor } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import NotesEditor from '../editor/NotesEditor';
-import { makeProposal, note } from '../editor/NotesEditor.test-fixtures';
+import { makeProposal, note } from './NotesEditor.test-fixtures';
 
 Object.defineProperty(Range.prototype, 'getClientRects', {
   configurable: true,
@@ -31,6 +31,19 @@ function renderMultiple(overrides: Partial<React.ComponentProps<typeof NotesEdit
     />,
   );
 }
+
+it('shows rendered math and reveals its editable source when selected', () => {
+  const source = 'Water is $H_2O$.';
+  const view = renderMultiple({ note: { ...note, markdown: source }, proposals: [] });
+  const editor = EditorView.findFromDOM(view.container.querySelector('.cm-editor')!);
+  if (!editor) throw new Error('Expected a mounted CodeMirror view');
+  expect(editor.state.doc.toString()).toBe(source);
+  expect(view.container.querySelector('.cm-markdown-math .katex')).not.toBeNull();
+  fireEvent.click(view.container.querySelector('.cm-markdown-math')!);
+  expect(editor.state.selection.main.head).toBe(source.indexOf('$') + 1);
+  expect(view.container.querySelector('.cm-markdown-math')).toBeNull();
+  expect(view.container.querySelector('.cm-content')?.textContent).toContain('$H_2O$');
+});
 
 it('puts independent pending text in the editor and accepts only the focused candidate', () => {
   const onAccept = vi.fn();

@@ -10,6 +10,7 @@ import {
   useState,
 } from 'react';
 import { type Components, Streamdown } from 'streamdown';
+import { math } from '../../components/ai-elements/math';
 import {
   Tooltip,
   TooltipContent,
@@ -133,6 +134,7 @@ function AnnotationContent({
       <div className="markdown-response">
         <Streamdown
           skipHtml
+          plugins={{ math }}
           linkSafety={{ enabled: false }}
           parseMarkdownIntoBlocksFn={(source) => [source]}
           rehypePlugins={[

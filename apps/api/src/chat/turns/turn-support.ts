@@ -11,11 +11,6 @@ import { HttpError } from '../../http';
 const ORPHANED_TURN_AFTER_MS = 315_000;
 const encoder = new TextEncoder();
 
-export const NEXT_USER_SEQUENCE_SQL =
-  "SELECT COALESCE(MAX(sequence + CASE WHEN role='user' THEN 1 ELSE 0 END),0)+1 AS sequence FROM messages WHERE conversation_id=?";
-export const REGENERATE_ASSISTANT_SQL =
-  "UPDATE messages SET id=?,turn_id=?,content=?,reasoning=?,activity_json=?,incomplete=0,created_at=? WHERE id=? AND conversation_id=? AND owner_id=? AND role='assistant' AND incomplete=0 AND sequence=(SELECT MAX(sequence) FROM messages WHERE conversation_id=? AND owner_id=?)";
-
 export function sse(event: ChatEvent) {
   return encoder.encode(`data: ${JSON.stringify(event)}\n\n`);
 }

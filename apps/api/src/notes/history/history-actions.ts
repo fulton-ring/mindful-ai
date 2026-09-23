@@ -9,13 +9,10 @@ type HistoryInput = z.infer<typeof noteHistoryActionSchema>;
 type SuggestionChange = { id: string; beforeStatus: string; afterStatus: string };
 type HistoryEdit = {
   id: string;
-  suggestion_id: string | null;
   before_markdown: string;
   before_provenance_json: string;
   after_markdown: string;
   after_provenance_json: string;
-  before_suggestion_status: string | null;
-  after_suggestion_status: string | null;
   suggestion_changes_json: string | null;
 };
 type HistoryMove = {
@@ -62,7 +59,7 @@ async function loadHistoryEdit(
   const edit = await first<HistoryEdit>(
     db
       .prepare(
-        `SELECT id,suggestion_id,before_markdown,before_provenance_json,after_markdown,after_provenance_json,before_suggestion_status,after_suggestion_status,suggestion_changes_json
+        `SELECT id,before_markdown,before_provenance_json,after_markdown,after_provenance_json,suggestion_changes_json
        FROM note_edits WHERE note_id=? AND owner_id=? AND undone=? AND discarded=0 ORDER BY result_revision ${undo ? 'DESC' : 'ASC'} LIMIT 1`,
       )
       .bind(noteId, ownerId, undo ? 0 : 1),
@@ -72,17 +69,7 @@ async function loadHistoryEdit(
 }
 
 function readSuggestionChanges(edit: HistoryEdit) {
-  const legacy =
-    edit.suggestion_id && edit.before_suggestion_status && edit.after_suggestion_status
-      ? [
-          {
-            id: edit.suggestion_id,
-            beforeStatus: edit.before_suggestion_status,
-            afterStatus: edit.after_suggestion_status,
-          },
-        ]
-      : [];
-  return parseJson<SuggestionChange[]>(edit.suggestion_changes_json ?? '', legacy);
+  return parseJson<SuggestionChange[]>(edit.suggestion_changes_json ?? '', []);
 }
 
 async function assertSuggestionStatuses(
@@ -107,33 +94,6 @@ async function assertSuggestionStatuses(
     return suggestion?.status !== (undo ? change?.afterStatus : change?.beforeStatus);
   });
   if (changed) throw new HttpError(409, 'Note history changed');
-}
-
-async function assertNoNewerSuggestions(
-  db: D1Database,
-  ownerId: string,
-  noteId: string,
-  changes: SuggestionChange[],
-) {
-  for (const change of changes) {
-    if (change.beforeStatus !== 'pending') continue;
-    const newer = await first<{ id: string }>(
-      db
-        .prepare(
-          `SELECT newer.id FROM note_suggestions target
-         JOIN note_suggestions newer ON newer.owner_id=target.owner_id
-           AND newer.conversation_id=target.conversation_id
-           AND newer.source_message_id=target.source_message_id
-         WHERE target.id=? AND target.note_id=? AND target.owner_id=?
-           AND newer.id<>target.id AND newer.status='pending'
-           AND (newer.created_at>target.created_at OR (newer.created_at=target.created_at AND newer.id>target.id))
-         LIMIT 1`,
-        )
-        .bind(change.id, noteId, ownerId),
-    );
-    if (newer)
-      throw new HttpError(409, 'Resolve the newer note suggestion before undoing this decision.');
-  }
 }
 
 const buildHistoryStatements = (
@@ -270,7 +230,6 @@ export async function moveNoteHistory(
   if (state.note.markdown !== expectedMarkdown) throw new HttpError(409, 'Note history diverged');
   const changes = readSuggestionChanges(edit);
   await assertSuggestionStatuses(db, ownerId, noteId, direction, changes);
-  if (undo) await assertNoNewerSuggestions(db, ownerId, noteId, changes);
   await runHistoryBatch(db, ownerId, noteId, {
     direction,
     input,

@@ -184,7 +184,9 @@ function launchNoteProposal(
   args.display.setProposalMessageId(messageId);
   clearProposalNotice(args.display, messageId);
   args.props.onProposalCancelable(() => cancelProposal(args, run));
-  args.props.onProposalStart(sourceId);
+  if (input.action === 'capture' && input.captureText)
+    args.props.onProposalStart(sourceId, input.captureText);
+  else args.props.onProposalStart(sourceId);
   void runProposalStream(run, args)
     .catch((error) => handleProposalTransportError(args, run, error))
     .finally(() => finishProposalStream(args, run));

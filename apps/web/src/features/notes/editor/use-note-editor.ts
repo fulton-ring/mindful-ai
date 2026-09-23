@@ -30,7 +30,7 @@ export type NotesEditorProps = {
   proposal: EditProposal | null;
   proposals: EditProposal[];
   /** Every addition on the note in order, accepted ones included. */
-  additionQueue?: readonly { id: string; text: string; accepted: boolean }[];
+  additionQueue?: readonly { id: string; text: string; accepted: boolean; at?: number }[];
   onChange: (markdown: string, provenance: ProvenanceSpan[]) => void;
   onAccept: (proposal: EditProposal) => void;
   onDismiss: (reason?: 'typing' | 'reject', proposal?: EditProposal) => void;
@@ -92,8 +92,11 @@ const previewField = StateField.define<DecorationSet>({
   create: () => Decoration.none,
   update(value, transaction) {
     for (const effect of transaction.effects) if (effect.is(previewEffect)) return effect.value;
-    return transaction.docChanged
-      ? markdownPreviewDecorations(transaction.newDoc.toString())
+    return transaction.docChanged || transaction.selection
+      ? markdownPreviewDecorations(
+          transaction.newDoc.toString(),
+          transaction.newSelection.main.head,
+        )
       : value;
   },
   provide: (field) => EditorView.decorations.from(field),
@@ -394,7 +397,7 @@ function mountEditor(
   view.dispatch({
     effects: [
       suggestionEffect.of(decorations),
-      previewEffect.of(markdownPreviewDecorations(projection.text)),
+      previewEffect.of(markdownPreviewDecorations(projection.text, view.state.selection.main.head)),
       provenanceValueEffect.of(note.provenance),
     ],
   });
@@ -496,7 +499,9 @@ function useEditorSync(
     view.dispatch({
       effects: [
         suggestionEffect.of(createSuggestionDecorations(projected, proposals, actions)),
-        previewEffect.of(markdownPreviewDecorations(projected.text)),
+        previewEffect.of(
+          markdownPreviewDecorations(projected.text, view.state.selection.main.head),
+        ),
         provenanceValueEffect.of(note.provenance),
       ],
     });

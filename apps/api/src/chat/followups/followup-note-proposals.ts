@@ -6,8 +6,8 @@ import type {
   NoteProposalEvent,
 } from '@walden/contracts';
 import { resolveEdit } from '@walden/domain';
-import { first, parseJson } from '../../db/client';
 import { HttpError, newId, nowIso } from '../../http';
+import { selectNote, toNote } from '../../notes/repository';
 import { persistNoteSuggestion } from '../../notes/suggestions/suggestions';
 import type { AgentService, AgentTurnInput } from '../../services/types';
 import { loadConversation } from '../conversations/conversations';
@@ -39,33 +39,11 @@ export async function loadNote(
   db: D1Database,
   ownerId: string,
   id: string | null,
-  title: string,
 ): Promise<Note | null> {
   if (!id) return null;
-  const row = await first<{
-    id: string;
-    markdown: string;
-    revision: number;
-    provenance_json: string;
-    created_at: string;
-    updated_at: string;
-  }>(
-    db
-      .prepare(
-        'SELECT id,markdown,revision,provenance_json,created_at,updated_at FROM notes WHERE id=? AND owner_id=?',
-      )
-      .bind(id, ownerId),
-  );
+  const row = await selectNote(db, ownerId, id);
   if (!row) throw new HttpError(404, 'Note not found');
-  return {
-    id: row.id,
-    title,
-    markdown: row.markdown,
-    revision: row.revision,
-    provenance: parseJson(row.provenance_json, []),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
+  return toNote(row);
 }
 
 async function removeCancelledPendingSuggestion(db: D1Database, input: PendingSuggestion) {
@@ -128,7 +106,7 @@ async function latestProposalNote(
   const latest = await loadConversation(db, ownerId, conversation.id, {
     branchId: conversation.branchId,
   });
-  const currentNote = await loadNote(db, ownerId, latest.noteId, latest.title);
+  const currentNote = await loadNote(db, ownerId, latest.noteId);
   if (signal.aborted) return null;
   const sourceStillExists = latest.messages.some(
     (message) =>

@@ -388,20 +388,10 @@ async function persistCapturedNote(
       .bind(noteId, ownerId, now, now, conversation.title, conversationId, ownerId, now),
     db
       .prepare(
-        `INSERT INTO note_edits (id,note_id,owner_id,operation_id,base_revision,result_revision,before_title,before_markdown,before_provenance_json,after_title,after_markdown,after_provenance_json,created_at)
-         SELECT ?,id,owner_id,?,0,1,?,'','[]',?,?,?,? FROM notes WHERE id=? AND owner_id=? AND revision=0`,
+        `INSERT INTO note_edits (id,note_id,owner_id,operation_id,base_revision,result_revision,before_markdown,before_provenance_json,after_markdown,after_provenance_json,created_at)
+         SELECT ?,id,owner_id,?,0,1,'','[]',?,?,? FROM notes WHERE id=? AND owner_id=? AND revision=0`,
       )
-      .bind(
-        newId(),
-        input.operationId,
-        conversation.title,
-        conversation.title,
-        input.text,
-        provenanceJson,
-        now,
-        noteId,
-        ownerId,
-      ),
+      .bind(newId(), input.operationId, input.text, provenanceJson, now, noteId, ownerId),
     db
       .prepare(
         'UPDATE notes SET markdown=?,provenance_json=?,revision=1,updated_at=? WHERE id=? AND owner_id=? AND revision=0 AND EXISTS (SELECT 1 FROM note_edits WHERE note_id=? AND owner_id=? AND operation_id=?)',

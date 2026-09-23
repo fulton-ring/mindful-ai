@@ -3,122 +3,67 @@ import { type CaptureDependencies, useCaptureActions } from './use-capture-actio
 import { useConversationActions } from './use-conversation-actions';
 import { type DraftDependencies, useDraftActions, useDraftBlocker } from './use-draft-actions';
 import { useNoteConflict } from './use-note-conflict';
-import { type HistoryDependencies, useNoteHistory } from './use-note-history';
-import { type ProposalDependencies, useProposalActions } from './use-proposal-actions';
+import { useNoteHistory } from './use-note-history';
+import { useProposalActions } from './use-proposal-actions';
 
 type Composition = ReturnType<typeof useConversationComposition>;
 
-function useConversationActionPrimitives(composition: Composition) {
-  const { baseContext, navigation, editor, doSave } = composition;
-  const captureActions = useCaptureActions({
-    ...baseContext,
-    setConversation: navigation.setConversation,
-    captureError: (message) => editor.setNotice(message),
-  });
+function actionContext({
+  identity,
+  route,
+  panel,
+  themeState,
+  editor,
+  sidebar,
+  query,
+  navigation,
+}: Composition) {
+  return {
+    identity,
+    ...route,
+    ...panel,
+    ...themeState,
+    ...editor,
+    ...sidebar,
+    ...query,
+    ...navigation,
+  };
+}
 
-  function ensureConversation() {
-    return conversationActions.ensureConversation();
-  }
+export function useConversationActionGroups(composition: Composition) {
+  const { editor, doSave } = composition;
+  const context = actionContext(composition);
+  const captureActions = useCaptureActions({
+    ...context,
+    captureError: editor.setNotice,
+  });
 
   function captureText(text: string, verbatim: boolean) {
     const dependencies: CaptureDependencies = {
-      ensureConversation,
+      ensureConversation: () => conversationActions.ensureConversation(),
       updateDraft: draftActions.updateDraft,
-      flushNoteDraft,
+      flushNoteDraft: () => draftActions.flushNoteDraft(getDraftDependencies()),
     };
     return captureActions.captureText(dependencies, text, verbatim);
   }
 
-  function cancelProposalRequest() {
-    return proposalActions.cancelProposalRequest();
-  }
-
   function getDraftDependencies(): DraftDependencies {
-    return { captureText, cancelProposalRequest };
+    return {
+      captureText,
+      cancelProposalRequest: proposalActions.cancelProposalRequest,
+    };
   }
 
-  const draftActions = useDraftActions({ ...baseContext, doSave });
+  const draftActions = useDraftActions({ ...context, doSave });
+  const flush = (allowConflict = false) =>
+    draftActions.flush(allowConflict, getDraftDependencies());
+  const conversationActions = useConversationActions(context, flush);
+  const proposalActions = useProposalActions(context);
+  const proposalDependencies = { flush, applyNoteState: conversationActions.applyNoteState };
+  const conflictActions = useNoteConflict({ ...context, doSave });
+  const historyActions = useNoteHistory(context);
+  useDraftBlocker({ ...context, doSave }, draftActions.flush, getDraftDependencies);
 
-  function flush(allowConflict = false) {
-    return draftActions.flush(allowConflict, getDraftDependencies());
-  }
-
-  function flushNoteDraft() {
-    return draftActions.flushNoteDraft(getDraftDependencies());
-  }
-
-  const conversationActions = useConversationActions({ ...baseContext }, flush);
-  const proposalActions = useProposalActions({ ...baseContext });
-  const proposalDependencies: ProposalDependencies = {
-    flush,
-    applyNoteState: conversationActions.applyNoteState,
-  };
-  const conflictActions = useNoteConflict({ ...baseContext, doSave });
-  const historyActions = useNoteHistory({ ...baseContext });
-  const historyDependencies: HistoryDependencies = {
-    flush,
-    applyNoteState: conversationActions.applyNoteState,
-  };
-  useDraftBlocker({ ...baseContext, doSave }, draftActions.flush, getDraftDependencies);
-  return {
-    captureActions,
-    conversationActions,
-    draftActions,
-    conflictActions,
-    historyActions,
-    historyDependencies,
-    proposalActions,
-    proposalDependencies,
-    captureText,
-    cancelProposalRequest,
-    ensureConversation,
-    flush,
-    flushNoteDraft,
-    getDraftDependencies,
-  };
-}
-
-type ActionPrimitives = ReturnType<typeof useConversationActionPrimitives>;
-
-function createConversationActionHandlers(primitives: ActionPrimitives) {
-  const {
-    captureActions,
-    conversationActions,
-    draftActions,
-    conflictActions,
-    historyActions,
-    historyDependencies,
-    proposalActions,
-    proposalDependencies,
-    captureText,
-    cancelProposalRequest,
-    ensureConversation,
-    flush,
-    flushNoteDraft,
-    getDraftDependencies,
-  } = primitives;
-  const acceptProposal = (value: Parameters<typeof proposalActions.acceptProposal>[0]) =>
-    proposalActions.acceptProposal(value, proposalDependencies);
-  const decideSuggestion = (
-    value: Parameters<typeof proposalActions.decideSuggestion>[0],
-    decision: Parameters<typeof proposalActions.decideSuggestion>[1],
-  ) => proposalActions.decideSuggestion(value, decision, proposalDependencies);
-  const previewProposal = (
-    value: Parameters<typeof proposalActions.previewProposal>[0],
-    streaming: Parameters<typeof proposalActions.previewProposal>[1],
-    sourceId: Parameters<typeof proposalActions.previewProposal>[2],
-  ) => proposalActions.previewProposal(value, streaming, sourceId, proposalDependencies);
-  const completeProposals = (
-    values: Parameters<typeof proposalActions.completeProposals>[0],
-    sourceId: Parameters<typeof proposalActions.completeProposals>[1],
-  ) => proposalActions.completeProposals(values, sourceId, proposalDependencies);
-  const updateUnsavedDraft = (
-    markdown: Parameters<typeof draftActions.updateUnsavedDraft>[0],
-    provenance: Parameters<typeof draftActions.updateUnsavedDraft>[1],
-  ) => draftActions.updateUnsavedDraft(markdown, provenance, getDraftDependencies());
-  const persistUnsavedDraft = () => draftActions.persistUnsavedDraft(getDraftDependencies());
-  const moveNoteHistory = (action: Parameters<typeof historyActions.moveNoteHistory>[0]) =>
-    historyActions.moveNoteHistory(action, historyDependencies);
   return {
     ...draftActions,
     ...proposalActions,
@@ -126,21 +71,30 @@ function createConversationActionHandlers(primitives: ActionPrimitives) {
     ...captureActions,
     ...conflictActions,
     ...historyActions,
-    acceptProposal,
-    cancelProposalRequest,
     captureText,
-    completeProposals,
-    decideSuggestion,
-    ensureConversation,
     flush,
-    flushNoteDraft,
-    moveNoteHistory,
-    persistUnsavedDraft,
-    previewProposal,
-    updateUnsavedDraft,
+    flushNoteDraft: () => draftActions.flushNoteDraft(getDraftDependencies()),
+    persistUnsavedDraft: () => draftActions.persistUnsavedDraft(getDraftDependencies()),
+    updateUnsavedDraft: (
+      markdown: Parameters<typeof draftActions.updateUnsavedDraft>[0],
+      provenance: Parameters<typeof draftActions.updateUnsavedDraft>[1],
+    ) => draftActions.updateUnsavedDraft(markdown, provenance, getDraftDependencies()),
+    acceptProposal: (value: Parameters<typeof proposalActions.acceptProposal>[0]) =>
+      proposalActions.acceptProposal(value, proposalDependencies),
+    decideSuggestion: (
+      value: Parameters<typeof proposalActions.decideSuggestion>[0],
+      decision: Parameters<typeof proposalActions.decideSuggestion>[1],
+    ) => proposalActions.decideSuggestion(value, decision, proposalDependencies),
+    previewProposal: (
+      value: Parameters<typeof proposalActions.previewProposal>[0],
+      streaming: Parameters<typeof proposalActions.previewProposal>[1],
+      sourceId: Parameters<typeof proposalActions.previewProposal>[2],
+    ) => proposalActions.previewProposal(value, streaming, sourceId, proposalDependencies),
+    completeProposals: (
+      values: Parameters<typeof proposalActions.completeProposals>[0],
+      sourceId: Parameters<typeof proposalActions.completeProposals>[1],
+    ) => proposalActions.completeProposals(values, sourceId, proposalDependencies),
+    moveNoteHistory: (action: Parameters<typeof historyActions.moveNoteHistory>[0]) =>
+      historyActions.moveNoteHistory(action, proposalDependencies),
   };
-}
-
-export function useConversationActionGroups(composition: Composition) {
-  return createConversationActionHandlers(useConversationActionPrimitives(composition));
 }

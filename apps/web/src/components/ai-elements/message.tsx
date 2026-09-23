@@ -1,4 +1,5 @@
 import { Streamdown } from 'streamdown';
+import { escapeCurrency, math } from './math';
 
 export function MessageResponse({
   children,
@@ -9,7 +10,9 @@ export function MessageResponse({
 }) {
   return (
     <div className={`message-response ${className}`}>
-      <Streamdown skipHtml>{children}</Streamdown>
+      <Streamdown skipHtml plugins={{ math }}>
+        {escapeCurrency(children)}
+      </Streamdown>
     </div>
   );
 }
