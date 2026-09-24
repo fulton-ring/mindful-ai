@@ -36,6 +36,6 @@ export default defineConfig({
     // parallel workspace run rather than on their own merits.
     testTimeout: 20_000,
     hookTimeout: 20_000,
-    maxWorkers: 2,
+    fileParallelism: false,
   },
 });
