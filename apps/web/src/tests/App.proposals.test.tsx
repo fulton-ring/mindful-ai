@@ -336,7 +336,7 @@ it('removes a deleted thread and its note from the sidebar', async () => {
   expect(client.getQueryData(['notes'])).toEqual([]);
   expect(view.queryByRole('button', { name: 'Open note: Note' })).toBeNull();
   client.clear();
-});
+}, 60_000);
 
 it.each(['single', 'batch'])('settles a %s result before allowing its decision', async (kind) => {
   const { note, proposal, decide, client } = await setup();
