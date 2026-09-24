@@ -14,4 +14,4 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:ci
-      - run: pnpm exec turbo run typecheck test build
+      - run: pnpm verify
