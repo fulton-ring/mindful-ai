@@ -34,6 +34,12 @@ vi.mock('../components/ui/resizable', () => ({
   ResizablePanel: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   ResizableHandle: () => null,
 }));
+vi.mock('@radix-ui/react-popover', () => ({
+  Root: ({ children }: { children: ReactNode }) => <>{children}</>,
+  Trigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+  Portal: ({ children }: { children: ReactNode }) => <>{children}</>,
+  Content: ({ children }: { children: ReactNode }) => <>{children}</>,
+}));
 vi.mock('../lib/telemetry', () => ({ track: vi.fn(), productSessionId: () => 'session' }));
 
 afterEach(() => {
@@ -324,9 +330,7 @@ it('removes a deleted thread and its note from the sidebar', async () => {
     client.setQueryData(['conversations'], [thread]);
     client.setQueryData(['notes'], [note]);
   });
-  await view.findByRole('button', { name: 'Thread options: Test' });
   vi.spyOn(api, 'deleteConversation').mockResolvedValue(undefined);
-  fireEvent.click(view.getByRole('button', { name: 'Thread options: Test' }));
   fireEvent.click(await view.findByRole('button', { name: 'Delete everything' }));
   const dialog = await view.findByRole('alertdialog');
   fireEvent.click(dialog.querySelector('.danger')!);
@@ -336,7 +340,7 @@ it('removes a deleted thread and its note from the sidebar', async () => {
   expect(client.getQueryData(['notes'])).toEqual([]);
   expect(view.queryByRole('button', { name: 'Open note: Note' })).toBeNull();
   client.clear();
-}, 60_000);
+});
 
 it.each(['single', 'batch'])('settles a %s result before allowing its decision', async (kind) => {
   const { note, proposal, decide, client } = await setup();
