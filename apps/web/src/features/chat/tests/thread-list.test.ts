@@ -79,7 +79,7 @@ describe('thread metadata', () => {
   };
   it('distinguishes permanent deletion from clearing history and retaining a note', () => {
     expect(threadRetention(item, now)).toBe('Expires in 2 days');
-    expect(threadRetention({ ...item, noteId: 'note' }, now)).toBeNull();
+    expect(threadRetention({ ...item, noteId: 'note' }, now)).toBe('Archives in 2 days');
   });
   it('only warns within three days of expiry', () => {
     expect(threadRetention({ ...item, expiresAt: '2026-09-22T12:00:00.001Z' }, now)).toBeNull();

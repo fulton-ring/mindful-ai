@@ -32,6 +32,83 @@ function renderMultiple(overrides: Partial<React.ComponentProps<typeof NotesEdit
   );
 }
 
+it('nests and unnests a list item with Tab and Shift-Tab', () => {
+  const view = renderMultiple({
+    note: { ...note, markdown: '- Parent\n- Child' },
+    proposals: [],
+  });
+  const editor = EditorView.findFromDOM(view.container.querySelector('.cm-editor')!);
+  if (!editor) throw new Error('Expected a mounted CodeMirror view');
+  const content = view.container.querySelector('.cm-content')!;
+
+  editor.dispatch({ selection: { anchor: editor.state.doc.line(2).from + 2 } });
+  fireEvent.keyDown(content, { key: 'Tab' });
+  expect(editor.state.doc.toString()).toBe('- Parent\n  - Child');
+
+  fireEvent.keyDown(content, { key: 'Tab', shiftKey: true });
+  expect(editor.state.doc.toString()).toBe('- Parent\n- Child');
+});
+
+it('indents and outdents selected list lines with Tab and Shift-Tab', () => {
+  const view = renderMultiple({
+    note: { ...note, markdown: '- Parent\n- First\n- Second' },
+    proposals: [],
+  });
+  const editor = EditorView.findFromDOM(view.container.querySelector('.cm-editor')!);
+  if (!editor) throw new Error('Expected a mounted CodeMirror view');
+  const content = view.container.querySelector('.cm-content')!;
+
+  editor.dispatch({
+    selection: { anchor: editor.state.doc.line(2).from, head: editor.state.doc.length },
+  });
+  fireEvent.keyDown(content, { key: 'Tab' });
+  expect(editor.state.doc.toString()).toBe('- Parent\n  - First\n  - Second');
+  fireEvent.keyDown(content, { key: 'Tab', shiftKey: true });
+  expect(editor.state.doc.toString()).toBe('- Parent\n- First\n- Second');
+});
+
+it('does not indent root-level prose', () => {
+  const view = renderMultiple({ note: { ...note, markdown: 'Paragraph' }, proposals: [] });
+  const editor = EditorView.findFromDOM(view.container.querySelector('.cm-editor')!);
+  if (!editor) throw new Error('Expected a mounted CodeMirror view');
+  const content = view.container.querySelector('.cm-content')!;
+
+  editor.dispatch({ selection: { anchor: 3 } });
+  fireEvent.keyDown(content, { key: 'Tab' });
+  expect(editor.state.doc.toString()).toBe('Paragraph');
+});
+
+it('nests a paragraph under a list block, including from mid-line', () => {
+  const view = renderMultiple({
+    note: { ...note, markdown: '- Parent\nParagraph' },
+    proposals: [],
+  });
+  const editor = EditorView.findFromDOM(view.container.querySelector('.cm-editor')!);
+  if (!editor) throw new Error('Expected a mounted CodeMirror view');
+
+  editor.dispatch({ selection: { anchor: editor.state.doc.line(2).from + 3 } });
+  fireEvent.keyDown(view.container.querySelector('.cm-content')!, { key: 'Tab' });
+  expect(editor.state.doc.toString()).toBe('- Parent\n  Paragraph');
+});
+
+it('aligns with the previous nested block without skipping a level', () => {
+  const view = renderMultiple({
+    note: { ...note, markdown: '- Parent\n  - Child\n- Next' },
+    proposals: [],
+  });
+  const editor = EditorView.findFromDOM(view.container.querySelector('.cm-editor')!);
+  if (!editor) throw new Error('Expected a mounted CodeMirror view');
+  const content = view.container.querySelector('.cm-content')!;
+
+  editor.dispatch({ selection: { anchor: editor.state.doc.line(2).from + 4 } });
+  fireEvent.keyDown(content, { key: 'Tab' });
+  expect(editor.state.doc.toString()).toBe('- Parent\n  - Child\n- Next');
+
+  editor.dispatch({ selection: { anchor: editor.state.doc.line(3).from + 2 } });
+  fireEvent.keyDown(content, { key: 'Tab' });
+  expect(editor.state.doc.toString()).toBe('- Parent\n  - Child\n  - Next');
+});
+
 it('shows rendered math and reveals its editable source when selected', () => {
   const source = 'Water is $H_2O$.';
   const view = renderMultiple({ note: { ...note, markdown: source }, proposals: [] });

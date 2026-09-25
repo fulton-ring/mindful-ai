@@ -69,12 +69,11 @@ export function threadRetention(thread: ConversationSummary, now: Date = new Dat
   if (!Number.isFinite(remaining)) return 'Expiry unavailable';
   if (remaining <= 0) return thread.noteId ? 'History expired · Note kept' : 'Expired';
   if (remaining > 3 * 86_400_000) return null;
-  if (thread.noteId) return null;
   const minutes = Math.ceil(remaining / 60_000);
   const amount =
     minutes < 60 ? minutes : minutes < 1440 ? Math.ceil(minutes / 60) : Math.ceil(minutes / 1440);
   const unit = minutes < 60 ? 'minute' : minutes < 1440 ? 'hour' : 'day';
-  return `Expires in ${amount} ${unit}${amount === 1 ? '' : 's'}`;
+  return `${thread.noteId ? 'Archives' : 'Expires'} in ${amount} ${unit}${amount === 1 ? '' : 's'}`;
 }
 
 export function threadTimestamp(thread: ConversationSummary) {

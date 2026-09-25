@@ -12,6 +12,92 @@ import { createCloudflareModel, DEFAULT_AI_MODEL } from '../../../services/agent
 import { streamMastraTurn } from '../../index';
 import { researchModel, researchTools, turnInput, usage } from '../fixtures/research-tools';
 
+it('passes screenshot image content to the next model step', async () => {
+  const calls: LanguageModelV3CallOptions[] = [];
+  const screenshotWebPage = createTool({
+    id: 'screenshot_web_page',
+    description: 'Capture a page',
+    inputSchema: z.object({ url: z.string() }),
+    execute: async () => ({
+      url: 'https://example.com/',
+      content: [{ type: 'image', data: '/9j/', mimeType: 'image/jpeg' }],
+    }),
+  });
+
+  const events: ChatEvent[] = [];
+  for await (const event of streamMastraTurn(
+    turnInput(),
+    screenshotModel(calls),
+    new AbortController().signal,
+    { screenshotWebPage },
+  ))
+    events.push(event);
+
+  expect(calls).toHaveLength(2);
+  expect(JSON.stringify(calls[1]?.prompt)).toContain('"type":"image-data"');
+  expect(JSON.stringify(calls[1]?.prompt)).toContain('image/jpeg');
+  expect(JSON.stringify(calls[1]?.prompt)).toContain('/9j/');
+  expect(events).toContainEqual({
+    type: 'source',
+    source: { id: 'screenshot-1:0', url: 'https://example.com/' },
+  });
+});
+
+it('allows fifteen sequential tool calls followed by a final answer', async () => {
+  const calls: LanguageModelV3CallOptions[] = [];
+  const model: LanguageModelV3 = {
+    ...silentModel(calls),
+    async doStream(options) {
+      calls.push(options);
+      const step = calls.length;
+      const parts: LanguageModelV3StreamPart[] =
+        step <= 15
+          ? [
+              {
+                type: 'tool-call',
+                toolCallId: `lookup-${step}`,
+                toolName: 'lookup',
+                input: '{}',
+              },
+              { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'tool-calls' }, usage },
+            ]
+          : [
+              { type: 'text-start', id: 'answer' },
+              { type: 'text-delta', id: 'answer', delta: 'Research complete.' },
+              { type: 'text-end', id: 'answer' },
+              { type: 'finish', finishReason: { unified: 'stop', raw: 'stop' }, usage },
+            ];
+      return {
+        stream: new ReadableStream<LanguageModelV3StreamPart>({
+          start(controller) {
+            controller.enqueue({ type: 'stream-start', warnings: [] });
+            for (const part of parts) controller.enqueue(part);
+            controller.close();
+          },
+        }),
+      };
+    },
+  };
+  const lookup = createTool({
+    id: 'lookup',
+    description: 'Look up a fact',
+    inputSchema: z.object({}),
+    execute: async () => ({ result: 'found' }),
+  });
+  const events: ChatEvent[] = [];
+  for await (const event of streamMastraTurn(turnInput(), model, new AbortController().signal, {
+    lookup,
+  }))
+    events.push(event);
+
+  expect(calls).toHaveLength(16);
+  expect(events.find((event) => event.type === 'done')).toEqual(
+    expect.objectContaining({
+      message: expect.objectContaining({ content: 'Research complete.' }),
+    }),
+  );
+});
+
 describe('research tools in a Mastra turn', () => {
   it('stops a failed web lookup before the model can turn it into an unsupported answer', async () => {
     const events: ChatEvent[] = [];
@@ -72,6 +158,43 @@ describe('research tools in a Mastra turn', () => {
     });
   });
 });
+
+function screenshotModel(calls: LanguageModelV3CallOptions[]): LanguageModelV3 {
+  let step = 0;
+  return {
+    ...silentModel(calls),
+    async doStream(options) {
+      calls.push(options);
+      step += 1;
+      const parts: LanguageModelV3StreamPart[] =
+        step === 1
+          ? [
+              {
+                type: 'tool-call',
+                toolCallId: 'screenshot-1',
+                toolName: 'screenshotWebPage',
+                input: JSON.stringify({ url: 'https://example.com/' }),
+              },
+              { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'tool-calls' }, usage },
+            ]
+          : [
+              { type: 'text-start', id: 'answer' },
+              { type: 'text-delta', id: 'answer', delta: 'I can see the page.' },
+              { type: 'text-end', id: 'answer' },
+              { type: 'finish', finishReason: { unified: 'stop', raw: 'stop' }, usage },
+            ];
+      return {
+        stream: new ReadableStream<LanguageModelV3StreamPart>({
+          start(controller) {
+            controller.enqueue({ type: 'stream-start', warnings: [] });
+            for (const part of parts) controller.enqueue(part);
+            controller.close();
+          },
+        }),
+      };
+    },
+  };
+}
 
 function silentModel(calls: LanguageModelV3CallOptions[], text = 'Noted.'): LanguageModelV3 {
   return {

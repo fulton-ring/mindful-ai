@@ -1,10 +1,13 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import type { McpTools } from '../mcp';
+import { createBrowserActions } from './browser-actions';
+import { assertActive, boundedJson, escapeRegex, publicUrl, within } from './research-common';
+
+export { boundedJson, publicUrl } from './research-common';
 
 const MAX_PAGE_CHARS = 12_000;
 const MAX_INDEX_CHARS = 64_000;
-const MAX_RESPONSE_BYTES = 256_000;
 const MAX_QUERY_CHARS = 500;
 const MAX_RESULTS = 5;
 const MAX_CHUNK_CHARS = 4_000;
@@ -16,92 +19,6 @@ export type ResearchEnv = {
   CLOUDFLARE_ACCOUNT_ID?: string;
   CLOUDFLARE_API_TOKEN?: string;
 };
-
-function abortError(): DOMException {
-  return new DOMException('Research request was cancelled.', 'AbortError');
-}
-
-function assertActive(signal: AbortSignal): void {
-  if (signal.aborted) throw abortError();
-}
-
-export function publicUrl(input: string): URL {
-  let url: URL;
-  try {
-    url = new URL(input);
-  } catch {
-    throw new Error('Enter a valid public HTTP or HTTPS URL.');
-  }
-
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new Error('Only public HTTP and HTTPS URLs are supported.');
-  }
-  if (url.username || url.password)
-    throw new Error('URLs containing credentials are not supported.');
-
-  const hostname = url.hostname
-    .replace(/^\[|\]$/g, '')
-    .replace(/\.$/, '')
-    .toLowerCase();
-  const privateName =
-    hostname === 'localhost' ||
-    hostname.endsWith('.localhost') ||
-    hostname.endsWith('.local') ||
-    hostname.endsWith('.internal');
-  const ipLiteral = hostname.includes(':') || /^\d+\.\d+\.\d+\.\d+$/.test(hostname);
-  if (!hostname || !hostname.includes('.') || privateName || ipLiteral) {
-    throw new Error('Only public internet URLs are supported.');
-  }
-  url.hash = '';
-  return url;
-}
-
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-async function within<T>(promise: Promise<T>, signal: AbortSignal, timeoutMs: number): Promise<T> {
-  assertActive(signal);
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let onAbort: (() => void) | undefined;
-  const stop = new Promise<never>((_, reject) => {
-    onAbort = () => reject(abortError());
-    signal.addEventListener('abort', onAbort, { once: true });
-    timer = setTimeout(() => reject(new Error('Research request timed out.')), timeoutMs);
-  });
-  try {
-    return await Promise.race([promise, stop]);
-  } finally {
-    if (timer) clearTimeout(timer);
-    if (onAbort) signal.removeEventListener('abort', onAbort);
-  }
-}
-
-export async function boundedJson<T = { success?: boolean; result?: unknown }>(
-  response: Response,
-): Promise<T> {
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error('Browser Run returned an empty response.');
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > MAX_RESPONSE_BYTES) {
-      await reader.cancel();
-      throw new Error('Browser Run response was too large.');
-    }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return JSON.parse(new TextDecoder().decode(bytes)) as T;
-}
 
 class ResearchApiError extends Error {
   constructor(readonly status: number) {
@@ -121,7 +38,7 @@ type ResearchInstance = {
 };
 
 type ResearchBrowser = {
-  quickAction: (action: 'markdown', options: BrowserRunMarkdownOptions) => Promise<Response>;
+  quickAction: BrowserRun['quickAction'];
 };
 
 async function cloudflareResult<T>(response: Response): Promise<T> {
@@ -188,8 +105,8 @@ function createRestBrowser(
   signal: AbortSignal,
 ): ResearchBrowser {
   return {
-    quickAction: (_action, options) =>
-      fetch(`${apiBase}/browser-rendering/markdown`, {
+    quickAction: (action, options) =>
+      fetch(`${apiBase}/browser-rendering/${action}`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${apiToken}`,
@@ -392,5 +309,6 @@ export function createResearchTools(
   return {
     readWebPage: createReadWebPageTool(browser, instance, ownerScope, signal, allowedUrls),
     searchSources: createSearchSourcesTool(instance, ownerScope, signal, allowedUrls),
+    ...createBrowserActions(browser, signal, allowedUrls),
   };
 }

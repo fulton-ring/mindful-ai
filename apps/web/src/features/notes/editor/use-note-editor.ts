@@ -1,4 +1,11 @@
-import { defaultKeymap, history, historyKeymap, invertedEffects } from '@codemirror/commands';
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentLess,
+  indentMore,
+  invertedEffects,
+} from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import {
   ChangeSet,
@@ -227,10 +234,36 @@ function runHistoryAction(refs: EditorRefs, action: 'onUndo' | 'onRedo'): boolea
 }
 
 function suggestionKeyBindings(refs: EditorRefs) {
+  const hasSuggestionOnLine = (editor: EditorView) => {
+    const projection = refs.projection.current;
+    return (
+      projection && candidateOnLine(projection, editor.state.selection.main.head).kind !== 'none'
+    );
+  };
+  const canNestUnderPreviousLine = (editor: EditorView) => {
+    const line = editor.state.doc.lineAt(editor.state.selection.main.from);
+    if (line.number === 1) return false;
+    const previous = editor.state.doc.line(line.number - 1).text;
+    if (!previous.trim()) return false;
+    const previousIndent = previous.match(/^[ \t]*/)?.[0].length ?? 0;
+    const currentIndent = line.text.match(/^[ \t]*/)?.[0].length ?? 0;
+    const previousIsList = /^[ \t]*(?:[-+*]|\d+[.)])[ \t]+/.test(previous);
+    return (previousIsList || previousIndent > 0) && currentIndent <= previousIndent;
+  };
   return [
     {
       key: 'Tab',
-      run: (editor: EditorView) => acceptSuggestion(refs, editor),
+      run: (editor: EditorView) => {
+        if (hasSuggestionOnLine(editor)) {
+          acceptSuggestion(refs, editor);
+          return true;
+        }
+        return canNestUnderPreviousLine(editor) ? indentMore(editor) : true;
+      },
+    },
+    {
+      key: 'Shift-Tab',
+      run: (editor: EditorView) => (hasSuggestionOnLine(editor) ? true : indentLess(editor)),
     },
     {
       key: 'Escape',

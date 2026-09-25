@@ -64,10 +64,18 @@ function toolSummary(name: string, state: ToolActivity['state']) {
     error: 'Web search failed',
   };
   if (name === 'searchWeb') return searchSummary[state] ?? '';
-  const action = name === 'readWebPage' ? 'source' : name === 'searchSources' ? 'sources' : 'tool';
+  const actions: Record<string, string> = {
+    readWebPage: 'source',
+    searchSources: 'sources',
+    listWebLinks: 'links',
+    screenshotWebPage: 'screenshot',
+  };
+  const action = actions[name] ?? 'tool';
   const summaries: Record<string, Partial<Record<ToolActivity['state'], string>>> = {
     source: { running: 'Reading source…', error: 'Could not read source' },
     sources: { running: 'Searching sources…', error: 'Could not search sources' },
+    links: { running: 'Listing page links…', error: 'Could not list page links' },
+    screenshot: { running: 'Capturing page…', error: 'Could not capture page' },
     tool: { running: 'Using tool…', error: 'Tool failed' },
   };
   return summaries[action]?.[state] ?? '';
@@ -213,22 +221,23 @@ function responseOptions(
       : {}),
     context: turnContext.context,
     stopWhen: () => proposals.drain().intervention?.kind === 'learning_check',
-    maxSteps: 7,
+    maxSteps: 16,
     toolCallConcurrency: 1,
     modelSettings: { maxOutputTokens: 4_096 },
   };
 }
 
 function queryFromToolCall(name: string, args: unknown) {
-  if (
-    (name !== 'searchWeb' && name !== 'searchSources') ||
-    !args ||
-    typeof args !== 'object' ||
-    !('query' in args) ||
-    typeof args.query !== 'string'
-  )
-    return undefined;
-  return args.query.trim().slice(0, 500);
+  if (!args || typeof args !== 'object') return undefined;
+  if (name === 'searchWeb' || name === 'searchSources')
+    return 'query' in args && typeof args.query === 'string'
+      ? args.query.trim().slice(0, 500)
+      : undefined;
+  if (name === 'listWebLinks' || name === 'screenshotWebPage')
+    return 'url' in args && typeof args.url === 'string'
+      ? args.url.trim().slice(0, 500)
+      : undefined;
+  return undefined;
 }
 
 function toolCallEvents(
@@ -255,6 +264,8 @@ function toolStatusEvents(name: string): ChatEvent[] {
   if (name === 'readWebPage') return [{ type: 'status', text: 'Reading source…' }];
   if (name === 'searchSources') return [{ type: 'status', text: 'Searching sources…' }];
   if (name === 'searchWeb') return [{ type: 'status', text: 'Searching the web…' }];
+  if (name === 'listWebLinks') return [{ type: 'status', text: 'Listing page links…' }];
+  if (name === 'screenshotWebPage') return [{ type: 'status', text: 'Capturing page…' }];
   return [];
 }
 
@@ -268,7 +279,8 @@ function sourceResults(
   const found: MessageSource[] = [];
   addPageSource(found, state, toolName, toolCallId, result);
   addSearchSources(found, state, toolName, toolCallId, result);
-  if (['searchWeb', 'searchSources', 'readWebPage'].includes(toolName)) tool.sources = found;
+  if (['searchWeb', 'searchSources', 'readWebPage', 'screenshotWebPage'].includes(toolName))
+    tool.sources = found;
   return found.flatMap((source) => addSource(state, source));
 }
 
@@ -279,7 +291,8 @@ function addPageSource(
   toolCallId: string,
   result: object,
 ) {
-  if (toolName !== 'readWebPage' || !('url' in result)) return;
+  if ((toolName !== 'readWebPage' && toolName !== 'screenshotWebPage') || !('url' in result))
+    return;
   const source = publicSource(state.sources, `${toolCallId}:0`, result.url);
   if (source) found.push(source);
 }

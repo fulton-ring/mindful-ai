@@ -20,6 +20,33 @@ it('blocks a model from appending private content to an otherwise allowed URL', 
   await expect(read.execute({ url: 'https://example.com/' })).resolves.toHaveProperty('markdown');
 });
 
+it('reads a relevant page discovered from an allowed page', async () => {
+  const { env, quickAction } = fixture();
+  quickAction
+    .mockResolvedValueOnce(
+      Response.json({ success: true, result: ['https://example.com/docs/topic'] }),
+    )
+    .mockResolvedValueOnce(Response.json({ success: true, result: '# Topic\n\nDetails' }));
+  const tools = createResearchTools(
+    env,
+    'user',
+    new AbortController().signal,
+    new Set(['https://example.com/docs']),
+  );
+
+  const links = tools.listWebLinks as unknown as ExecutableTool;
+  const read = tools.readWebPage as unknown as ExecutableTool;
+  await links.execute({ url: 'https://example.com/docs' });
+  await expect(read.execute({ url: 'https://example.com/docs/topic' })).resolves.toMatchObject({
+    markdown: '# Topic\n\nDetails',
+  });
+  expect(quickAction).toHaveBeenNthCalledWith(
+    2,
+    'markdown',
+    expect.objectContaining({ url: 'https://example.com/docs/topic' }),
+  );
+});
+
 function fixture() {
   const upload = vi.fn().mockResolvedValue({ id: 'item-1', status: 'queued' });
   const search = vi.fn().mockResolvedValue({ search_query: 'workers', chunks: [] });
