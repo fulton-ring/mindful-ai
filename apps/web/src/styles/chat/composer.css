@@ -36,8 +36,10 @@
     color: var(--muted);
     font-style: normal;
   }
+  /* display, not visibility: a hidden placeholder still takes up width and
+     pushes the caret past where "Message…" would end. */
   .composer-editor .cm-focused .cm-placeholder {
-    visibility: hidden;
+    display: none;
   }
   .composer-attachments,
   .message-attachments {
