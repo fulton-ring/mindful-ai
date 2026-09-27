@@ -15,7 +15,7 @@
     {
       "binding": "DB",
       "database_name": "walden",
-      "database_id": "252d35f0-18c6-40fa-9e72-bb8b4fd51b1f",
+      "database_id": "18072abe-34d0-4972-9ef6-d955ca0d6896",
       "migrations_dir": "migrations"
     }
   ],
