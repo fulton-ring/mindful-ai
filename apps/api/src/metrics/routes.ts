@@ -1,12 +1,14 @@
 import type { Usage } from '@walden/contracts';
 import { Hono } from 'hono';
+import { loadMessageBudget, messageLimitFrom } from '../chat/turns/message-limit';
 import { first } from '../db/client';
 import type { Bindings, Variables } from '../types';
 
 export const metricsRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 metricsRoutes.get('/usage', async (c) => {
   const ownerId = c.get('userId');
-  const [sent, favorite] = await Promise.all([
+  const [budget, sent, favorite] = await Promise.all([
+    loadMessageBudget(c.env.DB, ownerId, messageLimitFrom(c.env)),
     first<{ total: number }>(
       c.env.DB.prepare(
         "SELECT COUNT(*) AS total FROM messages WHERE owner_id=? AND role='user'",
@@ -24,6 +26,7 @@ metricsRoutes.get('/usage', async (c) => {
     ),
   ]);
   return c.json({
+    budget,
     messagesSent: sent?.total ?? 0,
     favoritePersona: favorite?.persona_name ?? null,
   } satisfies Usage);

@@ -83,7 +83,13 @@
     background: var(--line);
     border-radius: 10px;
     overflow: hidden;
+    margin: 0.6rem 0;
+  }
+  .message-budget {
     margin: 1rem 0 2rem;
+  }
+  .message-budget p {
+    margin: 0;
   }
   .meter span {
     display: block;

@@ -90,11 +90,38 @@ it('requires explicit confirmation before account deletion', () => {
   expect(view.queryByRole('button', { name: 'Permanently delete account' })).toBeNull();
 });
 
-it('shows usage', async () => {
-  vi.spyOn(api, 'usage').mockResolvedValue({ messagesSent: 4, favoritePersona: 'Mentor' });
+it('shows usage with the remaining message budget and when it comes back', async () => {
+  const next = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const full = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString();
+  vi.spyOn(api, 'usage').mockResolvedValue({
+    budget: { used: 6, limit: 20, windowHours: 4, nextResetAt: next, fullResetAt: full },
+    messagesSent: 4,
+    favoritePersona: 'Mentor',
+  });
   const view = renderSettings();
   fireEvent.click(view.getByRole('button', { name: /usage/i }));
   expect(await view.findByText('Messages sent')).toBeTruthy();
+  const meter = view.getByRole('meter', { name: 'Message points left' });
+  expect(meter.getAttribute('aria-valuenow')).toBe('14');
+  expect(meter.getAttribute('aria-valuemax')).toBe('20');
+  expect(view.getByText(/of 20 message points left/)).toBeTruthy();
+  expect(
+    view.getByText(/Points come back 4 hours after each message: the next at .+, all by .+\./),
+  ).toBeTruthy();
+});
+
+it('explains the budget before any message is sent', async () => {
+  vi.spyOn(api, 'usage').mockResolvedValue({
+    budget: { used: 0, limit: 20, windowHours: 4, nextResetAt: null, fullResetAt: null },
+    messagesSent: 0,
+    favoritePersona: null,
+  });
+  const view = renderSettings();
+  fireEvent.click(view.getByRole('button', { name: /usage/i }));
+  expect(
+    (await view.findByRole('meter', { name: 'Message points left' })).getAttribute('aria-valuenow'),
+  ).toBe('20');
+  expect(view.getByText(/Each message uses points for 4 hours/)).toBeTruthy();
 });
 
 it('keeps account deletion failures visible and retryable', async () => {

@@ -1,3 +1,4 @@
+import type { MessageBudget } from '@walden/contracts';
 import { all, first } from '../../db/client';
 import { HttpError } from '../../http';
 import type { Bindings } from '../../types';
@@ -40,6 +41,32 @@ export async function loadMessageUsage(
       .bind(ownerId, since),
   );
   return { used: row?.used ?? 0, since, windowMs };
+}
+
+/** Current budget for display: how much is used and when points return. */
+export async function loadMessageBudget(
+  db: D1Database,
+  ownerId: string,
+  limit: MessageLimit,
+  now = Date.now(),
+): Promise<MessageBudget> {
+  const windowMs = limit.windowHours * 60 * 60 * 1000;
+  const row = await first<{ used: number; oldest: string | null; newest: string | null }>(
+    db
+      .prepare(
+        'SELECT COALESCE(SUM(weight),0) AS used,MIN(created_at) AS oldest,MAX(created_at) AS newest FROM turns WHERE owner_id=? AND created_at>?',
+      )
+      .bind(ownerId, new Date(now - windowMs).toISOString()),
+  );
+  const after = (at: string | null | undefined) =>
+    at ? new Date(Date.parse(at) + windowMs).toISOString() : null;
+  return {
+    used: row?.used ?? 0,
+    limit: limit.limit,
+    windowHours: limit.windowHours,
+    nextResetAt: after(row?.oldest),
+    fullResetAt: after(row?.newest),
+  };
 }
 
 function waitText(ms: number) {

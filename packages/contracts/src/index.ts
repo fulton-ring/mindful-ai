@@ -351,7 +351,18 @@ export type AppConfig = {
   clerkPublishableKey?: string;
   telemetry?: { key: string; host: string };
 };
+/** The sliding message budget: points come back as old messages leave the window. */
+export type MessageBudget = {
+  used: number;
+  limit: number;
+  windowHours: number;
+  /** When the oldest message in the window ages out, or null when nothing is used. */
+  nextResetAt: string | null;
+  /** When the newest message ages out and the full budget is back. */
+  fullResetAt: string | null;
+};
 export type Usage = {
+  budget: MessageBudget;
   /** Messages you have sent, across every thread that still exists. */
   messagesSent: number;
   /** The persona used in the most threads, or null when nothing stands out. */

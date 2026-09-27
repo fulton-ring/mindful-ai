@@ -7,6 +7,7 @@ import { sqliteD1Binding } from '../../../agent/memory/tests/d1-test-binding';
 import { HttpError } from '../../../http';
 import {
   assertWithinMessageLimit,
+  loadMessageBudget,
   loadMessageUsage,
   type MessageLimit,
   messageLimitFrom,
@@ -84,6 +85,27 @@ describe('sliding message limit', () => {
       retryAt: new Date(NOW - 2 * HOUR + 5 * HOUR).toISOString(),
     });
     expect((error as HttpError).message).toContain('in 3h');
+  });
+
+  it('reports the budget with when points start and finish coming back', async () => {
+    const db = await fixture([
+      { hoursAgo: 6, weight: 3 },
+      { hoursAgo: 4, weight: 1 },
+      { hoursAgo: 1, weight: 2 },
+    ]);
+    expect(await loadMessageBudget(db, 'owner', limit, NOW)).toEqual({
+      used: 3,
+      limit: 4,
+      windowHours: 5,
+      nextResetAt: new Date(NOW + 1 * HOUR).toISOString(),
+      fullResetAt: new Date(NOW + 4 * HOUR).toISOString(),
+    });
+    const empty = await fixture([]);
+    expect(await loadMessageBudget(empty, 'owner', limit, NOW)).toMatchObject({
+      used: 0,
+      nextResetAt: null,
+      fullResetAt: null,
+    });
   });
 
   it('reads the budget from Worker vars with safe defaults', () => {

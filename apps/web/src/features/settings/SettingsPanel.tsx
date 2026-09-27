@@ -1,6 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useQuery } from '@tanstack/react-query';
-import type { Persona } from '@walden/contracts';
+import type { MessageBudget, Persona } from '@walden/contracts';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '../../lib/api';
@@ -172,6 +172,7 @@ function Usage() {
   return (
     <section>
       <h2>Usage</h2>
+      <MessageBudgetMeter budget={value.budget} />
       <dl>
         <div>
           <dt>Messages sent</dt>
@@ -183,5 +184,40 @@ function Usage() {
         </div>
       </dl>
     </section>
+  );
+}
+
+function resetTime(iso: string) {
+  const at = new Date(iso);
+  const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return at.toDateString() === new Date().toDateString()
+    ? time
+    : `${at.toLocaleDateString([], { weekday: 'short' })} ${time}`;
+}
+
+function MessageBudgetMeter({ budget }: { budget: MessageBudget }) {
+  const remaining = Math.max(0, budget.limit - budget.used);
+  const window = budget.windowHours === 1 ? 'hour' : `${budget.windowHours} hours`;
+  return (
+    <div className="message-budget">
+      <p>
+        <strong>{remaining}</strong> of {budget.limit} message points left
+      </p>
+      <div
+        className="meter"
+        role="meter"
+        aria-label="Message points left"
+        aria-valuemin={0}
+        aria-valuemax={budget.limit}
+        aria-valuenow={remaining}
+      >
+        <span style={{ width: `${(remaining / budget.limit) * 100}%` }} />
+      </div>
+      <p className="muted">
+        {budget.nextResetAt && budget.fullResetAt
+          ? `Points come back ${window} after each message: the next at ${resetTime(budget.nextResetAt)}, all by ${resetTime(budget.fullResetAt)}.`
+          : `Each message uses points for ${window}; heavier models use more.`}
+      </p>
+    </div>
   );
 }
