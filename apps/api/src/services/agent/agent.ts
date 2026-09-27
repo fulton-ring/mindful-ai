@@ -20,18 +20,22 @@ type ConfigureModel = (persona: Persona) => ConfiguredModel;
 type SecondaryContext = ReturnType<typeof createSecondaryContext>;
 type Background = (task: Promise<void>) => void;
 
+/**
+ * Gemma needs thinking disabled to leave room for visible output. GLM 5.3 Flash
+ * does not support disabling reasoning, so it uses its lowest effort. Qwen 3.8
+ * is the deliberate option (weight 2) and reasons at medium effort; Workers AI
+ * accepts only low, medium, and xhigh (its default) for it, not 'high'.
+ */
+export function cloudflareModelSettings(modelName: string) {
+  if (modelName === '@cf/google/gemma-4-26b-a4b-it')
+    return { reasoning_effort: null, chat_template_kwargs: { enable_thinking: false } } as const;
+  if (modelName === DEFAULT_AI_MODEL) return { reasoning_effort: 'low' } as const;
+  if (modelName === '@cf/qwen/qwen3.8-27b') return { reasoning_effort: 'medium' } as const;
+  return {};
+}
+
 export function createCloudflareModel(env: ServiceEnv, modelName: string) {
-  // Gemma needs thinking disabled to leave room for visible output. GLM 5.3
-  // Flash does not support disabling reasoning, so use its lowest effort. Qwen
-  // 3.8 is the deliberate option (weight 2), so it reasons at high effort.
-  const modelSettings =
-    modelName === '@cf/google/gemma-4-26b-a4b-it'
-      ? ({ reasoning_effort: null, chat_template_kwargs: { enable_thinking: false } } as const)
-      : modelName === DEFAULT_AI_MODEL
-        ? ({ reasoning_effort: 'low' } as const)
-        : modelName === '@cf/qwen/qwen3.8-27b'
-          ? ({ reasoning_effort: 'high' } as const)
-          : {};
+  const modelSettings = cloudflareModelSettings(modelName);
   if (env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN) {
     return createWorkersAI({
       accountId: env.CLOUDFLARE_ACCOUNT_ID,
