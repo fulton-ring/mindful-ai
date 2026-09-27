@@ -2,6 +2,7 @@ import { chatRequestSchema } from '@walden/contracts';
 import { Hono } from 'hono';
 import { first, parseJson } from '../../db/client';
 import { HttpError, jsonBody, nowIso } from '../../http';
+import { modelNameForPersona } from '../../services/agent/agent';
 import type { Bindings, Variables } from '../../types';
 import {
   attachmentKey,
@@ -18,6 +19,7 @@ import {
 import { requireConversation } from '../conversations/repository';
 import { cancelTurn, type DurableTurnRow } from './durable-store';
 import { createTurnEventsResponse } from './event-stream';
+import { messageLimitFrom } from './message-limit';
 import { ensureTurnScheduled } from './scheduling';
 import { prepareTurn } from './turn-lifecycle';
 export const chatRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -150,7 +152,16 @@ chatRoutes.post('/turns', async (c) => {
     : [];
   let result: Awaited<ReturnType<typeof prepareTurn>>;
   try {
-    result = await prepareTurn({ db: c.env.DB, ownerId }, request, attachments);
+    result = await prepareTurn(
+      {
+        db: c.env.DB,
+        ownerId,
+        messageLimit: messageLimitFrom(c.env),
+        modelFor: (persona) => modelNameForPersona(c.env, persona),
+      },
+      request,
+      attachments,
+    );
   } catch (error) {
     const concurrent = await findOwnedTurn(c.env.DB, ownerId, request.requestId);
     if (!concurrent || concurrent.request_json !== requestJson) throw error;

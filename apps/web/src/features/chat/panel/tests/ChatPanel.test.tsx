@@ -3,7 +3,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ChatEvent } from '@walden/contracts';
 import { describe, expect, it } from 'vitest';
+import { ApiError } from '../../../../lib/api';
 import {
+  composerValue,
   conversation,
   getTransport,
   props,
@@ -145,4 +147,21 @@ it.each([
   expect(transport.setWebSearch).toHaveBeenLastCalledWith(value.id, next);
   expect(transport.streamChat).not.toHaveBeenCalled();
   view.unmount();
+});
+
+describe('message limit', () => {
+  it('shows the limit and keeps the draft when the server refuses the message', async () => {
+    transport.streamChat.mockRejectedValueOnce(
+      new ApiError(
+        429,
+        "You've reached your message limit for the last 4 hours. You can send another message in 2h 10m.",
+      ),
+    );
+    render(<ChatPanel {...props()} />);
+    setComposerValue(screen.getByLabelText('Message'), 'One more question');
+    fireEvent.click(screen.getByLabelText('Send message'));
+    expect(await screen.findByText(/reached your message limit/)).toBeTruthy();
+    expect(transport.streamChat).toHaveBeenCalledTimes(1);
+    expect(composerValue(screen.getByLabelText('Message'))).toBe('One more question');
+  });
 });

@@ -13,6 +13,10 @@ Chat admission returns a turn ID. Cloudflare Workflow generates the answer, and 
 
 Run `pnpm verify`, `pnpm lint`, `pnpm db:check`, and `git diff --check` before release. Wrangler's dry-run build checks the Workflow binding and Worker bundle.
 
+## Message limit
+
+Admission enforces a sliding budget per account: the summed weights of turns created in the last `MESSAGE_WINDOW_HOURS` (default 4) may not exceed `MESSAGE_LIMIT` (default 20). Every send, regenerate, and edit counts. A turn's weight comes from its model's `weight` in `PERSONA_MODELS` (`packages/contracts`), and each turn stores `model` and `weight`. Over the budget, `POST /api/chat/turns` returns 429 with `details.retryAt`, and the composer keeps the unsent draft. Both values are Worker vars in `wrangler.jsonc`, so changing them needs only a redeploy. Turns of deleted threads drop out of the window.
+
 ## Production rollout
 
 Apply D1 migrations with `pnpm --filter @walden/api db:migrate:remote` before deploying the Worker, and deploy the API and bundled web assets together. `turns`, `turn_events` and `turn_cancellations` hold active turn state; the schema is in `0000_baseline.sql` (see `docs/database.md`).

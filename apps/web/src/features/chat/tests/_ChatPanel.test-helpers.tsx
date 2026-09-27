@@ -40,7 +40,8 @@ export function composerValue(element: HTMLElement) {
   return EditorView.findFromDOM(element)?.state.doc.toString();
 }
 
-vi.mock('../../../lib/api', () => ({
+vi.mock('../../../lib/api', async (importOriginal) => ({
+  ApiError: (await importOriginal<typeof import('../../../lib/api')>()).ApiError,
   api: {
     setWebSearch: transport.setWebSearch,
     setLearningChecks: transport.setLearningChecks,

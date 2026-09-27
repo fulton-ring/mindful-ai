@@ -23,6 +23,10 @@ export type Bindings = {
   MCP_SERVER_TOKEN?: string;
   MCP_ALLOWED_TOOLS?: string;
   MCP_TOOL_EFFECTS?: string;
+  /** Messages allowed per sliding window (default 20). */
+  MESSAGE_LIMIT?: string;
+  /** Sliding window length in hours (default 4). */
+  MESSAGE_WINDOW_HOURS?: string;
   POSTHOG_API_KEY?: string;
   POSTHOG_HOST?: string;
   POSTHOG_PERSONAL_API_KEY?: string;

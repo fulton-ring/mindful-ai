@@ -81,6 +81,10 @@ it('admits one immutable turn, protects replay, and persists Stop', async () => 
   expect(
     (await DB.prepare('SELECT COUNT(*) AS count FROM turns').first<{ count: number }>())?.count,
   ).toBe(1);
+  expect(await DB.prepare('SELECT model,weight FROM turns').first()).toEqual({
+    model: '@cf/zai-org/glm-5.3-flash',
+    weight: 1,
+  });
   expect((await start('same', 'Changed')).status).toBe(409);
   expect((await start('another')).status).toBe(409);
   expect(

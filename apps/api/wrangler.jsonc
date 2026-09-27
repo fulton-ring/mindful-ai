@@ -55,7 +55,9 @@
     "POSTHOG_PROJECT_ID": "619294",
     "CLERK_PUBLISHABLE_KEY": "pk_test_bW9yYWwtbGVtdXItNjI4Mi5jbGVyay5hY2NvdW50cy5kZXYk",
     "CLERK_AUTHORIZED_PARTIES": "http://localhost:5173,http://localhost:8788,http://localhost:8787,http://127.0.0.1:5173,http://127.0.0.1:8788,http://127.0.0.1:8787,https://walden.jeremy-herzog.workers.dev",
-    "AI_SEARCH_INSTANCE": "mindful-ai-sources"
+    "AI_SEARCH_INSTANCE": "mindful-ai-sources",
+    "MESSAGE_LIMIT": "20",
+    "MESSAGE_WINDOW_HOURS": "4"
   },
   "assets": {
     "directory": "../web/dist",

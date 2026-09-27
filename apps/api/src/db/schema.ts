@@ -435,6 +435,9 @@ export const turns = sqliteTable(
     inputJson: text('input_json'),
     requestJson: text('request_json'),
     userMessageId: text('user_message_id'),
+    /** Model the turn was admitted with and its message-budget weight. */
+    model: text('model'),
+    weight: integer('weight').notNull().default(sql.raw('1')),
     executionEpoch: integer('execution_epoch').notNull().default(0),
   },
   (table) => [
@@ -444,6 +447,7 @@ export const turns = sqliteTable(
       .where(sql.raw("status='streaming'")),
     uniqueIndex('turns_owner_id_request_id_unique').on(table.ownerId, table.requestId),
     index('turns_conversation').on(table.conversationId),
+    index('turns_owner_created').on(table.ownerId, table.createdAt),
   ],
 );
 

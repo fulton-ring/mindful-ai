@@ -1,16 +1,18 @@
-import type {
-  ChatRequest,
-  Conversation,
-  Intervention,
-  Note,
-  Persona,
-  ProvenanceSpan,
+import {
+  type ChatRequest,
+  type Conversation,
+  type Intervention,
+  modelWeight,
+  type Note,
+  type Persona,
+  type ProvenanceSpan,
 } from '@walden/contracts';
 import { conversationTitle } from '@walden/domain';
 import { first, parseJson } from '../../db/client';
 import { HttpError, newId, nowIso } from '../../http';
 import type { LoadedAttachment } from '../attachments/attachments';
 import { loadConversation, RETENTION_MS } from '../conversations/repository';
+import { assertWithinMessageLimit, loadMessageUsage, type MessageLimit } from './message-limit';
 import {
   batchIfAny,
   editContext,
@@ -24,7 +26,13 @@ import {
 export type TurnRuntime = {
   db: D1Database;
   ownerId: string;
+  /** Omitted only by tests that exercise admission without a message budget. */
+  messageLimit?: MessageLimit;
+  /** Resolves the model a persona will run on; defaults to the persona's own model. */
+  modelFor?: (persona: Persona) => string;
 };
+
+type TurnModel = { model: string | null; weight: number };
 
 type Regeneration = NonNullable<ReturnType<typeof regenerationContext>>;
 type Edit = NonNullable<ReturnType<typeof editContext>>;
@@ -152,7 +160,12 @@ function validateLearningCheck(
   if (invalid) throw new HttpError(409, 'This learning check is no longer pending');
 }
 
-async function reserveTurn(runtime: TurnRuntime, input: TurnInput, persona: Persona) {
+async function reserveTurn(
+  runtime: TurnRuntime,
+  input: TurnInput,
+  persona: Persona,
+  turnModel: TurnModel,
+) {
   const { db, ownerId } = runtime;
   const editInPlace = Boolean(input.edit?.replacedAssistant?.incomplete);
   const branchFork = Boolean(input.regeneration || (input.edit && !editInPlace));
@@ -164,7 +177,7 @@ async function reserveTurn(runtime: TurnRuntime, input: TurnInput, persona: Pers
   try {
     await db
       .prepare(
-        "INSERT INTO turns (id,request_id,conversation_id,owner_id,status,created_at,branch_id,source_branch_id,request_json) VALUES (?,?,?,?, 'streaming',?,?,?,?)",
+        "INSERT INTO turns (id,request_id,conversation_id,owner_id,status,created_at,branch_id,source_branch_id,request_json,model,weight) VALUES (?,?,?,?, 'streaming',?,?,?,?,?,?)",
       )
       .bind(
         turnId,
@@ -175,6 +188,8 @@ async function reserveTurn(runtime: TurnRuntime, input: TurnInput, persona: Pers
         branchId,
         input.conversation.branchId,
         JSON.stringify(input.request),
+        turnModel.model,
+        turnModel.weight,
       )
       .run();
   } catch {
@@ -348,8 +363,9 @@ async function prepareStreamTurn(
   input: TurnInput,
   persona: Persona,
   pendingIntervention: Intervention | undefined,
+  turnModel: TurnModel,
 ): Promise<PreparedTurn> {
-  const reservation = await reserveTurn(runtime, input, persona);
+  const reservation = await reserveTurn(runtime, input, persona, turnModel);
   const userMessageId = await persistTurnSetup(runtime, input, reservation, persona);
   input.conversation.expiresAt = reservation.expiresAt;
   if (
@@ -408,8 +424,11 @@ export async function prepareTurn(
     throw new HttpError(409, 'Completed response not found on this branch');
   if (request.editMessageId && !records.edit)
     throw new HttpError(404, 'Message to edit was not found');
-  const [, persona, pendingRow] = await Promise.all([
+  const [, usage, persona, pendingRow] = await Promise.all([
     rejectOverlappingTurn(runtime, conversation),
+    runtime.messageLimit
+      ? loadMessageUsage(runtime.db, runtime.ownerId, runtime.messageLimit)
+      : undefined,
     personaFor(runtime.db, runtime.ownerId, request.personaId),
     first<{ id: string; payload_json: string }>(
       runtime.db
@@ -423,6 +442,16 @@ export async function prepareTurn(
     ? parseJson<Intervention | undefined>(pendingRow.payload_json, undefined)
     : undefined;
   validateLearningCheck(request, pendingIntervention);
+  const model = runtime.modelFor?.(persona) ?? persona.model ?? null;
+  const turnModel = { model, weight: modelWeight(model ?? '') };
+  if (runtime.messageLimit && usage)
+    await assertWithinMessageLimit(
+      runtime.db,
+      runtime.ownerId,
+      runtime.messageLimit,
+      usage,
+      turnModel.weight,
+    );
   const input: TurnInput = {
     request,
     attachments,
@@ -437,7 +466,7 @@ export async function prepareTurn(
   return {
     kind: 'stream',
     turn: {
-      ...(await prepareStreamTurn(runtime, input, persona, pendingIntervention)),
+      ...(await prepareStreamTurn(runtime, input, persona, pendingIntervention, turnModel)),
       attachments,
     },
   };

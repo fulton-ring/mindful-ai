@@ -7,7 +7,7 @@ import type {
 } from '@walden/contracts';
 import { conversationTitle } from '@walden/domain';
 
-import { streamChat } from '../../../../../lib/api';
+import { ApiError, streamChat } from '../../../../../lib/api';
 import { id } from '../../../../../lib/ids';
 import { failureDetails, track } from '../../../../../lib/telemetry';
 import type { ChatPanelProps } from '../../chat-panel-types';
@@ -452,6 +452,11 @@ async function runSend(args: SendArgs, run: SendRun) {
     );
   } catch (cause) {
     reportSendFailure(args, run, cause);
+    // Over the message limit nothing was sent: keep the draft so it can go out later.
+    if (cause instanceof ApiError && cause.status === 429) {
+      resetFailedSend(args, run, cause.message);
+      return;
+    }
     if (!run.requestController.signal.aborted)
       args.display.setError(
         cause instanceof Error ? cause.message : 'The response was interrupted.',

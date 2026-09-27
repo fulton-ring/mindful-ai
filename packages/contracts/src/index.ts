@@ -82,11 +82,15 @@ export const personaIconSchema = z.enum([
   'pencil',
   'user',
 ]);
+/** `weight` is what one message on the model costs against the sliding message budget (1–3). */
 export const PERSONA_MODELS = [
-  { id: '@cf/zai-org/glm-5.3-flash', label: 'GLM 5.3 Flash' },
-  { id: '@cf/google/gemma-4-26b-a4b-it', label: 'Gemma 4' },
+  { id: '@cf/zai-org/glm-5.3-flash', label: 'GLM 5.3 Flash', weight: 1 },
+  { id: '@cf/google/gemma-4-26b-a4b-it', label: 'Gemma 4', weight: 1 },
 ] as const;
 export type PersonaModel = (typeof PERSONA_MODELS)[number]['id'];
+/** Models outside the persona list (such as a development provider override) cost 1. */
+export const modelWeight = (modelId: string): number =>
+  PERSONA_MODELS.find(({ id }) => id === modelId)?.weight ?? 1;
 const personaModelIds = PERSONA_MODELS.map((model) => model.id) as [
   PersonaModel,
   ...PersonaModel[],

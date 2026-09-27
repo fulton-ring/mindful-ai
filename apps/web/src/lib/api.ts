@@ -463,11 +463,11 @@ function retryDelay(attempt: number, signal: AbortSignal): Promise<void> {
   });
 }
 
+/** A 429 here is the account's message limit, which retrying cannot clear. */
 function canRetry(error: unknown) {
   return (
     error instanceof TypeError ||
-    (error instanceof ApiError &&
-      (error.status >= 500 || error.status === 408 || error.status === 429))
+    (error instanceof ApiError && (error.status >= 500 || error.status === 408))
   );
 }
 
