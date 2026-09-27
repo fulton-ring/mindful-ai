@@ -28,7 +28,7 @@ function MobileHeader() {
       <button className="icon-button" aria-label="Open sidebar" onClick={() => setSidebar(true)}>
         <Menu />
       </button>
-      <span>{conversation?.title || draft?.title || 'Walden'}</span>
+      <span>{conversation?.title || draft?.title || 'New thread'}</span>
       <button
         className="text-button"
         onClick={noteOnly ? startChatFromNote : mobilePane === 'note' ? closeNote : showNote}
