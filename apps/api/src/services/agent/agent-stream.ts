@@ -6,12 +6,11 @@ import { GemmaToolLeakDecoder } from '../../agent/learning-checks';
 import { streamMastraTurn } from '../../agent/mastra-turn';
 import { type MemoryLifecycleEvent, prepareAgentMemory } from '../../agent/memory/memory';
 import { R2WorkspaceFilesystem } from '../../agent/r2-workspace';
-import { agentTrace, streamAnnotationResponse } from '../../agent/stream-events';
+import { agentTrace } from '../../agent/stream-events';
 import { loadAttachments } from '../../chat/attachments/attachments';
 import { isConversationLive } from '../../chat/turns/durable-store';
 import { type ApiTelemetry, createApiTelemetry } from '../../observability';
 import { captureConversation, contentPreference } from '../../privacy/content-telemetry';
-import { streamWithDurableAnnotations } from '../annotations/durable-annotations';
 import { createMcpService, type McpTools } from '../mcp';
 import { createResearchTools, publicUrl } from '../research/research';
 import { createWebSearchTools } from '../research/web-search';
@@ -28,6 +27,8 @@ type TurnStreamOptions = {
   /** Aborts on cancellation or the turn deadline. */
   signal: AbortSignal;
   checkpoints: AgentCheckpoints;
+  /** Runs work after the turn commits; telemetry must not delay the reply. */
+  background?: (task: Promise<void>) => void;
 };
 
 function collectAllowedUrls(input: AgentTurnInput): Set<string> {
@@ -162,29 +163,6 @@ async function createPrimaryStream(
   });
 }
 
-function createAnnotatedStream(
-  options: TurnStreamOptions,
-  stream: AsyncIterable<ChatEvent>,
-  telemetry: ApiTelemetry | null,
-): AsyncIterable<ChatEvent> {
-  const { input, model, modelName, signal, checkpoints } = options;
-  const trace = agentTrace(telemetry, input.telemetryUserId, modelName);
-  const annotationModel = checkpointModel(model, checkpoints, 'annotations', { retries: 0 });
-  return streamWithDurableAnnotations(
-    stream,
-    (text, annotationSignal) =>
-      streamAnnotationResponse({
-        text,
-        turnId: input.turnId,
-        conversationId: input.conversation.id,
-        model: annotationModel,
-        signal: annotationSignal,
-        trace,
-      }),
-    signal,
-  );
-}
-
 function appendVisibleResponse(visibleResponse: string, event: ChatEvent): string {
   if (event.type === 'text') return (visibleResponse + event.text).slice(0, 24_000);
   if (event.type !== 'intervention' || event.intervention.kind !== 'learning_check') {
@@ -234,13 +212,23 @@ export async function* streamTurnEvents(options: TurnStreamOptions): AsyncGenera
     const workspace = createTurnWorkspace(env, input);
     const stream = await createPrimaryStream(options, memory, workspace, telemetry);
     options.signal.throwIfAborted();
-    const annotatedStream = createAnnotatedStream(options, stream, telemetry);
-    for await (const event of annotatedStream) {
+    for await (const event of stream) {
       visibleResponse = appendVisibleResponse(visibleResponse, event);
-      yield event;
+      // Highlights are generated after the reply commits, through the
+      // follow-up annotations stream, so they never hold the composer.
+      yield event.type === 'done' ? { ...event, annotationsHandled: false } : event;
     }
     completed = true;
   } finally {
-    await finishTurnStream(options, preference, telemetry, visibleResponse, startedAt, completed);
+    const finishing = finishTurnStream(
+      options,
+      preference,
+      telemetry,
+      visibleResponse,
+      startedAt,
+      completed,
+    );
+    if (options.background) options.background(finishing);
+    else await finishing;
   }
 }

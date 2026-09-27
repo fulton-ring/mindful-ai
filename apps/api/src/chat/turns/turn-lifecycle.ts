@@ -68,10 +68,19 @@ type PreparedTurnResult = { kind: 'replay' } | { kind: 'stream'; turn: PreparedT
 
 async function loadTurnRecords(runtime: TurnRuntime, request: ChatRequest): Promise<TurnRecords> {
   const { db, ownerId } = runtime;
-  const conversation = await loadConversation(db, ownerId, request.conversationId, {
-    renewExpired: !request.regenerateMessageId,
-    branchId: request.branchId,
-  });
+  const [conversation, previous] = await Promise.all([
+    loadConversation(db, ownerId, request.conversationId, {
+      renewExpired: !request.regenerateMessageId,
+      branchId: request.branchId,
+    }),
+    first<PreviousTurn>(
+      db
+        .prepare(
+          'SELECT id,status,created_at,branch_id FROM turns WHERE owner_id=? AND request_id=?',
+        )
+        .bind(ownerId, request.requestId),
+    ),
+  ]);
   const regeneration = request.regenerateMessageId
     ? regenerationContext(conversation.messages, request.regenerateMessageId)
     : null;
@@ -80,11 +89,6 @@ async function loadTurnRecords(runtime: TurnRuntime, request: ChatRequest): Prom
     : null;
   if (request.regenerateMessageId && request.editMessageId)
     throw new HttpError(400, 'Choose either a message edit or regeneration');
-  const previous = await first<PreviousTurn>(
-    db
-      .prepare('SELECT id,status,created_at,branch_id FROM turns WHERE owner_id=? AND request_id=?')
-      .bind(ownerId, request.requestId),
-  );
   const noteRow = await loadNoteRow(db, ownerId, conversation.noteId);
   validateNoteRevision(request, conversation, previous, noteRow);
   return { conversation, regeneration, edit, previous, noteRow };
@@ -404,15 +408,17 @@ export async function prepareTurn(
     throw new HttpError(409, 'Completed response not found on this branch');
   if (request.editMessageId && !records.edit)
     throw new HttpError(404, 'Message to edit was not found');
-  await rejectOverlappingTurn(runtime, conversation);
-  const persona = await personaFor(runtime.db, runtime.ownerId, request.personaId);
-  const pendingRow = await first<{ id: string; payload_json: string }>(
-    runtime.db
-      .prepare(
-        "SELECT id,payload_json FROM interventions WHERE branch_id=? AND owner_id=? AND status='pending' AND kind!='ghost' ORDER BY created_at DESC LIMIT 1",
-      )
-      .bind(conversation.branchId, runtime.ownerId),
-  );
+  const [, persona, pendingRow] = await Promise.all([
+    rejectOverlappingTurn(runtime, conversation),
+    personaFor(runtime.db, runtime.ownerId, request.personaId),
+    first<{ id: string; payload_json: string }>(
+      runtime.db
+        .prepare(
+          "SELECT id,payload_json FROM interventions WHERE branch_id=? AND owner_id=? AND status='pending' AND kind!='ghost' ORDER BY created_at DESC LIMIT 1",
+        )
+        .bind(conversation.branchId, runtime.ownerId),
+    ),
+  ]);
   const pendingIntervention = pendingRow
     ? parseJson<Intervention | undefined>(pendingRow.payload_json, undefined)
     : undefined;

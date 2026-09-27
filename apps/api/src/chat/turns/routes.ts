@@ -178,12 +178,11 @@ chatRoutes.post('/turns', async (c) => {
     userMessageId: turn.userMessageId,
     forked: turn.branchFork,
   };
-  await c.env.DB.prepare(
-    "UPDATE turns SET input_json=?,request_json=?,user_message_id=? WHERE id=? AND owner_id=? AND status='streaming'",
-  )
-    .bind(JSON.stringify(input), requestJson, turn.userMessageId, turn.turnId, ownerId)
-    .run();
-  const row = await findOwnedTurn(c.env.DB, ownerId, turn.turnId);
+  const row = await first<DurableTurnRow>(
+    c.env.DB.prepare(
+      "UPDATE turns SET input_json=?,request_json=?,user_message_id=? WHERE id=? AND owner_id=? AND status='streaming' RETURNING *",
+    ).bind(JSON.stringify(input), requestJson, turn.userMessageId, turn.turnId, ownerId),
+  );
   if (!row) throw new HttpError(500, 'Turn admission failed.');
   try {
     await ensureTurnScheduled(c.env, row);

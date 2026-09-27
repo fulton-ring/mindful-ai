@@ -183,6 +183,7 @@ export function createAgentService(env: ServiceEnv, background?: Background): Ag
         model,
         signal: withDeadline(signal, TURN_DEADLINE_MS),
         checkpoints,
+        background,
       });
     },
     ...createSecondaryOperations(env, background, configuredModel),

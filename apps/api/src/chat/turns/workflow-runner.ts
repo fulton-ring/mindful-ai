@@ -17,6 +17,7 @@ import {
 } from './durable-store';
 
 type Guard = () => Promise<void>;
+type Background = (task: Promise<void>) => void;
 type Progress = { model: string; partialResponse: boolean; toolIds: Set<string> };
 type Publisher = { emit(event: ChatEvent): Promise<void>; flush(): Promise<void> };
 
@@ -92,13 +93,14 @@ async function loadInput(env: Bindings, row: DurableTurnRow): Promise<DurableTur
 
 function checkpoints(
   step: WorkflowStep,
+  signal: AbortSignal,
   assertActive: Guard,
   publish: Publisher,
   preview: { used: boolean },
 ) {
   return {
     publish: async (event: ChatEvent) => {
-      await assertActive();
+      signal.throwIfAborted();
       preview.used = true;
       await publish.emit(event);
     },
@@ -134,17 +136,20 @@ async function generateTurn(
   assertActive: Guard,
   publish: Publisher,
   progress: Progress,
+  background: Background,
 ) {
   const input = await loadInput(env, row);
   progress.model = modelNameForPersona(env, input.persona);
   const preview = { used: false };
-  const agent = createAgentService(env);
-  const turnCheckpoints = checkpoints(step, assertActive, publish, preview);
+  const agent = createAgentService(env, background);
+  const turnCheckpoints = checkpoints(step, controller.signal, assertActive, publish, preview);
   await publish.emit({ type: 'status', text: 'Thinking…' });
   let done: Extract<ChatEvent, { type: 'done' }> | undefined;
   let intervention: Extract<ChatEvent, { type: 'intervention' }>['intervention'] | undefined;
+  // The cancellation watcher checks D1 once a second and aborts the signal;
+  // event writes are fenced by epoch and status, so no per-chunk query.
   for await (const item of await agent.streamTurn(input, turnCheckpoints, controller.signal)) {
-    await assertActive();
+    controller.signal.throwIfAborted();
     if (preview.used && (item.type === 'text' || item.type === 'reasoning')) continue;
     trackProgress(progress, item);
     if (item.type === 'done') done = item;
@@ -166,6 +171,7 @@ async function recordFailure(
   epoch: number,
   error: unknown,
   progress: Progress,
+  background: Background,
 ) {
   const code = aiFailureCode(error);
   const message =
@@ -177,34 +183,48 @@ async function recordFailure(
     await finishTurn(env.DB, row.id, row.owner_id, 'failed', message, epoch, code);
     return true;
   });
-  await captureChatFailure(env, {
-    userId: row.owner_id,
-    conversationId: row.conversation_id,
-    turnId: row.id,
-    code,
-    model: progress.model,
-    hadPartialResponse: progress.partialResponse,
-    toolCount: progress.toolIds.size,
-  });
+  background(
+    captureChatFailure(env, {
+      userId: row.owner_id,
+      conversationId: row.conversation_id,
+      turnId: row.id,
+      code,
+      model: progress.model,
+      hadPartialResponse: progress.partialResponse,
+      toolCount: progress.toolIds.size,
+    }),
+  );
 }
 
-async function terminalResult(env: Bindings, row: DurableTurnRow, epoch: number) {
+async function terminalResult(
+  env: Bindings,
+  row: DurableTurnRow,
+  epoch: number,
+  background: Background,
+) {
   const latest = await first<{ status: string }>(
     env.DB.prepare('SELECT status FROM turns WHERE id=?').bind(row.id),
   );
   const status = latest?.status ?? 'deleted';
-  await captureTurnLifecycle(env, 'chat_turn_terminal', {
-    userId: row.owner_id,
-    conversationId: row.conversation_id,
-    turnId: row.id,
-    requestId: row.request_id,
-    attempt: epoch,
-    status,
-  });
+  background(
+    captureTurnLifecycle(env, 'chat_turn_terminal', {
+      userId: row.owner_id,
+      conversationId: row.conversation_id,
+      turnId: row.id,
+      requestId: row.request_id,
+      attempt: epoch,
+      status,
+    }),
+  );
   return { turnId: row.id, status };
 }
 
-export async function runChatTurn(env: Bindings, turnId: string, step: WorkflowStep) {
+export async function runChatTurn(
+  env: Bindings,
+  turnId: string,
+  step: WorkflowStep,
+  background: Background = (task) => void task.catch(() => undefined),
+) {
   const row = await first<DurableTurnRow>(
     env.DB.prepare('SELECT * FROM turns WHERE id=?').bind(turnId),
   );
@@ -212,13 +232,18 @@ export async function runChatTurn(env: Bindings, turnId: string, step: WorkflowS
     return { turnId, status: row?.status ?? 'deleted' };
   const epoch = await beginTurnExecution(env.DB, turnId);
   if (epoch === null) return { turnId, status: 'stopped' };
-  await captureTurnLifecycle(env, epoch > 1 ? 'chat_turn_recovered' : 'chat_turn_started', {
-    userId: row.owner_id,
-    conversationId: row.conversation_id,
-    turnId,
-    requestId: row.request_id,
-    attempt: epoch,
-  });
+  background(
+    captureTurnLifecycle(env, epoch > 1 ? 'chat_turn_recovered' : 'chat_turn_started', {
+      userId: row.owner_id,
+      conversationId: row.conversation_id,
+      turnId,
+      requestId: row.request_id,
+      attempt: epoch,
+      // Time from turn reservation to the Workflow starting; separates
+      // admission cost from Workflow scheduling in latency investigations.
+      queueMs: Date.now() - Date.parse(row.created_at),
+    }),
+  );
   const controller = new AbortController();
   const assertActive = activeGuard(env, row, epoch, controller);
   const cancellation = watchCancellation(assertActive, controller);
@@ -233,6 +258,7 @@ export async function runChatTurn(env: Bindings, turnId: string, step: WorkflowS
       assertActive,
       publish,
       progress,
+      background,
     );
     const committed = await step.do('commit-turn', async () => {
       await assertActive();
@@ -247,11 +273,11 @@ export async function runChatTurn(env: Bindings, turnId: string, step: WorkflowS
         'The response could not finish. Please try again.',
         epoch,
       );
-    return terminalResult(env, row, epoch);
+    return terminalResult(env, row, epoch, background);
   } catch (error) {
     await publish.flush();
-    await recordFailure(env, row, step, epoch, error, progress);
-    return terminalResult(env, row, epoch);
+    await recordFailure(env, row, step, epoch, error, progress, background);
+    return terminalResult(env, row, epoch, background);
   } finally {
     clearInterval(cancellation);
   }

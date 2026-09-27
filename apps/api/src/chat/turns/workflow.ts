@@ -4,6 +4,6 @@ import { runChatTurn } from './workflow-runner';
 
 export class ChatWorkflow extends WorkflowEntrypoint<Bindings, { turnId: string }> {
   run(event: WorkflowEvent<{ turnId: string }>, step: WorkflowStep) {
-    return runChatTurn(this.env, event.payload.turnId, step);
+    return runChatTurn(this.env, event.payload.turnId, step, (task) => this.ctx.waitUntil(task));
   }
 }

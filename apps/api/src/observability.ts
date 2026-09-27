@@ -171,6 +171,7 @@ export async function captureTurnLifecycle(
     requestId: string;
     attempt: number;
     status?: string;
+    queueMs?: number;
   },
 ): Promise<void> {
   if (!env.POSTHOG_API_KEY) return;
@@ -191,6 +192,7 @@ export async function captureTurnLifecycle(
           request_id: details.requestId,
           attempt: details.attempt,
           ...(details.status ? { status: details.status } : {}),
+          ...(details.queueMs === undefined ? {} : { queue_ms: details.queueMs }),
         },
       }),
     });
