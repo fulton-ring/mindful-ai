@@ -101,6 +101,11 @@ function AnnotationMark({
 }
 
 const markdownComponents = { mark: AnnotationMark } satisfies Components;
+/** Streamdown's built-in reveal: words fade in as a reply streams. */
+// A longer fade with a tight stagger spreads each ~100 ms batch of words evenly.
+const STREAM_ANIMATION = { animation: 'fadeIn', sep: 'word', duration: 280, stagger: 18 } as const;
+const prefersReducedMotion = () =>
+  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
 type AnnotatedTextProps = {
   active?: boolean;
@@ -108,6 +113,8 @@ type AnnotatedTextProps = {
   annotations?: Annotation[];
   animatedAnnotationIds?: ReadonlySet<string>;
   markdown?: boolean;
+  /** The text is still arriving: fade new words in as they stream. */
+  streaming?: boolean;
   onAction(action: ContextualActionId, quote: string): void;
   highlights?: MessageHighlight[];
   onHighlight?(value: MessageHighlight): Promise<void> | void;
@@ -124,10 +131,11 @@ function AnnotationContent({
   highlights = [],
   markdown = false,
   animatedAnnotationIds,
+  streaming = false,
   menuOpen,
 }: Pick<
   AnnotatedTextProps,
-  'text' | 'annotations' | 'highlights' | 'markdown' | 'animatedAnnotationIds'
+  'text' | 'annotations' | 'highlights' | 'markdown' | 'animatedAnnotationIds' | 'streaming'
 > & { menuOpen: boolean }) {
   if (markdown) {
     return (
@@ -141,6 +149,8 @@ function AnnotationContent({
             createAnnotationPlugin(text, annotations, animatedAnnotationIds, highlights),
           ]}
           components={markdownComponents}
+          animated={STREAM_ANIMATION}
+          isAnimating={streaming && !prefersReducedMotion()}
         >
           {text}
         </Streamdown>
@@ -189,6 +199,7 @@ export function AnnotatedText({
   annotations = [],
   animatedAnnotationIds,
   markdown = false,
+  streaming,
   onAction,
   highlights = [],
   onHighlight,
@@ -220,6 +231,7 @@ export function AnnotatedText({
             highlights={highlights}
             markdown={markdown}
             animatedAnnotationIds={animatedAnnotationIds}
+            streaming={streaming}
             menuOpen={Boolean(selection.menu)}
           />
           <AnnotationActions

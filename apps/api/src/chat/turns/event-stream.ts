@@ -8,11 +8,14 @@ import {
   type StoredChunk,
 } from './durable-store';
 
-type Observer = { cursor: number; started: number };
+type Observer = { cursor: number; started: number; keptAliveAt: number };
 type Output = ReadableStreamDefaultController<Uint8Array>;
 
 const encoder = new TextEncoder();
 const RECONNECT_WINDOW_MS = 25_000;
+/** The Workflow writes about every 100 ms; polling faster keeps streamed text from arriving in lumps. */
+const POLL_MS = 80;
+const KEEPALIVE_MS = 5_000;
 const ENDED: WaldenUIMessageChunk = {
   type: 'error',
   errorText: 'Turn has ended. Reload the conversation.',
@@ -67,8 +70,11 @@ async function pollChunks(db: D1Database, row: DurableTurnRow, state: Observer, 
   }
   // The client reconnects after this window; it never outlives a request.
   if (Date.now() - state.started > RECONNECT_WINDOW_MS) return true;
-  output.enqueue(encoder.encode(': keepalive\n\n'));
-  await new Promise((resolve) => setTimeout(resolve, 250));
+  if (Date.now() - state.keptAliveAt >= KEEPALIVE_MS) {
+    output.enqueue(encoder.encode(': keepalive\n\n'));
+    state.keptAliveAt = Date.now();
+  }
+  await new Promise((resolve) => setTimeout(resolve, POLL_MS));
   return false;
 }
 
@@ -84,7 +90,7 @@ export async function createTurnEventsResponse(
 ): Promise<Response> {
   if (row.status !== 'streaming' && !(await readTurnChunks(db, row.id, after, 1)).length)
     return new Response(null, { status: 204 });
-  const state: Observer = { cursor: after, started: Date.now() };
+  const state: Observer = { cursor: after, started: Date.now(), keptAliveAt: 0 };
   let closed = false;
   const stream = new ReadableStream<Uint8Array>({
     async pull(output) {

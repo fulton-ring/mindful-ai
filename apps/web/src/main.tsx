@@ -5,6 +5,8 @@ import type { AppConfig } from '@walden/contracts';
 import { type ReactNode, StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import 'katex/dist/katex.min.css';
+// Keyframes for Streamdown's streaming word animation (`animated` in AnnotatedText).
+import 'streamdown/styles.css';
 import { LegalLinks, LegalPage } from './features/legal/LegalPage';
 import { setTokenProvider } from './lib/api';
 import { isIdentityScopedDraftKey, storageKeys } from './lib/storage-keys';

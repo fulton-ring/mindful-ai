@@ -126,6 +126,7 @@ function AssistantMessage({ message, ...props }: MessageProps) {
           highlights={message.metadata?.highlights}
           onHighlight={!props.isLive && !interrupted ? props.onHighlight : undefined}
           markdown
+          streaming={props.isLive && props.sending}
           animatedAnnotationIds={
             props.isLive
               ? new Set((annotations ?? []).map((item) => item.id))
