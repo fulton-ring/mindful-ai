@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import type { Persona } from '@walden/contracts';
+import { PERSONA_MODELS, type Persona, type PersonaModel } from '@walden/contracts';
 import { ChevronDown, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
@@ -113,7 +113,11 @@ function PersonaFields({
       <TextFields draft={draft} busy={busy} onChange={onChange} />
       <label htmlFor="persona-model">
         Model
-        <ModelSelect />
+        <ModelSelect
+          value={draft.model ?? PERSONA_MODELS[0].id}
+          disabled={busy}
+          onChange={(model) => onChange({ ...draft, model })}
+        />
       </label>
       <div className="field-grid">
         <PersonaSelect
@@ -209,15 +213,31 @@ function TextFields({
   );
 }
 
-function ModelSelect() {
+function ModelSelect({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: PersonaModel;
+  disabled: boolean;
+  onChange(model: PersonaModel): void;
+}) {
   return (
-    <Select value="gemma-4" disabled>
+    <Select
+      value={value}
+      disabled={disabled}
+      onValueChange={(model) => onChange(model as PersonaModel)}
+    >
       <SelectTrigger id="persona-model" aria-label="Model">
         <SelectValue />
         <ChevronDown size={14} aria-hidden />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="gemma-4">Gemma 4</SelectItem>
+        {PERSONA_MODELS.map((model) => (
+          <SelectItem key={model.id} value={model.id}>
+            {model.label}
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );

@@ -2,7 +2,7 @@ import type { EditProposal, Note, ProvenanceSpan } from '@walden/contracts';
 import { additionEdit } from './markdown-placement';
 import { acceptQueueEdit, type QueuedAddition } from './note-queue';
 
-export type TextEdit = { from: number; to: number; insert: string };
+type TextEdit = { from: number; to: number; insert: string };
 
 export class EditError extends Error {
   constructor(message: string) {
@@ -144,14 +144,4 @@ export function applyProposal(
     markdown: note.markdown.slice(0, edit.from) + edit.insert + note.markdown.slice(edit.to),
     provenance: applyAgentProvenance(note.provenance, edit, proposal.id),
   };
-}
-
-const EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
-export function expiryFrom(now = Date.now()): string {
-  return new Date(now + EXPIRY_MS).toISOString();
-}
-
-export function isExpired(expiresAt: string, now = Date.now()): boolean {
-  const timestamp = Date.parse(expiresAt);
-  return !Number.isFinite(timestamp) || timestamp <= now;
 }

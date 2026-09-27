@@ -2,11 +2,16 @@ import { noteHistoryActionSchema } from '@walden/contracts';
 import type { z } from 'zod';
 import { first, parseJson } from '../../db/client';
 import { HttpError, nowIso } from '../../http';
+import {
+  assertReplayMatches,
+  loadOperationRequest,
+  runIdempotentBatch,
+  type SuggestionChange,
+} from '../operations';
 import { loadNoteState } from './history';
 
 type HistoryDirection = 'undo' | 'redo';
 type HistoryInput = z.infer<typeof noteHistoryActionSchema>;
-type SuggestionChange = { id: string; beforeStatus: string; afterStatus: string };
 type HistoryEdit = {
   id: string;
   before_markdown: string;
@@ -25,29 +30,6 @@ type HistoryMove = {
   provenance: string;
   changes: SuggestionChange[];
 };
-
-const loadHistoryRequest = (db: D1Database, ownerId: string, noteId: string, operationId: string) =>
-  first<{ action: string; base_revision: number }>(
-    db
-      .prepare(
-        'SELECT action,base_revision FROM note_history_requests WHERE owner_id=? AND note_id=? AND operation_id=?',
-      )
-      .bind(ownerId, noteId, operationId),
-  );
-
-async function isHistoryReplay(
-  db: D1Database,
-  ownerId: string,
-  noteId: string,
-  direction: HistoryDirection,
-  input: HistoryInput,
-) {
-  const replay = await loadHistoryRequest(db, ownerId, noteId, input.operationId);
-  if (!replay) return false;
-  if (replay.action !== direction || replay.base_revision !== input.baseRevision)
-    throw new HttpError(409, 'Operation ID was already used');
-  return true;
-}
 
 async function loadHistoryEdit(
   db: D1Database,
@@ -126,11 +108,10 @@ const buildHistoryStatements = (
     );
   const edit = db
     .prepare(
-      'UPDATE note_edits SET undone=?,undone_at=? WHERE id=? AND owner_id=? AND undone=? AND discarded=0 AND EXISTS (SELECT 1 FROM notes WHERE id=? AND owner_id=? AND revision=? AND markdown=?) AND EXISTS (SELECT 1 FROM note_history_requests WHERE owner_id=? AND note_id=? AND operation_id=? AND edit_id=?)',
+      'UPDATE note_edits SET undone=? WHERE id=? AND owner_id=? AND undone=? AND discarded=0 AND EXISTS (SELECT 1 FROM notes WHERE id=? AND owner_id=? AND revision=? AND markdown=?) AND EXISTS (SELECT 1 FROM note_history_requests WHERE owner_id=? AND note_id=? AND operation_id=? AND edit_id=?)',
     )
     .bind(
       undo ? 1 : 0,
-      undo ? now : null,
       move.edit.id,
       ownerId,
       undo ? 0 : 1,
@@ -178,12 +159,11 @@ const buildSuggestionUpdates = (
     const expected = undo ? change.afterStatus : change.beforeStatus;
     return db
       .prepare(
-        'UPDATE note_suggestions SET status=?,updated_at=?,decided_at=? WHERE id=? AND note_id=? AND owner_id=? AND status=? AND EXISTS (SELECT 1 FROM note_edits WHERE id=? AND owner_id=? AND undone=?) AND EXISTS (SELECT 1 FROM note_history_requests WHERE owner_id=? AND note_id=? AND operation_id=? AND edit_id=?)',
+        'UPDATE note_suggestions SET status=?,updated_at=? WHERE id=? AND note_id=? AND owner_id=? AND status=? AND EXISTS (SELECT 1 FROM note_edits WHERE id=? AND owner_id=? AND undone=?) AND EXISTS (SELECT 1 FROM note_history_requests WHERE owner_id=? AND note_id=? AND operation_id=? AND edit_id=?)',
       )
       .bind(
         status,
         now,
-        status === 'pending' ? null : now,
         change.id,
         noteId,
         ownerId,
@@ -199,17 +179,13 @@ const buildSuggestionUpdates = (
   });
 
 async function runHistoryBatch(db: D1Database, ownerId: string, noteId: string, move: HistoryMove) {
-  try {
-    const results = await db.batch(buildHistoryStatements(db, ownerId, noteId, move, nowIso()));
-    if (results.some((result) => result.meta.changes !== 1))
-      throw new HttpError(409, 'Note history changed');
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    const replayed = await loadHistoryRequest(db, ownerId, noteId, move.input.operationId);
-    const matches =
-      replayed?.action === move.direction && replayed.base_revision === move.input.baseRevision;
-    if (!matches) throw new HttpError(409, 'Note history changed');
-  }
+  const statements = buildHistoryStatements(db, ownerId, noteId, move, nowIso());
+  await runIdempotentBatch(db, statements, {
+    key: { ownerId, noteId, operationId: move.input.operationId },
+    expected: { action: move.direction, baseRevision: move.input.baseRevision },
+    checked: statements.length,
+    conflict: 'Note history changed',
+  });
 }
 
 export async function moveNoteHistory(
@@ -219,8 +195,15 @@ export async function moveNoteHistory(
   direction: HistoryDirection,
   input: HistoryInput,
 ) {
-  if (await isHistoryReplay(db, ownerId, noteId, direction, input))
+  const replay = await loadOperationRequest(db, {
+    ownerId,
+    noteId,
+    operationId: input.operationId,
+  });
+  if (replay) {
+    assertReplayMatches(replay, { action: direction, baseRevision: input.baseRevision });
     return loadNoteState(db, ownerId, noteId);
+  }
   const state = await loadNoteState(db, ownerId, noteId);
   if (state.note.revision !== input.baseRevision)
     throw new HttpError(409, 'Note revision conflict', { currentRevision: state.note.revision });

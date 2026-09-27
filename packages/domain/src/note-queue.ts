@@ -10,7 +10,7 @@ export type QueuedAddition = {
 };
 
 /** Where one queued addition landed in the rendered note. */
-export type QueuedSpan = {
+type QueuedSpan = {
   id: string;
   from: number;
   to: number;
@@ -30,7 +30,7 @@ export type QueuedSpan = {
   insert: string;
 };
 
-export type RenderedNote = {
+type RenderedNote = {
   /** The note as it reads with every queued addition applied, in order. */
   markdown: string;
   /** The text each addition contributed, so the reader can be shown what is pending. */

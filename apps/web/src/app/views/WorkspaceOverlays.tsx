@@ -1,24 +1,24 @@
-import type { AppConfig } from '@walden/contracts';
 import { DEFAULT_PERSONAS } from '@walden/contracts';
 import { DeleteThreadDialog } from '../../features/chat/DeleteThreadDialog';
 import { PersonaEditor } from '../../features/personas/PersonaEditor';
 import { SettingsPanel } from '../../features/settings/SettingsPanel';
-import type { WorkspaceData } from '../data/app-types';
+import { useWorkspaceShell } from '../data/workspace-context';
 
-export function WorkspaceOverlays({ data, config }: { data: WorkspaceData; config: AppConfig }) {
+export function WorkspaceOverlays() {
   return (
     <>
-      <PersonaOverlay data={data} />
-      <ThreadDeleteOverlay data={data} />
-      <NoteDeleteOverlay data={data} />
-      <SettingsOverlay data={data} config={config} />
-      <SidebarScrim data={data} />
+      <PersonaOverlay />
+      <ThreadDeleteOverlay />
+      <NoteDeleteOverlay />
+      <SettingsOverlay />
+      <SidebarScrim />
     </>
   );
 }
 
-function PersonaOverlay({ data }: { data: WorkspaceData }) {
-  const { personaEditing, personas, savePersona, deleteEditingPersona, setPersonaEditing } = data;
+function PersonaOverlay() {
+  const { personaEditing, personas, savePersona, deleteEditingPersona, setPersonaEditing } =
+    useWorkspaceShell();
   if (!personaEditing) return null;
   return (
     <PersonaEditor
@@ -30,18 +30,25 @@ function PersonaOverlay({ data }: { data: WorkspaceData }) {
   );
 }
 
-function ThreadDeleteOverlay({ data }: { data: WorkspaceData }) {
-  const { threadToDelete, deleteConversation, setThreadToDelete } = data;
+function ThreadDeleteOverlay() {
+  const {
+    threadToDelete,
+    setThreadToDelete,
+    deletingThread,
+    threadDeleteError,
+    confirmThreadDeletion,
+    resetThreadDeletion,
+  } = useWorkspaceShell();
   if (!threadToDelete) return null;
   return (
     <DeleteThreadDialog
       title={threadToDelete.thread.title}
       mode={threadToDelete.mode}
-      pending={deleteConversation.isPending}
+      pending={deletingThread}
       error={
-        deleteConversation.isError
+        threadDeleteError
           ? threadError(
-              deleteConversation.error,
+              threadDeleteError,
               threadToDelete.mode === 'archive'
                 ? 'The thread could not be archived. Please try again.'
                 : 'The thread could not be deleted. Please try again.',
@@ -49,38 +56,45 @@ function ThreadDeleteOverlay({ data }: { data: WorkspaceData }) {
           : undefined
       }
       onCancel={() => {
-        deleteConversation.reset();
+        resetThreadDeletion();
         setThreadToDelete(null);
       }}
-      onConfirm={() => deleteConversation.mutate(threadToDelete)}
+      onConfirm={() => confirmThreadDeletion(threadToDelete)}
     />
   );
 }
 
-function NoteDeleteOverlay({ data }: { data: WorkspaceData }) {
-  const { noteToDelete, deleteNote, setNoteToDelete } = data;
+function NoteDeleteOverlay() {
+  const {
+    noteToDelete,
+    setNoteToDelete,
+    deletingNote,
+    noteDeleteError,
+    confirmNoteDeletion,
+    resetNoteDeletion,
+  } = useWorkspaceShell();
   if (!noteToDelete) return null;
   return (
     <DeleteThreadDialog
       title={noteToDelete.title}
       mode="delete"
       target="note"
-      pending={deleteNote.isPending}
+      pending={deletingNote}
       error={
-        deleteNote.isError
-          ? threadError(deleteNote.error, 'The note could not be deleted. Please try again.')
+        noteDeleteError
+          ? threadError(noteDeleteError, 'The note could not be deleted. Please try again.')
           : undefined
       }
       onCancel={() => {
-        deleteNote.reset();
+        resetNoteDeletion();
         setNoteToDelete(null);
       }}
-      onConfirm={() => deleteNote.mutate(noteToDelete)}
+      onConfirm={() => confirmNoteDeletion(noteToDelete)}
     />
   );
 }
 
-function SettingsOverlay({ data, config }: { data: WorkspaceData; config: AppConfig }) {
+function SettingsOverlay() {
   const {
     settingsOpen,
     personaEditing,
@@ -88,12 +102,11 @@ function SettingsOverlay({ data, config }: { data: WorkspaceData; config: AppCon
     setPersonaEditing,
     deletePersona,
     setSettingsOpen,
-  } = data;
+  } = useWorkspaceShell();
   if (!settingsOpen) return null;
   return (
     <SettingsPanel
       open={!personaEditing}
-      config={config}
       personas={personas}
       onEditPersona={setPersonaEditing}
       onCreatePersona={() => {
@@ -101,7 +114,6 @@ function SettingsOverlay({ data, config }: { data: WorkspaceData; config: AppCon
         setPersonaEditing({
           ...template,
           id: '',
-          revision: 0,
           name: 'New persona',
           icon: 'user',
         });
@@ -112,8 +124,8 @@ function SettingsOverlay({ data, config }: { data: WorkspaceData; config: AppCon
   );
 }
 
-function SidebarScrim({ data }: { data: WorkspaceData }) {
-  const { sidebar, setSidebar } = data;
+function SidebarScrim() {
+  const { sidebar, setSidebar } = useWorkspaceShell();
   if (!sidebar) return null;
   return (
     <button

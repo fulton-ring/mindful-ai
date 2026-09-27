@@ -9,8 +9,33 @@ import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import { createCloudflareModel, DEFAULT_AI_MODEL } from '../../../services/agent/agent';
-import { streamMastraTurn } from '../../index';
+import { streamMastraTurn } from '../../mastra-turn';
 import { researchModel, researchTools, turnInput, usage } from '../fixtures/research-tools';
+
+it('sends attached image bytes to the model as image content', async () => {
+  const calls: LanguageModelV3CallOptions[] = [];
+  const input = {
+    ...turnInput(),
+    attachments: [
+      {
+        id: crypto.randomUUID(),
+        name: 'chart.png',
+        mimeType: 'image/png',
+        size: 3,
+        bytes: new Uint8Array([1, 2, 3]),
+      },
+    ],
+  };
+  for await (const _ of streamMastraTurn({
+    input,
+    model: silentModel(calls),
+    signal: new AbortController().signal,
+  })) {
+    // Consume the model stream.
+  }
+  expect(JSON.stringify(calls[0]?.prompt)).toContain('"type":"file"');
+  expect(JSON.stringify(calls[0]?.prompt)).toContain('image/png');
+});
 
 it('passes screenshot image content to the next model step', async () => {
   const calls: LanguageModelV3CallOptions[] = [];
@@ -25,12 +50,12 @@ it('passes screenshot image content to the next model step', async () => {
   });
 
   const events: ChatEvent[] = [];
-  for await (const event of streamMastraTurn(
-    turnInput(),
-    screenshotModel(calls),
-    new AbortController().signal,
-    { screenshotWebPage },
-  ))
+  for await (const event of streamMastraTurn({
+    input: turnInput(),
+    model: screenshotModel(calls),
+    signal: new AbortController().signal,
+    tools: { screenshotWebPage },
+  }))
     events.push(event);
 
   expect(calls).toHaveLength(2);
@@ -85,8 +110,13 @@ it('allows fifteen sequential tool calls followed by a final answer', async () =
     execute: async () => ({ result: 'found' }),
   });
   const events: ChatEvent[] = [];
-  for await (const event of streamMastraTurn(turnInput(), model, new AbortController().signal, {
-    lookup,
+  for await (const event of streamMastraTurn({
+    input: turnInput(),
+    model,
+    signal: new AbortController().signal,
+    tools: {
+      lookup,
+    },
   }))
     events.push(event);
 
@@ -103,11 +133,11 @@ describe('research tools in a Mastra turn', () => {
     const events: ChatEvent[] = [];
     const calls: LanguageModelV3CallOptions[] = [];
     const run = async () => {
-      for await (const event of streamMastraTurn(
-        { ...turnInput(), message: 'Explain the huggingface attack to me' },
-        researchModel(calls, true),
-        new AbortController().signal,
-        {
+      for await (const event of streamMastraTurn({
+        input: { ...turnInput(), message: 'Explain the huggingface attack to me' },
+        model: researchModel(calls, true),
+        signal: new AbortController().signal,
+        tools: {
           searchWeb: createTool({
             id: 'search_web',
             description: 'Search',
@@ -117,7 +147,7 @@ describe('research tools in a Mastra turn', () => {
             },
           }),
         },
-      ))
+      }))
         events.push(event);
     };
     await expect(run()).rejects.toThrow('Web search failed');
@@ -135,12 +165,12 @@ describe('research tools in a Mastra turn', () => {
     const fixture = researchTools(controller.signal);
     fixture.upload.mockRejectedValueOnce(new Error('Index unavailable'));
     const events = [];
-    for await (const event of streamMastraTurn(
-      turnInput(),
-      researchModel([]),
-      controller.signal,
-      fixture.tools,
-    ))
+    for await (const event of streamMastraTurn({
+      input: turnInput(),
+      model: researchModel([]),
+      signal: controller.signal,
+      tools: fixture.tools,
+    }))
       events.push(event);
     expect(events).toContainEqual({
       type: 'tool',
@@ -227,15 +257,17 @@ function silentModel(calls: LanguageModelV3CallOptions[], text = 'Noted.'): Lang
   };
 }
 
-async function systemPrompt(tools: Parameters<typeof streamMastraTurn>[3]): Promise<string> {
+async function systemPrompt(
+  tools: Parameters<typeof streamMastraTurn>[0]['tools'],
+): Promise<string> {
   const controller = new AbortController();
   const calls: LanguageModelV3CallOptions[] = [];
-  for await (const _event of streamMastraTurn(
-    turnInput(),
-    silentModel(calls),
-    controller.signal,
+  for await (const _event of streamMastraTurn({
+    input: turnInput(),
+    model: silentModel(calls),
+    signal: controller.signal,
     tools,
-  ));
+  }));
   return JSON.stringify(calls[0]?.prompt.filter((message) => message.role === 'system'));
 }
 
@@ -278,7 +310,12 @@ describe.skipIf(!runLive)('live Gemma research tool calling', () => {
       'Use readWebPage on https://example.com/research, then use searchSources for "deterministic research result". Answer only from those tool results and cite the returned source URL.';
 
     const events = [];
-    for await (const event of streamMastraTurn(input, model, controller.signal, fixture.tools))
+    for await (const event of streamMastraTurn({
+      input,
+      model,
+      signal: controller.signal,
+      tools: fixture.tools,
+    }))
       events.push(event);
 
     expect(fixture.quickAction).toHaveBeenCalledOnce();
@@ -300,11 +337,11 @@ it('ends the model loop once a learning check is ready for the user', async () =
   input.message = 'Help me study photosynthesis';
   const calls: LanguageModelV3CallOptions[] = [];
   const events: ChatEvent[] = [];
-  for await (const event of streamMastraTurn(
+  for await (const event of streamMastraTurn({
     input,
-    researchModel(calls, false, true),
-    new AbortController().signal,
-  ))
+    model: researchModel(calls, false, true),
+    signal: new AbortController().signal,
+  }))
     events.push(event);
   expect(calls).toHaveLength(1);
   expect(events).toContainEqual(
@@ -334,14 +371,14 @@ it.each(['study-partner', 'account-override'])(
       id: personaId,
     };
     const events: ChatEvent[] = [];
-    for await (const event of streamMastraTurn(
+    for await (const event of streamMastraTurn({
       input,
-      silentModel(
+      model: silentModel(
         [],
         'Where does the Calvin cycle occur?\n\nA) Thylakoid membrane\nB) Stroma\nC) Lumen\nD) Outer membrane',
       ),
-      new AbortController().signal,
-    ))
+      signal: new AbortController().signal,
+    }))
       events.push(event);
 
     expect(events).toContainEqual(
@@ -368,14 +405,14 @@ it('turns an introduced, numbered multiple-choice reply into a learning-check ca
   input.conversation.learningChecksEnabled = true;
   input.persona = DEFAULT_PERSONAS.find((persona) => persona.id === 'study-partner')!;
   const events: ChatEvent[] = [];
-  for await (const event of streamMastraTurn(
+  for await (const event of streamMastraTurn({
     input,
-    silentModel(
+    model: silentModel(
       [],
       'Since you said "Sure," I will test your understanding.\n\nWhich stage of the Calvin cycle uses ATP and NADPH to turn 3-PGA into G3P?\n\n1. Carbon Fixation\n2. Reduction\n3. Regeneration',
     ),
-    new AbortController().signal,
-  ))
+    signal: new AbortController().signal,
+  }))
     events.push(event);
 
   expect(events).toContainEqual(
@@ -444,7 +481,11 @@ it('recovers a short-answer card when Gemma calls the quiz tool with empty argum
     },
   };
   const events: ChatEvent[] = [];
-  for await (const event of streamMastraTurn(input, model, new AbortController().signal))
+  for await (const event of streamMastraTurn({
+    input,
+    model,
+    signal: new AbortController().signal,
+  }))
     events.push(event);
 
   expect(events).toContainEqual(
@@ -475,13 +516,18 @@ it('removes web search from the model tools when disabled for the conversation',
   const input = turnInput();
   input.conversation.webSearchEnabled = false;
   const execute = vi.fn();
-  for await (const _ of streamMastraTurn(input, silentModel(calls), new AbortController().signal, {
-    searchWeb: createTool({
-      id: 'search_web',
-      description: 'Search',
-      inputSchema: z.object({ query: z.string() }),
-      execute,
-    }),
+  for await (const _ of streamMastraTurn({
+    input,
+    model: silentModel(calls),
+    signal: new AbortController().signal,
+    tools: {
+      searchWeb: createTool({
+        id: 'search_web',
+        description: 'Search',
+        inputSchema: z.object({ query: z.string() }),
+        execute,
+      }),
+    },
   })) {
   }
   expect(calls[0]?.tools?.some((tool) => tool.name === 'searchWeb')).toBe(false);

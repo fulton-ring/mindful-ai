@@ -88,6 +88,7 @@ function TranscriptMessage({
   return (
     <ChatMessage
       message={message}
+      conversationId={props.conversation?.id}
       index={index}
       messages={model.renderedMessages}
       isLive={isLive}
@@ -211,6 +212,13 @@ export function ChatPanelView({ props, controller, model }: ViewProps) {
       )}
       <ChatComposer
         input={controller.input}
+        attachments={controller.attachments}
+        uploadProgress={controller.progress}
+        onAttach={controller.addAttachments}
+        onRemoveAttachment={(index) => {
+          const file = controller.attachments[index];
+          if (file) controller.removeAttachment(file);
+        }}
         sending={controller.sending}
         savingChatPreference={controller.savingChatPreference}
         webSearch={props.conversation?.webSearchEnabled ?? true}

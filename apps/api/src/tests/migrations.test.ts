@@ -18,12 +18,15 @@ it('initializes the complete application schema with current defaults and constr
     const query = (sql: string) => execFileSync('sqlite3', [db, sql], { encoding: 'utf8' }).trim();
     expect(
       query("SELECT count(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"),
-    ).toBe('20');
+    ).toBe('18');
+    expect(query("SELECT group_concat(name) FROM sqlite_master WHERE type='trigger'")).toBe(
+      'prevent_cancelled_turn_admission,prevent_overlapping_turn_branches',
+    );
     query(`PRAGMA foreign_keys=ON;
       INSERT INTO users VALUES ('owner','subject','now','now',0);
       INSERT INTO notes (id,owner_id,created_at,updated_at) VALUES ('note','owner','now','now');
       INSERT INTO conversations (id,owner_id,note_id,last_user_activity_at,expires_at,created_at) VALUES ('chat','owner','note','now','2999','now');
-      INSERT INTO messages (id,conversation_id,owner_id,role,content,sequence,created_at) VALUES ('message','chat','owner','assistant','Answer',1,'now');`);
+      INSERT INTO messages (id,conversation_id,owner_id,role,content,created_at) VALUES ('message','chat','owner','assistant','Answer','now');`);
     expect(
       query("SELECT learning_checks_enabled||':'||web_search_enabled FROM conversations"),
     ).toBe('1:1');

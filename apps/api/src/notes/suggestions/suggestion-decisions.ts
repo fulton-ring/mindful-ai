@@ -4,7 +4,13 @@ import type { z } from 'zod';
 import { first } from '../../db/client';
 import { HttpError, newId, nowIso } from '../../http';
 import { applySuggestionPatch, loadNoteState } from '../history/history';
-import { loadNoteAdditionQueue, SELECT_SUGGESTION, type SuggestionRow } from './suggestions';
+import {
+  assertReplayMatches,
+  loadOperationRequest,
+  runIdempotentBatch,
+  type SuggestionChange,
+} from '../operations';
+import { loadNoteAdditionQueue, SELECT_SUGGESTION, type SuggestionRow } from './queries';
 
 type DecisionInput = z.infer<typeof noteDecisionSchema>;
 type DecisionContext = {
@@ -16,37 +22,6 @@ type DecisionContext = {
 
 const decisionAction = (input: DecisionInput, suggestionId: string) =>
   `${input.decision}:${suggestionId}`;
-
-const loadDecisionRequest = (
-  db: D1Database,
-  ownerId: string,
-  noteId: string,
-  operationId: string,
-) =>
-  first<{ action: string; base_revision: number }>(
-    db
-      .prepare(
-        'SELECT action,base_revision FROM note_history_requests WHERE owner_id=? AND note_id=? AND operation_id=?',
-      )
-      .bind(ownerId, noteId, operationId),
-  );
-
-async function loadDecisionReplay(
-  db: D1Database,
-  ownerId: string,
-  noteId: string,
-  input: DecisionInput,
-  suggestionId: string,
-) {
-  const replay = await loadDecisionRequest(db, ownerId, noteId, input.operationId);
-  if (!replay) return false;
-  if (
-    replay.action !== decisionAction(input, suggestionId) ||
-    replay.base_revision !== input.baseRevision
-  )
-    throw new HttpError(409, 'Operation ID was already used');
-  return true;
-}
 
 async function loadPendingSuggestion(
   db: D1Database,
@@ -144,7 +119,9 @@ const buildDecisionCreates = (
         after.markdown,
         afterProvenance,
         now,
-        JSON.stringify([{ id: suggestion.id, beforeStatus: 'pending', afterStatus: status }]),
+        JSON.stringify([
+          { id: suggestion.id, beforeStatus: 'pending', afterStatus: status },
+        ] satisfies SuggestionChange[]),
         noteId,
         ownerId,
         state.note.revision,
@@ -183,9 +160,9 @@ const buildDecisionUpdates = (
       ),
     db
       .prepare(
-        "UPDATE note_suggestions SET status=?,decided_at=?,updated_at=? WHERE id=? AND note_id=? AND owner_id=? AND status='pending' AND EXISTS (SELECT 1 FROM note_edits WHERE id=? AND owner_id=?)",
+        "UPDATE note_suggestions SET status=?,updated_at=? WHERE id=? AND note_id=? AND owner_id=? AND status='pending' AND EXISTS (SELECT 1 FROM note_edits WHERE id=? AND owner_id=?)",
       )
-      .bind(status, now, now, suggestion.id, noteId, ownerId, editId, ownerId),
+      .bind(status, now, suggestion.id, noteId, ownerId, editId, ownerId),
     db
       .prepare(
         'UPDATE note_edits SET discarded=1 WHERE note_id=? AND owner_id=? AND undone=1 AND discarded=0 AND id<>? AND EXISTS (SELECT 1 FROM note_edits WHERE id=? AND owner_id=?)',
@@ -212,20 +189,20 @@ async function runDecisionBatch(
   noteId: string,
   context: DecisionContext,
 ) {
-  try {
-    const results = await db.batch(
-      buildDecisionStatements(db, ownerId, noteId, context, newId(), nowIso()),
-    );
-    if (results.slice(0, 4).some((result) => result.meta.changes !== 1))
-      throw new HttpError(409, 'Note or suggestion changed');
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    const replayed = await loadDecisionRequest(db, ownerId, noteId, context.input.operationId);
-    const matches =
-      replayed?.action === decisionAction(context.input, context.suggestion.id) &&
-      replayed.base_revision === context.input.baseRevision;
-    if (!matches) throw new HttpError(409, 'Note or suggestion changed');
-  }
+  await runIdempotentBatch(
+    db,
+    buildDecisionStatements(db, ownerId, noteId, context, newId(), nowIso()),
+    {
+      key: { ownerId, noteId, operationId: context.input.operationId },
+      expected: {
+        action: decisionAction(context.input, context.suggestion.id),
+        baseRevision: context.input.baseRevision,
+      },
+      // The history request, edit, note and suggestion rows; discarding redo may touch none.
+      checked: 4,
+      conflict: 'Note or suggestion changed',
+    },
+  );
 }
 
 export async function decideSuggestion(
@@ -235,8 +212,18 @@ export async function decideSuggestion(
   suggestionId: string,
   input: DecisionInput,
 ) {
-  if (await loadDecisionReplay(db, ownerId, noteId, input, suggestionId))
+  const replay = await loadOperationRequest(db, {
+    ownerId,
+    noteId,
+    operationId: input.operationId,
+  });
+  if (replay) {
+    assertReplayMatches(replay, {
+      action: decisionAction(input, suggestionId),
+      baseRevision: input.baseRevision,
+    });
     return loadNoteState(db, ownerId, noteId);
+  }
   const state = await loadNoteState(db, ownerId, noteId);
   if (input.decision !== 'accept' && state.note.revision !== input.baseRevision)
     throw new HttpError(409, 'Note revision conflict', { currentRevision: state.note.revision });

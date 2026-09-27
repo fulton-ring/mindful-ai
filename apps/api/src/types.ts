@@ -1,7 +1,7 @@
-import type { Usage } from '@walden/contracts';
-
 export type Bindings = {
   DB: D1Database;
+  CHAT_WORKFLOW?: Workflow<{ turnId: string }>;
+  FILES?: R2Bucket;
   AI?: Ai;
   BROWSER?: BrowserRun;
   AI_SEARCH?: AiSearchNamespace;
@@ -9,10 +9,6 @@ export type Bindings = {
   CLERK_SECRET_KEY?: string;
   CLERK_PUBLISHABLE_KEY?: string;
   CLERK_AUTHORIZED_PARTIES?: string;
-  STRIPE_SECRET_KEY?: string;
-  STRIPE_WEBHOOK_SECRET?: string;
-  STRIPE_PRICE_ID?: string;
-  APP_URL?: string;
   AI_PROVIDER?: string;
   AI_MODEL?: string;
   OPENROUTER_API_KEY?: string;
@@ -20,13 +16,13 @@ export type Bindings = {
   R2_BUCKET?: string;
   R2_ACCESS_KEY_ID?: string;
   R2_SECRET_ACCESS_KEY?: string;
+  UPLOAD_LOCAL_FALLBACK?: string;
   CLOUDFLARE_ACCOUNT_ID?: string;
   CLOUDFLARE_API_TOKEN?: string;
   MCP_SERVER_URL?: string;
   MCP_SERVER_TOKEN?: string;
   MCP_ALLOWED_TOOLS?: string;
   MCP_TOOL_EFFECTS?: string;
-  BILLING_ENABLED?: string;
   POSTHOG_API_KEY?: string;
   POSTHOG_HOST?: string;
   POSTHOG_PERSONAL_API_KEY?: string;
@@ -37,8 +33,3 @@ export type Variables = {
   userId: string;
   authSubject: string;
 };
-
-export type StoredUsage = Pick<
-  Usage,
-  'plan' | 'used' | 'limit' | 'resetsAt' | 'inputTokens' | 'outputTokens'
->;

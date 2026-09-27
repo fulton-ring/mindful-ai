@@ -14,8 +14,10 @@ let editor: NotesEditorProps;
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => vi.fn(),
   useBlocker: () => undefined,
-  useRouterState: ({ select }: { select: (state: unknown) => unknown }) =>
-    select({ location: { pathname: '/conversations/thread', search: {} } }),
+  useMatch: ({ from, select }: { from: string; select: (match: unknown) => unknown }) =>
+    from === '/conversations/$conversationId'
+      ? select({ params: { conversationId: 'thread' }, search: {} })
+      : undefined,
 }));
 vi.mock('../features/chat/ChatPanel', () => ({
   ChatPanel: (props: ComponentProps<typeof ChatPanel>) => {
@@ -40,7 +42,10 @@ vi.mock('@radix-ui/react-popover', () => ({
   Portal: ({ children }: { children: ReactNode }) => <>{children}</>,
   Content: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
-vi.mock('../lib/telemetry', () => ({ track: vi.fn(), productSessionId: () => 'session' }));
+vi.mock('../lib/telemetry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/telemetry')>()),
+  track: vi.fn(),
+}));
 
 afterEach(() => {
   cleanup();
@@ -131,7 +136,7 @@ async function setup(linked = true, markdown = '') {
   const previousChat = chat;
   const view = render(
     <QueryClientProvider client={client}>
-      <App config={{ authConfigured: true, billingConfigured: false, modelConfigured: true }} />
+      <App />
     </QueryClientProvider>,
   );
   await waitFor(() => expect(chat).not.toBe(previousChat));

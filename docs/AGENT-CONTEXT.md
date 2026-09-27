@@ -27,7 +27,7 @@ Sources: [TokenLimiter](https://mastra.ai/reference/processors/token-limiter-pro
 
 ## Filesystem
 
-The primary agent can attach native `Workspace` + `S3Filesystem` backed by Cloudflare R2. Configuration requires R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY. Access is scoped to an encoded owner/thread prefix and read-only; approved note writes continue through the review/accept flow. With no R2 config, no filesystem tools are advertised; partial config fails explicitly. R2 credentials and a bucket have not been provisioned or tested. See runbooks/credentials.md.
+The primary agent attaches a native Mastra `Workspace` with a read-only R2 filesystem view of the authenticated thread's uploads. Native file tools can list, stat, read, and grep text attachments. The `extractDocument` tool uses Workers AI `toMarkdown` for PDF, DOCX, and XLSX, then stores a searchable Markdown sidecar. Browser uploads use short-lived presigned R2 staging URLs and an authenticated completion step; local development has an explicit multipart fallback. Approved note writes still go through the review/accept flow. Production R2 provisioning is documented in runbooks/credentials.md.
 
 ## Browser and source retrieval
 

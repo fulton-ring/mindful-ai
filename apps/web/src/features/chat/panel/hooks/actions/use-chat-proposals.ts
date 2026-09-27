@@ -1,7 +1,13 @@
-import type { EditProposal, NoteProposalEvent, NoteState } from '@walden/contracts';
+import type {
+  EditProposal,
+  MessageFollowupRequest,
+  NoteProposalEvent,
+  NoteState,
+} from '@walden/contracts';
 
-import { api, type MessageFollowupRequest, streamNoteProposal } from '../../../../../lib/api';
+import { api, streamNoteProposal } from '../../../../../lib/api';
 import { id } from '../../../../../lib/ids';
+import { failureDetails, track } from '../../../../../lib/telemetry';
 import type { ChatPanelProps } from '../../chat-panel-types';
 import type { ChatDisplayState, ProposalNotice } from '../state/use-chat-display-state';
 import type { ChatRuntimeState } from '../state/use-chat-runtime-state';
@@ -112,6 +118,11 @@ function handleProposalDone(
   event: Extract<NoteProposalEvent, { type: 'done' }>,
 ) {
   run.settled = true;
+  if (run.sourceId.startsWith('proposal-manual'))
+    track('note_suggestion_generated', {
+      conversation_id: run.conversationId,
+      proposal_count: event.proposals?.length ?? (event.proposal ? 1 : 0),
+    });
   if (event.proposals && args.props.onGhostBatch)
     args.props.onGhostBatch(event.proposals, run.sourceId);
   else args.props.onGhost(event.proposal, false, run.sourceId);
@@ -123,8 +134,20 @@ function handleProposalDone(
     });
 }
 
-function handleProposalErrorEvent(args: ProposalArgs, run: ProposalRun, message: string) {
+function handleProposalErrorEvent(
+  args: ProposalArgs,
+  run: ProposalRun,
+  message: string,
+  details: { failure_code?: string; http_status?: number; stage?: string } = {},
+) {
   run.settled = true;
+  if (run.sourceId.startsWith('proposal-manual'))
+    track('note_suggestion_failed', {
+      conversation_id: run.conversationId,
+      failure_code: details.failure_code ?? 'proposal_error',
+      http_status: details.http_status,
+      stage: details.stage ?? 'generation',
+    });
   args.props.onGhost(null, false, run.sourceId);
   setProposalNotice(args.display, run.messageId, {
     message,
@@ -214,10 +237,15 @@ function handleProposalTransportError(args: ProposalArgs, run: ProposalRun, erro
     error instanceof Error
       ? error.message
       : 'The note suggestion was interrupted. Please try again.',
+    { ...failureDetails(error), stage: 'stream' },
   );
 }
 
 async function prepareProposal(args: ProposalArgs, messageId: string, capture?: { text: string }) {
+  track('note_suggestion_requested', {
+    conversation_id: args.runtime.activeConversationId.current ?? undefined,
+    action: capture ? 'capture' : 'add_to_note',
+  });
   const conversationId = args.runtime.activeConversationId.current;
   if (
     !conversationId ||
@@ -270,6 +298,10 @@ function proposalPreparationIsValid(
 }
 
 function reportBlockedProposal(args: ProposalArgs, messageId: string, capture?: { text: string }) {
+  track('action_blocked', {
+    action: capture ? 'capture_to_note' : 'add_to_note',
+    failure_code: 'note_save_pending',
+  });
   setProposalNotice(args.display, messageId, {
     message: 'Your note still has unsaved changes. Resolve the save, then try again.',
     retryable: true,

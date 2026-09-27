@@ -1,12 +1,10 @@
 import { useBlocker } from '@tanstack/react-router';
 import type { ProvenanceSpan } from '@walden/contracts';
-import { api } from '../../lib/api';
-import { productSessionId } from '../../lib/telemetry';
 import type { ConversationContext } from '../data/conversation-context';
 import {
-  type CachedNoteDraft,
   shouldBypassLazyConversationBlock,
   waitForPendingCapture,
+  writeCachedDraft,
 } from '../lifecycle/workspace-helpers';
 
 type DraftContext = ConversationContext & {
@@ -33,12 +31,7 @@ async function flushNoteDraft(context: DraftContext, persistUnsavedDraft: () => 
   return okay ? context.draftRef.current.revision : false;
 }
 
-function updateDraft(
-  context: DraftContext,
-  markdown: string,
-  provenance: ProvenanceSpan[],
-  userChange = true,
-) {
+function updateDraft(context: DraftContext, markdown: string, provenance: ProvenanceSpan[]) {
   if (!context.draftRef.current) return;
   const previous = context.draftRef.current;
   const conflicted = context.saveStateRef.current === 'conflict';
@@ -46,36 +39,7 @@ function updateDraft(
   context.draftRef.current = next;
   context.setDraft(next);
   context.setSaveState(conflicted ? 'conflict' : 'dirty');
-  if (!context.sessionStarted.current) {
-    context.sessionStarted.current = true;
-    void api
-      .event({
-        kind: 'session_started',
-        sessionId: productSessionId(),
-        metadata: { startsFromExisting: previous.markdown.length > 0 },
-      })
-      .catch(() => undefined);
-  }
-  if (userChange && !context.ownWordsRecorded.current) {
-    context.ownWordsRecorded.current = true;
-    void api
-      .event({
-        kind: 'own_words_saved',
-        sessionId: productSessionId(),
-        metadata: { noteId: next.id },
-      })
-      .catch(() => undefined);
-  }
-  sessionStorage.setItem(
-    `walden:draft:${next.id}`,
-    JSON.stringify({
-      version: 1,
-      baseRevision: next.revision,
-      markdown,
-      provenance,
-      dismissedSuggestionIds: [...context.dismissSuggestionsOnSave.current],
-    } satisfies CachedNoteDraft),
-  );
+  writeCachedDraft(next, context.dismissSuggestionsOnSave.current);
   if (context.timer.current) window.clearTimeout(context.timer.current);
   if (!conflicted) context.timer.current = window.setTimeout(() => void context.doSave(), 700);
 }
@@ -111,8 +75,8 @@ function persistUnsavedDraft(
 }
 
 export function useDraftActions(context: DraftContext) {
-  const update = (markdown: string, provenance: ProvenanceSpan[], userChange = true) =>
-    updateDraft(context, markdown, provenance, userChange);
+  const update = (markdown: string, provenance: ProvenanceSpan[]) =>
+    updateDraft(context, markdown, provenance);
   const persist = (dependencies: DraftDependencies) =>
     persistUnsavedDraft(context, dependencies.captureText, (markdown, provenance) =>
       update(markdown, provenance),

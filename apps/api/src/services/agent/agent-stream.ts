@@ -1,16 +1,17 @@
 import { Workspace } from '@mastra/core/workspace';
 import type { ChatEvent } from '@walden/contracts';
-import type {
-  AgentRuntime,
-  AgentTraceContext,
-  streamAnnotationResponse,
-  streamMastraTurn,
-} from '../../agent';
-import { createR2Filesystem } from '../../agent/filesystem';
+import { type AgentCheckpoints, checkpointModel } from '../../agent/checkpoints';
+import { createDocumentTools } from '../../agent/document-tool';
+import { GemmaToolLeakDecoder } from '../../agent/learning-checks';
+import { streamMastraTurn } from '../../agent/mastra-turn';
 import { type MemoryLifecycleEvent, prepareAgentMemory } from '../../agent/memory/memory';
+import { R2WorkspaceFilesystem } from '../../agent/r2-workspace';
+import { agentTrace, streamAnnotationResponse } from '../../agent/stream-events';
+import { loadAttachments } from '../../chat/attachments/attachments';
+import { isConversationLive } from '../../chat/turns/durable-store';
 import { type ApiTelemetry, createApiTelemetry } from '../../observability';
 import { captureConversation, contentPreference } from '../../privacy/content-telemetry';
-import { streamWithEarlyAnnotations } from '../annotations/early-annotations';
+import { streamWithDurableAnnotations } from '../annotations/durable-annotations';
 import { createMcpService, type McpTools } from '../mcp';
 import { createResearchTools, publicUrl } from '../research/research';
 import { createWebSearchTools } from '../research/web-search';
@@ -19,23 +20,14 @@ import { streamMemoryPreparation } from './agent-memory-stream';
 
 type AgentModel = Parameters<typeof prepareAgentMemory>[3]['model'];
 
-export type TurnStreamContext = {
-  controller: AbortController;
-  cleanup: () => void;
-};
-
-type StreamDependencies = {
-  streamMastraTurn: typeof streamMastraTurn;
-  streamAnnotationResponse: typeof streamAnnotationResponse;
-};
-
-type TurnStreamOptions = StreamDependencies & {
+type TurnStreamOptions = {
   env: ServiceEnv;
   input: AgentTurnInput;
   modelName: string;
   model: AgentModel;
-  context: TurnStreamContext;
-  background?: (task: Promise<void>) => void;
+  /** Aborts on cancellation or the turn deadline. */
+  signal: AbortSignal;
+  checkpoints: AgentCheckpoints;
 };
 
 function collectAllowedUrls(input: AgentTurnInput): Set<string> {
@@ -56,6 +48,42 @@ function collectAllowedUrls(input: AgentTurnInput): Set<string> {
   return allowedUrls;
 }
 
+function restoreSearchUrls(allowedUrls: Set<string>) {
+  return (name: string, result: unknown) => {
+    if (name !== 'searchWeb' && name !== 'searchSources') return;
+    if (
+      !result ||
+      typeof result !== 'object' ||
+      !('results' in result) ||
+      !Array.isArray(result.results)
+    )
+      return;
+    for (const source of result.results) {
+      if (!source || typeof source.url !== 'string') continue;
+      try {
+        allowedUrls.add(publicUrl(source.url).toString());
+      } catch {
+        /* Invalid URL. */
+      }
+    }
+  };
+}
+
+function modelProgress(checkpoints: AgentCheckpoints) {
+  if (!checkpoints.publish) return undefined;
+  const previews = new Map<string, { text: string; reasoning: string }>();
+  return async (step: string, text: string, reasoning: string, complete: boolean) => {
+    const decoder = new GemmaToolLeakDecoder();
+    const visible = decoder.push(text).text + (complete ? decoder.finish() : '');
+    previews.set(step, { text: visible, reasoning });
+    await checkpoints.publish!({
+      type: 'text-snapshot',
+      text: [...previews.values()].map((value) => value.text).join(''),
+      reasoning: [...previews.values()].map((value) => value.reasoning).join(''),
+    });
+  };
+}
+
 async function* prepareTurnMemory(
   env: ServiceEnv,
   input: AgentTurnInput,
@@ -70,15 +98,7 @@ async function* prepareTurnMemory(
         model,
         signal,
         onLifecycle,
-        isActive: async () =>
-          Boolean(
-            await env
-              .DB!.prepare(
-                "SELECT id FROM conversations WHERE id=? AND owner_id=? AND status='active' AND expires_at>?",
-              )
-              .bind(input.conversation.id, ownerId, new Date().toISOString())
-              .first(),
-          ),
+        isActive: () => isConversationLive(env.DB!, ownerId, input.conversation.id),
       }),
   );
   let next = await preparation.next();
@@ -90,19 +110,31 @@ async function* prepareTurnMemory(
 }
 
 export function createTurnWorkspace(env: ServiceEnv, input: AgentTurnInput): Workspace | undefined {
-  if (!input.ownerId) return undefined;
-  const filesystem = createR2Filesystem({
-    ownerId: input.ownerId,
-    threadId: input.conversation.id,
-    config: {
-      accountId: env.R2_ACCOUNT_ID,
-      bucket: env.R2_BUCKET,
-      accessKeyId: env.R2_ACCESS_KEY_ID,
-      secretAccessKey: env.R2_SECRET_ACCESS_KEY,
-    },
+  if (!input.ownerId || !env.FILES) return undefined;
+  return new Workspace({
+    filesystem: new R2WorkspaceFilesystem(env.FILES, input.ownerId, input.conversation.id),
   });
-  if (!filesystem) return undefined;
-  return new Workspace({ filesystem });
+}
+
+export async function includeRecentImage(
+  env: ServiceEnv,
+  input: AgentTurnInput,
+): Promise<AgentTurnInput> {
+  if (!env.FILES || !input.ownerId || input.attachments?.some(({ bytes }) => bytes)) return input;
+  const recentImage = input.conversation.messages
+    .flatMap((message) => message.attachments ?? [])
+    .reverse()
+    .find(({ mimeType }) => mimeType.startsWith('image/'));
+  if (!recentImage) return input;
+  try {
+    const [image] = await loadAttachments(env.FILES, input.ownerId, input.conversation.id, [
+      recentImage.id,
+    ]);
+    return image ? { ...input, attachments: [...(input.attachments ?? []), image] } : input;
+  } catch {
+    // Expired or removed files should not prevent a normal text turn.
+    return input;
+  }
 }
 
 async function createPrimaryStream(
@@ -111,20 +143,23 @@ async function createPrimaryStream(
   workspace: Workspace | undefined,
   telemetry: ApiTelemetry | null,
 ): Promise<AsyncIterable<ChatEvent>> {
-  const { env, input, model, modelName, context } = options;
+  const { env, input, model, modelName, signal, checkpoints } = options;
   const mcpTools = await createMcpService(env).tools();
   const allowedUrls = collectAllowedUrls(input);
   const tools: McpTools = {
     ...mcpTools,
-    ...createResearchTools(env, input.ownerId, context.controller.signal, allowedUrls),
-    ...createWebSearchTools(env, context.controller.signal, allowedUrls),
+    ...createDocumentTools(env, input),
+    ...createResearchTools(env, input.ownerId, signal, allowedUrls),
+    ...createWebSearchTools(env, signal, allowedUrls),
   };
-  const trace: AgentTraceContext | undefined =
-    telemetry && input.telemetryUserId
-      ? { telemetry, userId: input.telemetryUserId, model: modelName }
-      : undefined;
-  const runtime: AgentRuntime = { memory, workspace };
-  return options.streamMastraTurn(input, model, context.controller.signal, tools, trace, runtime);
+  return streamMastraTurn({
+    input: await includeRecentImage(env, input),
+    model: checkpointModel(model, checkpoints, 'chat', undefined, modelProgress(checkpoints)),
+    signal,
+    tools,
+    trace: agentTrace(telemetry, input.telemetryUserId, modelName),
+    runtime: { memory, workspace, checkpoints, onToolResult: restoreSearchUrls(allowedUrls) },
+  });
 }
 
 function createAnnotatedStream(
@@ -132,24 +167,21 @@ function createAnnotatedStream(
   stream: AsyncIterable<ChatEvent>,
   telemetry: ApiTelemetry | null,
 ): AsyncIterable<ChatEvent> {
-  const { input, model, modelName, context } = options;
-  const trace: AgentTraceContext | undefined =
-    telemetry && input.telemetryUserId
-      ? { telemetry, userId: input.telemetryUserId, model: modelName }
-      : undefined;
-  return streamWithEarlyAnnotations(
+  const { input, model, modelName, signal, checkpoints } = options;
+  const trace = agentTrace(telemetry, input.telemetryUserId, modelName);
+  const annotationModel = checkpointModel(model, checkpoints, 'annotations', { retries: 0 });
+  return streamWithDurableAnnotations(
     stream,
-    async (text, annotationSignal) =>
-      options.streamAnnotationResponse(
+    (text, annotationSignal) =>
+      streamAnnotationResponse({
         text,
-        input.turnId,
-        model,
-        annotationSignal,
-        input.conversation.id,
+        turnId: input.turnId,
+        conversationId: input.conversation.id,
+        model: annotationModel,
+        signal: annotationSignal,
         trace,
-        true,
-      ),
-    context.controller.signal,
+      }),
+    signal,
   );
 }
 
@@ -173,9 +205,9 @@ async function finishTurnStream(
   startedAt: number,
   completed: boolean,
 ): Promise<void> {
-  const { env, input, background, context } = options;
+  const { env, input } = options;
   if (preference?.enabled && input.ownerId && input.telemetryUserId) {
-    const delivery = captureConversation(env, {
+    await captureConversation(env, {
       ownerId: input.ownerId,
       userId: input.telemetryUserId,
       turnId: input.turnId,
@@ -186,17 +218,11 @@ async function finishTurnStream(
       preferenceVersion: preference.revision,
       incomplete: !completed,
     });
-    if (background) background(delivery);
-    else await delivery;
   }
-  context.cleanup();
-  if (!telemetry) return;
-  const cleanup = telemetry.flush();
-  if (background) background(cleanup);
-  else await cleanup;
+  await telemetry?.flush();
 }
 
-async function* runTurnStream(options: TurnStreamOptions): AsyncGenerator<ChatEvent> {
+export async function* streamTurnEvents(options: TurnStreamOptions): AsyncGenerator<ChatEvent> {
   const { env, input, model } = options;
   const telemetry = input.telemetryUserId ? createApiTelemetry(env) : null;
   const startedAt = Date.now();
@@ -204,10 +230,10 @@ async function* runTurnStream(options: TurnStreamOptions): AsyncGenerator<ChatEv
   let visibleResponse = '';
   let completed = false;
   try {
-    const memory = yield* prepareTurnMemory(env, input, model, options.context.controller.signal);
+    const memory = yield* prepareTurnMemory(env, input, model, options.signal);
     const workspace = createTurnWorkspace(env, input);
     const stream = await createPrimaryStream(options, memory, workspace, telemetry);
-    options.context.controller.signal.throwIfAborted();
+    options.signal.throwIfAborted();
     const annotatedStream = createAnnotatedStream(options, stream, telemetry);
     for await (const event of annotatedStream) {
       visibleResponse = appendVisibleResponse(visibleResponse, event);
@@ -217,8 +243,4 @@ async function* runTurnStream(options: TurnStreamOptions): AsyncGenerator<ChatEv
   } finally {
     await finishTurnStream(options, preference, telemetry, visibleResponse, startedAt, completed);
   }
-}
-
-export function streamTurnEvents(options: TurnStreamOptions): AsyncIterable<ChatEvent> {
-  return runTurnStream(options);
 }

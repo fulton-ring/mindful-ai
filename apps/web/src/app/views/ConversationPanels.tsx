@@ -1,58 +1,56 @@
 import { Download, Redo2, Undo2, X } from 'lucide-react';
-import { type ComponentProps, lazy, Suspense } from 'react';
+import { lazy, Suspense } from 'react';
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from '../../components/ui/resizable';
 import { ChatPanel } from '../../features/chat/ChatPanel';
+import { storageKeys } from '../../lib/storage-keys';
 import { track } from '../../lib/telemetry';
-import type { WorkspaceData } from '../data/app-types';
-import type { CachedNoteDraft } from '../lifecycle/workspace-helpers';
+import { useChatBridge, useNoteDocument, useWorkspaceShell } from '../data/workspace-context';
 
 const NotesEditor = lazy(() =>
   import('../../features/notes/editor/NotesEditor').then(({ NotesEditor }) => ({
     default: NotesEditor,
   })),
 );
-const NO_PREVIEWS: ReadonlySet<string> = new Set();
-type EditorDismiss = NonNullable<ComponentProps<typeof NotesEditor>['onDismiss']>;
 
-export function ConversationPanels({ data }: { data: WorkspaceData }) {
-  const { desktop, noteOnly, noteOpen } = data;
+export function ConversationPanels() {
+  const { desktop, noteOnly, noteOpen } = useWorkspaceShell();
   return (
     <ResizablePanelGroup
       className={`conversation-panels ${noteOnly ? 'note-only' : ''}`}
       orientation="horizontal"
       disabled={!desktop}
     >
-      <ChatPanelView data={data} />
+      <ChatPanelView />
       <ResizableHandle
         aria-label="Resize note"
         disabled={!desktop || !noteOpen || noteOnly}
         className={noteOpen && !noteOnly ? '' : 'hidden'}
       />
-      <NotePanelView data={data} />
+      <NotePanelView />
     </ResizablePanelGroup>
   );
 }
 
-function ChatPanelView({ data }: { data: WorkspaceData }) {
+function ChatPanelView() {
   return (
     <ResizablePanel id="chat" className="chat-resizable-panel" minSize="30%">
-      <ChatContent data={data} />
+      <ChatContent />
     </ResizablePanel>
   );
 }
 
-function ChatContent({ data }: { data: WorkspaceData }) {
-  const { activeConversationId, conversationQuery } = data;
-  return activeConversationId && conversationQuery.isPending ? (
+function ChatContent() {
+  const { activeConversationId, conversationPending, conversationLoadError } = useWorkspaceShell();
+  return activeConversationId && conversationPending ? (
     <ChatLoading />
-  ) : activeConversationId && conversationQuery.isLoadingError ? (
-    <ChatError data={data} />
+  ) : activeConversationId && conversationLoadError ? (
+    <ChatError />
   ) : (
-    <ChatReady data={data} />
+    <ChatReady />
   );
 }
 
@@ -64,19 +62,20 @@ function ChatLoading() {
   );
 }
 
-function ChatError({ data }: { data: WorkspaceData }) {
-  const { activeBranchId, activeConversationId, conversationQuery, navigate } = data;
+function ChatError() {
+  const { activeBranchId, activeConversationId, conversationError, retryConversation, navigate } =
+    useWorkspaceShell();
   if (!activeConversationId) return null;
   return (
     <section className="chat-panel empty-state" aria-label="Thread" role="alert">
       <h2>Thread could not open</h2>
       <p>
-        {conversationQuery.error instanceof Error
-          ? conversationQuery.error.message
+        {conversationError instanceof Error
+          ? conversationError.message
           : 'This thread may have expired or been deleted.'}
       </p>
       <div className="button-row">
-        <button onClick={() => void conversationQuery.refetch()}>Try again</button>
+        <button onClick={() => void retryConversation()}>Try again</button>
         {activeBranchId && (
           <button
             onClick={() =>
@@ -98,30 +97,21 @@ function ChatError({ data }: { data: WorkspaceData }) {
   );
 }
 
-function ChatReady({ data }: { data: WorkspaceData }) {
+function ChatReady() {
   const {
     navigate,
     activeConversationId,
     noteOpen,
     desktop,
     mobilePane,
-    draftRef,
-    setProposal,
-    setProposalRequest,
-    cancelProposal,
     conversation,
     noteOnly,
-    setConversation,
-    flush,
-    ensureConversation,
-    applyCancelledNoteState,
-    previewProposal,
-    completeProposals,
     showNote,
     personas,
     personaId,
     setPersonaId,
-  } = data;
+  } = useWorkspaceShell();
+  const bridge = useChatBridge();
   return (
     <ChatPanel
       visible={!noteOnly && (desktop || mobilePane === 'chat')}
@@ -143,40 +133,21 @@ function ChatReady({ data }: { data: WorkspaceData }) {
           search: { branch },
         });
       }}
-      onEnsureConversation={ensureConversation}
-      onAdvance={() => advanceConversation(data)}
-      onConversation={setConversation}
-      onFlush={flush}
-      onProposalStart={(sourceId, capturedText) => {
-        setProposal(null);
-        setProposalRequest({
-          sourceId,
-          noteId: draftRef.current?.id ?? 'unsaved-note',
-          ...(capturedText ? { capturedText } : {}),
-          phase: 'streaming',
-          previewIds: NO_PREVIEWS,
-        });
-      }}
-      onProposalCancelable={(cancel) => {
-        cancelProposal.current = cancel;
-      }}
-      onProposalCancelled={applyCancelledNoteState}
-      onGhost={previewProposal}
-      onGhostBatch={completeProposals}
+      onEnsureConversation={bridge.ensureConversation}
+      onAdvance={bridge.refreshConversationNote}
+      onConversation={bridge.setConversation}
+      onFlush={bridge.flush}
+      onProposalStart={bridge.startProposalRequest}
+      onProposalCancelable={bridge.setProposalCanceler}
+      onProposalCancelled={bridge.applyCancelledNoteState}
+      onGhost={bridge.previewProposal}
+      onGhostBatch={bridge.completeProposals}
     />
   );
 }
 
-function advanceConversation(data: WorkspaceData) {
-  if (data.conversation?.noteId) {
-    void data.queryClient.invalidateQueries({
-      queryKey: ['note-state', data.conversation.noteId],
-    });
-  }
-}
-
-function NotePanelView({ data }: { data: WorkspaceData }) {
-  const { noteOpen, noteOnly, desktop, notePanelRef, noteWidth, closeNote } = data;
+function NotePanelView() {
+  const { noteOpen, noteOnly, desktop, notePanelRef, noteWidth, closeNote } = useWorkspaceShell();
   return (
     <ResizablePanel
       id="note"
@@ -191,26 +162,26 @@ function NotePanelView({ data }: { data: WorkspaceData }) {
         if (desktop && noteOpen && asPercentage === 0) closeNote();
         if (desktop && noteOpen && asPercentage >= 25) {
           noteWidth.current = asPercentage;
-          localStorage.setItem('walden:note-width', String(asPercentage));
+          localStorage.setItem(storageKeys.noteWidth, String(asPercentage));
         }
       }}
     >
-      <NoteSurface data={data} />
+      <NoteSurface />
     </ResizablePanel>
   );
 }
 
-function NoteSurface({ data }: { data: WorkspaceData }) {
+function NoteSurface() {
   return (
     <main className="note-surface">
-      <NoteNotice data={data} />
-      <NoteBody data={data} />
+      <NoteNotice />
+      <NoteBody />
     </main>
   );
 }
 
-function NoteNotice({ data }: { data: WorkspaceData }) {
-  const { notice, setNotice } = data;
+function NoteNotice() {
+  const { notice, setNotice } = useNoteDocument();
   return (
     <>
       {notice && (
@@ -223,21 +194,16 @@ function NoteNotice({ data }: { data: WorkspaceData }) {
   );
 }
 
-function NoteBody({ data }: { data: WorkspaceData }) {
-  const { activeDocumentNoteId, noteStateQuery } = data;
+function NoteBody() {
+  const { activeDocumentNoteId, notePending, noteLoadError } = useNoteDocument();
   return (
-    <>
-      {activeDocumentNoteId && (noteStateQuery.isPending || noteStateQuery.isLoadingError) ? (
-        <NoteLoading data={data} />
-      ) : (
-        <NoteEditor data={data} />
-      )}
-    </>
+    <>{activeDocumentNoteId && (notePending || noteLoadError) ? <NoteLoading /> : <NoteEditor />}</>
   );
 }
 
-function NoteLoading({ data }: { data: WorkspaceData }) {
-  const { draft, conversation, noteOnly, noteStateQuery, closeNote } = data;
+function NoteLoading() {
+  const { conversation, noteOnly, closeNote } = useWorkspaceShell();
+  const { draft, notePending, noteError, retryNote } = useNoteDocument();
   return (
     <>
       <div className="note-toolbar">
@@ -253,7 +219,7 @@ function NoteLoading({ data }: { data: WorkspaceData }) {
           </button>
         )}
       </div>
-      {noteStateQuery.isPending ? (
+      {notePending ? (
         // A brief fetch, not an empty note. The full empty state -
         // large glyph and heading - reads as a destination and is
         // jarring for something that resolves in a moment.
@@ -263,35 +229,36 @@ function NoteLoading({ data }: { data: WorkspaceData }) {
       ) : (
         <Empty
           title="Note could not open"
-          body={noteStateQuery.error?.message ?? ''}
+          body={noteError?.message ?? ''}
           action="Try again"
-          onAction={() => noteStateQuery.refetch()}
+          onAction={() => void retryNote()}
         />
       )}
     </>
   );
 }
 
-function NoteEditor({ data }: { data: WorkspaceData }) {
+function NoteEditor() {
   return (
     <>
-      <NoteToolbar data={data} />
-      <EditorWrap data={data} />
+      <NoteToolbar />
+      <EditorWrap />
     </>
   );
 }
 
-function NoteToolbar({ data }: { data: WorkspaceData }) {
+function NoteToolbar() {
   return (
     <div className="note-toolbar">
-      <NoteTitle data={data} />
-      <NoteToolbarActions data={data} />
+      <NoteTitle />
+      <NoteToolbarActions />
     </div>
   );
 }
 
-function NoteTitle({ data }: { data: WorkspaceData }) {
-  const { activeNoteId, draft, conversation, renameConversation, renameStandaloneNote } = data;
+function NoteTitle() {
+  const { activeNoteId, conversation, renameConversation } = useWorkspaceShell();
+  const { draft, renameStandaloneNote } = useNoteDocument();
   if (conversation) {
     return (
       <input
@@ -327,20 +294,9 @@ function NoteTitle({ data }: { data: WorkspaceData }) {
   return <span className="note-title">New thread</span>;
 }
 
-function NoteToolbarActions({ data }: { data: WorkspaceData }) {
-  const {
-    draft,
-    draftRef,
-    unsavedDraft,
-    saveState,
-    proposals,
-    noteOnly,
-    doSave,
-    persistUnsavedDraft,
-    startChatFromNote,
-    closeNote,
-    exportNote,
-  } = data;
+function NoteToolbarActions() {
+  const { noteOnly, startChatFromNote, closeNote } = useWorkspaceShell();
+  const { draft, unsavedDraft, saveState, proposals, retrySave, exportNote } = useNoteDocument();
   const saveLabel =
     proposals.length && !['dirty', 'saving', 'error', 'conflict'].includes(saveState)
       ? ''
@@ -363,15 +319,12 @@ function NoteToolbarActions({ data }: { data: WorkspaceData }) {
         {saveLabel}
       </span>
       {saveState === 'error' && (
-        <button
-          className="text-button"
-          onClick={() => void (draftRef.current ? doSave() : persistUnsavedDraft())}
-        >
+        <button className="text-button" onClick={() => void retrySave()}>
           Retry
         </button>
       )}
-      <HistoryButton direction="undo" data={data} />
-      <HistoryButton direction="redo" data={data} />
+      <HistoryButton direction="undo" />
+      <HistoryButton direction="redo" />
       {(draft || unsavedDraft.markdown) && (
         <button
           className="icon-button"
@@ -396,11 +349,10 @@ function NoteToolbarActions({ data }: { data: WorkspaceData }) {
   );
 }
 
-function HistoryButton({ direction, data }: { direction: 'undo' | 'redo'; data: WorkspaceData }) {
-  const { draft, historyPending, noteStateQuery, moveNoteHistory } = data;
+function HistoryButton({ direction }: { direction: 'undo' | 'redo' }) {
+  const { draft, historyPending, canUndo, canRedo, moveNoteHistory } = useNoteDocument();
   if (!draft) return null;
-  const canMove =
-    direction === 'undo' ? noteStateQuery.data?.canUndo : noteStateQuery.data?.canRedo;
+  const canMove = direction === 'undo' ? canUndo : canRedo;
   return (
     <button
       className="icon-button"
@@ -413,36 +365,34 @@ function HistoryButton({ direction, data }: { direction: 'undo' | 'redo'; data: 
   );
 }
 
-function EditorWrap({ data }: { data: WorkspaceData }) {
+function EditorWrap() {
   return (
     <div className="editor-wrap">
-      <EditorCanvas data={data} />
-      <ConflictCard data={data} />
+      <EditorCanvas />
+      <ConflictCard />
     </div>
   );
 }
 
-function EditorCanvas({ data }: { data: WorkspaceData }) {
+function EditorCanvas() {
+  const { activeConversationId, noteOpen } = useWorkspaceShell();
   const {
-    activeConversationId,
-    noteOpen,
     draft,
-    draftRef,
     unsavedDraft,
     proposal,
     proposals,
-    queueOrderRef,
+    additionQueueRef,
     proposalStreaming,
     streamingProposalIds,
     proposalLoading,
     decisionPending,
     captureRevealRange,
     historyPending,
-    updateDraft,
-    updateUnsavedDraft,
+    changeNote,
     acceptProposal,
+    dismissSuggestion,
     moveNoteHistory,
-  } = data;
+  } = useNoteDocument();
   if (!noteOpen && !draft && !unsavedDraft.markdown && proposals.length === 0) return null;
   return (
     <Suspense fallback={<p role="status">Opening editor…</p>}>
@@ -461,62 +411,23 @@ function EditorCanvas({ data }: { data: WorkspaceData }) {
           }
         }
         proposal={proposal}
-        additionQueue={queueOrderRef.current}
+        additionQueue={additionQueueRef.current}
         proposals={proposals}
         proposalStreaming={proposalStreaming}
         streamingProposalIds={streamingProposalIds}
-        onChange={(markdown, provenance) =>
-          draftRef.current
-            ? updateDraft(markdown, provenance)
-            : updateUnsavedDraft(markdown, provenance)
-        }
+        onChange={changeNote}
         onAccept={acceptProposal}
         onUndo={() => void moveNoteHistory('undo')}
         onRedo={() => void moveNoteHistory('redo')}
-        onDismiss={(reason, candidate) => handleEditorDismiss(data, reason, candidate)}
+        onDismiss={dismissSuggestion}
         disabled={decisionPending || historyPending || proposalLoading}
       />
     </Suspense>
   );
 }
 
-function handleEditorDismiss(data: WorkspaceData, ...args: Parameters<EditorDismiss>) {
-  const [reason, candidate] = args;
-  const target = candidate ?? data.proposalRef.current;
-  if (!target) return;
-  const isActive = data.proposalRef.current?.id === target.id;
-  if (data.proposalRequestRef.current?.previewIds.has(target.id)) {
-    data.cancelProposalRequest();
-    return;
-  }
-  track('note_suggestion_rejected', { conversation_id: data.conversation?.id });
-  if (reason === 'typing') {
-    data.dismissedSuggestionIds.current.add(target.id);
-    data.setProposals((items) => items.filter((item) => item.id !== target.id));
-    if (isActive) data.setProposal(null);
-    data.dismissSuggestionsOnSave.current.add(target.id);
-    const current = data.draftRef.current;
-    if (current) {
-      sessionStorage.setItem(
-        `walden:draft:${current.id}`,
-        JSON.stringify({
-          version: 1,
-          baseRevision: current.revision,
-          markdown: current.markdown,
-          provenance: current.provenance,
-          dismissedSuggestionIds: [...data.dismissSuggestionsOnSave.current],
-        } satisfies CachedNoteDraft),
-      );
-    }
-    return;
-  }
-  void data.decideSuggestion(target, 'reject').then((updated) => {
-    if (updated && isActive) data.setProposal(null);
-  });
-}
-
-function ConflictCard({ data }: { data: WorkspaceData }) {
-  const { saveState, keepLocalDraft, loadLatestNote } = data;
+function ConflictCard() {
+  const { saveState, keepLocalDraft, loadLatestNote } = useNoteDocument();
   if (saveState !== 'conflict') return null;
   return (
     <div className="conflict-card" role="alert">

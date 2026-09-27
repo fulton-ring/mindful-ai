@@ -3,7 +3,6 @@
     flex-shrink: 0;
   }
   .primary,
-  .open-chat,
   .send-button {
     background: var(--ink);
     color: var(--card);
@@ -18,9 +17,7 @@
     background: transparent;
   }
   .icon-button svg,
-  .new-note svg,
   .note-sidebar footer svg,
-  .open-chat svg,
   .popover svg {
     width: 17px;
     height: 17px;

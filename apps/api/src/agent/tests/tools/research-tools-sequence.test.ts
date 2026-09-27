@@ -1,7 +1,7 @@
 import type { LanguageModelV3CallOptions } from '@ai-sdk/provider';
 import { expect, it } from 'vitest';
 
-import { streamMastraTurn } from '../../index';
+import { streamMastraTurn } from '../../mastra-turn';
 import { researchModel, researchTools, turnInput } from '../fixtures/research-tools';
 
 async function collectResearchSequence() {
@@ -9,12 +9,12 @@ async function collectResearchSequence() {
   const calls: LanguageModelV3CallOptions[] = [];
   const fixture = researchTools(controller.signal);
   const events = [];
-  for await (const event of streamMastraTurn(
-    turnInput(),
-    researchModel(calls),
-    controller.signal,
-    fixture.tools,
-  ))
+  for await (const event of streamMastraTurn({
+    input: turnInput(),
+    model: researchModel(calls),
+    signal: controller.signal,
+    tools: fixture.tools,
+  }))
     events.push(event);
   return { calls, events };
 }

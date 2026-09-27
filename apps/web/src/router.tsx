@@ -4,20 +4,18 @@ import {
   createRouter,
   useRouter,
 } from '@tanstack/react-router';
-import type { AppConfig } from '@walden/contracts';
 import type { ReactNode } from 'react';
 import { App } from './App';
 import { track } from './lib/telemetry';
 
 export type AppRouterContext = {
-  config: AppConfig;
   authControls?: ReactNode;
   identity?: string;
 };
 
 function WorkspaceRoute() {
-  const { config, authControls, identity } = useRouter().options.context;
-  return <App config={config} authControls={authControls} identity={identity} />;
+  const { authControls, identity } = useRouter().options.context;
+  return <App authControls={authControls} identity={identity} />;
 }
 
 const rootRoute = createRootRouteWithContext<AppRouterContext>()({ component: WorkspaceRoute });
@@ -34,7 +32,7 @@ const routeTree = rootRoute.addChildren([indexRoute, conversationRoute, noteRout
 
 export const router = createRouter({
   routeTree,
-  context: { config: undefined!, authControls: undefined, identity: undefined },
+  context: { authControls: undefined, identity: undefined },
 });
 
 router.subscribe('onResolved', () => {

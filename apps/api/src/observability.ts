@@ -160,6 +160,91 @@ export type ApiTelemetry = {
   flush(): Promise<void>;
 };
 
+/** Bounded lifecycle data for turns that outlive the browser connection. */
+export async function captureTurnLifecycle(
+  env: TelemetryEnv,
+  event: 'chat_turn_started' | 'chat_turn_recovered' | 'chat_turn_terminal',
+  details: {
+    userId: string;
+    conversationId: string;
+    turnId: string;
+    requestId: string;
+    attempt: number;
+    status?: string;
+  },
+): Promise<void> {
+  if (!env.POSTHOG_API_KEY) return;
+  try {
+    const response = await fetch(`${env.POSTHOG_HOST || DEFAULT_POSTHOG_HOST}/i/v0/e/`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      signal: AbortSignal.timeout(1_500),
+      body: JSON.stringify({
+        api_key: env.POSTHOG_API_KEY,
+        event,
+        properties: {
+          distinct_id: details.userId,
+          $geoip_disable: true,
+          $process_person_profile: false,
+          conversation_id: details.conversationId,
+          turn_id: details.turnId,
+          request_id: details.requestId,
+          attempt: details.attempt,
+          ...(details.status ? { status: details.status } : {}),
+        },
+      }),
+    });
+    await response.body?.cancel();
+    if (!response.ok)
+      console.warn('Turn lifecycle telemetry delivery failed', { status: response.status });
+  } catch {
+    console.warn('Turn lifecycle telemetry delivery failed');
+  }
+}
+
+/** Server-side failure counts still arrive when the browser leaves mid-stream. */
+export async function captureChatFailure(
+  env: TelemetryEnv,
+  failure: {
+    userId: string;
+    conversationId: string;
+    turnId: string;
+    code: string;
+    model: string;
+    hadPartialResponse: boolean;
+    toolCount: number;
+  },
+): Promise<void> {
+  if (!env.POSTHOG_API_KEY) return;
+  try {
+    const response = await fetch(`${env.POSTHOG_HOST || DEFAULT_POSTHOG_HOST}/i/v0/e/`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      signal: AbortSignal.timeout(1_500),
+      body: JSON.stringify({
+        api_key: env.POSTHOG_API_KEY,
+        event: 'chat_generation_failed',
+        properties: {
+          distinct_id: failure.userId,
+          $geoip_disable: true,
+          $process_person_profile: false,
+          conversation_id: failure.conversationId,
+          turn_id: failure.turnId,
+          failure_code: failure.code,
+          model: failure.model,
+          had_partial_response: failure.hadPartialResponse,
+          tool_count: failure.toolCount,
+        },
+      }),
+    });
+    await response.body?.cancel();
+    if (!response.ok)
+      console.warn('Chat failure telemetry delivery failed', { status: response.status });
+  } catch {
+    console.warn('Chat failure telemetry delivery failed');
+  }
+}
+
 export function createApiTelemetry(env: TelemetryEnv): ApiTelemetry | null {
   const exporterConfig = posthogExporterConfig(env);
   if (!exporterConfig) return null;

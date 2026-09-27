@@ -116,12 +116,12 @@ beforeEach(async () => {
     .run();
   await db
     .prepare(
-      "INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,last_user_activity_at,expires_at,created_at) VALUES ('branch','conversation','owner',1,'now','2999-01-01','now')",
+      "INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,created_at) VALUES ('branch','conversation','owner',1,'now')",
     )
     .run();
   await db
     .prepare(
-      "INSERT INTO messages (id,conversation_id,owner_id,role,content,sequence,created_at) VALUES ('source','conversation','owner','assistant','Source',1,'now'),('later','conversation','owner','assistant','Later',2,'now')",
+      "INSERT INTO messages (id,conversation_id,owner_id,role,content,created_at) VALUES ('source','conversation','owner','assistant','Source','now'),('later','conversation','owner','assistant','Later','now')",
     )
     .run();
 });

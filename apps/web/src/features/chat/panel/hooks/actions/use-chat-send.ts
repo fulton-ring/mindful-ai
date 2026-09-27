@@ -1,23 +1,30 @@
-import type { ChatEvent, Conversation, LearningCheckResponse, Message } from '@walden/contracts';
+import type {
+  ChatEvent,
+  ChatRequest,
+  Conversation,
+  LearningCheckResponse,
+  Message,
+} from '@walden/contracts';
 import { conversationTitle } from '@walden/domain';
 
 import { streamChat } from '../../../../../lib/api';
 import { id } from '../../../../../lib/ids';
-import { track } from '../../../../../lib/telemetry';
-import type { ChatAction, ChatPanelProps } from '../../chat-panel-types';
+import { failureDetails, track } from '../../../../../lib/telemetry';
+import type { ChatPanelProps } from '../../chat-panel-types';
 import type { ChatDisplayState } from '../state/use-chat-display-state';
 import type { ChatRuntimeState } from '../state/use-chat-runtime-state';
 import type { ChatTurnState } from '../state/use-chat-turn';
 import { handleLiveChatEvent } from './live-chat-event';
+import type { useChatUploads } from './use-chat-uploads';
 
 type SendArgs = {
   props: ChatPanelProps;
   display: ChatDisplayState;
   runtime: ChatRuntimeState;
+  uploads: ReturnType<typeof useChatUploads>;
   turn: ChatTurnState;
   effectivePersonaId: string;
   pendingEdit: { id: string; content: string } | null;
-  cancelMainTurn(): void;
   resetAnnotationRetries(): void;
   animateAnnotations(messageId: string, values: NonNullable<Message['annotations']>): void;
   adoptIncompleteResponse(
@@ -36,7 +43,9 @@ type SendArgs = {
 
 type SendStart = {
   clean: string;
-  action: ChatAction;
+  files: File[];
+  uploadedFiles: NonNullable<Message['attachments']>;
+  action: ChatRequest['action'];
   editMessageId?: string;
   learningCheckResponse?: LearningCheckResponse;
   optimistic: Message;
@@ -50,19 +59,27 @@ type SendRun = SendStart & {
   noteRevision: number | null;
   requestController: AbortController;
   requestId: string;
-  clearDeadline(): void;
   startedAt: number;
 };
 
 function beginSend(
   args: SendArgs,
   message: string,
-  action: ChatAction,
+  action: ChatRequest['action'],
   editMessageId?: string,
   learningCheckResponse?: LearningCheckResponse,
 ): SendStart | null {
   const clean = message.trim();
-  if (!clean || args.runtime.sendingRef.current || args.display.savingChatPreference) return null;
+  const files = editMessageId ? [] : args.display.attachments;
+  const uploadedFiles = args.uploads.uploaded(files);
+  if (
+    (!clean && !files.length && !editMessageId) ||
+    (clean.length > 2000 && !editMessageId) ||
+    args.display.sendingRef.current ||
+    args.display.savingChatPreference ||
+    !uploadedFiles
+  )
+    return null;
   args.runtime.followingResponse.current = true;
   const preparation = ++args.runtime.preparationGeneration.current;
   const lifecycle = args.runtime.lifecycleCancellation.current;
@@ -70,24 +87,35 @@ function beginSend(
     id: id('local'),
     role: 'user',
     content: clean,
+    ...(uploadedFiles.length
+      ? {
+          attachments: uploadedFiles,
+        }
+      : editMessageId
+        ? {
+            attachments: args.runtime.latestConversation.current?.messages.find(
+              ({ id }) => id === editMessageId,
+            )?.attachments,
+          }
+        : {}),
     ...(learningCheckResponse ? { learningCheckResponse } : {}),
     createdAt: new Date().toISOString(),
   };
   args.turn.flushStream();
   args.resetAnnotationRetries();
-  args.runtime.sendingRef.current = true;
-  if (editMessageId) args.display.setPendingEdit({ id: editMessageId, content: clean });
-  else {
-    args.runtime.optimisticMessageRef.current = optimistic;
-    args.display.setOptimisticMessage(optimistic);
-  }
-  args.display.setInput('');
   args.display.setSending(true);
-  args.display.setStatus('Preparing…');
+  if (editMessageId) args.display.setPendingEdit({ id: editMessageId, content: clean });
+  else args.display.setOptimisticMessage(optimistic);
+  args.display.setInput('');
+  args.display.setAttachments([]);
+  args.uploads.clearSent(files);
+  args.display.dispatchLiveTurn({ type: 'status', text: 'Preparing…' });
   args.display.setError('');
   args.display.setInterrupted(false);
   return {
     clean,
+    files,
+    uploadedFiles,
     action,
     editMessageId,
     learningCheckResponse,
@@ -98,29 +126,33 @@ function beginSend(
   };
 }
 
-function resetFailedSend(args: SendArgs, clean: string, error: string) {
+function resetFailedSend(args: SendArgs, start: SendStart, error: string) {
   args.display.setError(error);
-  args.runtime.sendingRef.current = false;
   args.display.setSending(false);
-  args.runtime.optimisticMessageRef.current = null;
   args.display.setOptimisticMessage(null);
   args.display.setPendingEdit(null);
-  args.display.setInput(clean);
+  args.display.setInput(start.clean);
+  args.display.setAttachments(start.files);
+  args.uploads.restore(start.files, start.uploadedFiles);
+}
+
+/** The panel unmounted, changed conversation, or started another send since `start`. */
+function isStale(args: SendArgs, start: SendStart) {
+  return (
+    !args.runtime.mounted.current ||
+    args.runtime.lifecycleCancellation.current !== start.lifecycle ||
+    args.runtime.preparationGeneration.current !== start.preparation
+  );
 }
 
 async function waitForPreflight(args: SendArgs, start: SendStart) {
   await args.runtime.pendingTurnCancellation.current;
   const noteRevision = await args.props.onFlush();
-  if (
-    !args.runtime.mounted.current ||
-    args.runtime.lifecycleCancellation.current !== start.lifecycle ||
-    args.runtime.preparationGeneration.current !== start.preparation
-  )
-    return null;
+  if (isStale(args, start)) return null;
   if (noteRevision === false) {
     resetFailedSend(
       args,
-      start.clean,
+      start,
       'Your note still has unsaved changes. Resolve the save before starting a turn.',
     );
     return null;
@@ -137,15 +169,10 @@ async function ensureConversation(args: SendArgs, start: SendStart) {
     return conversation;
   } catch (cause) {
     args.runtime.awaitingConversationAdoption.current = false;
-    if (
-      !args.runtime.mounted.current ||
-      args.runtime.lifecycleCancellation.current !== start.lifecycle ||
-      args.runtime.preparationGeneration.current !== start.preparation
-    )
-      return null;
+    if (isStale(args, start)) return null;
     resetFailedSend(
       args,
-      start.clean,
+      start,
       cause instanceof Error ? cause.message : 'The thread could not start.',
     );
     return null;
@@ -167,14 +194,8 @@ function prepareStreamingState(args: SendArgs, conversation: Conversation) {
   args.turn.streamTarget.current = '';
   args.turn.streamCompletionId.current = null;
   args.turn.displayedStream.current = '';
-  args.display.setStreamed('');
-  args.display.setStatus('Thinking…');
-  args.display.setReasoning('');
-  args.display.setLiveTools([]);
-  args.display.setLiveSources([]);
-  args.display.setLiveContextCompacted(false);
+  args.display.dispatchLiveTurn({ type: 'reset', status: 'Thinking…' });
   args.display.setIntervention(null);
-  args.display.setLiveAnnotations([]);
   args.display.setRecentAnimation(null);
   if (args.display.recentAnimationTimeout.current !== undefined) {
     window.clearTimeout(args.display.recentAnimationTimeout.current);
@@ -194,9 +215,7 @@ async function prepareSend(args: SendArgs, start: SendStart): Promise<SendRun | 
     args.runtime.activeConversationId.current !== null &&
     args.runtime.activeConversationId.current !== conversation.id
   ) {
-    args.runtime.sendingRef.current = false;
     args.display.setSending(false);
-    args.runtime.optimisticMessageRef.current = null;
     args.display.setOptimisticMessage(null);
     args.display.setPendingEdit(null);
     return null;
@@ -209,26 +228,25 @@ async function prepareSend(args: SendArgs, start: SendStart): Promise<SendRun | 
     if (!adopted) return null;
     preparation = args.runtime.preparationGeneration.current;
   }
-  const named = nameConversation(args, conversation, start.clean);
+  const named = nameConversation(
+    args,
+    conversation,
+    start.clean || start.files[0]?.name || 'Files',
+  );
   prepareStreamingState(args, named);
   const requestController = new AbortController();
   args.runtime.mainAbort.current = requestController;
   const requestId = id('turn');
   args.runtime.activeRequestId.current = requestId;
-  const deadline = window.setTimeout(() => {
-    if (args.runtime.activeRequestId.current === requestId) args.cancelMainTurn();
-    if (args.runtime.activeConversationId.current === named.id)
-      args.display.setError('The response timed out. Please try again.');
-  }, 315_000);
-  const clearDeadline = () => window.clearTimeout(deadline);
-  requestController.signal.addEventListener('abort', clearDeadline, { once: true });
   const startedAt = performance.now();
   track('chat_submitted', {
     conversation_id: named.id,
-    turn_id: requestId,
+    request_id: requestId,
     persona_id: args.effectivePersonaId,
     action: start.action,
     characters: start.clean.length,
+    attachment_count: start.files.length,
+    had_note: Boolean(named.noteId),
   });
   return {
     ...start,
@@ -237,33 +255,32 @@ async function prepareSend(args: SendArgs, start: SendStart): Promise<SendRun | 
     noteRevision,
     requestController,
     requestId,
-    clearDeadline: () => {
-      clearDeadline();
-      requestController.signal.removeEventListener('abort', clearDeadline);
-    },
     startedAt,
   };
 }
 
-function buildCompletedConversation(
+/** `base` with the sent message and its reply as the newest turn, replacing any earlier copies. */
+function completedConversation(
   run: SendRun,
   event: Extract<ChatEvent, { type: 'done' }>,
   base: Conversation,
-) {
+): Conversation {
   const editIndex = run.editMessageId
     ? base.messages.findIndex(({ id: messageId }) => messageId === run.editMessageId)
     : -1;
+  const messages =
+    editIndex >= 0
+      ? base.messages.slice(0, editIndex)
+      : base.messages.filter(
+          (message) => message.id !== run.optimistic.id && message.id !== event.message.id,
+        );
   return {
     ...base,
     id: event.conversationId,
     branchId: event.branchId,
     title: event.title ?? base.title,
     expiresAt: event.expiresAt,
-    messages: [
-      ...(editIndex >= 0 ? base.messages.slice(0, editIndex) : base.messages),
-      run.optimistic,
-      event.message,
-    ],
+    messages: [...messages, run.optimistic, event.message],
   };
 }
 
@@ -277,24 +294,11 @@ function drainCompletedResponse(
   args.turn.streamCompletionId.current = event.message.id;
   args.turn.responseRenderKeys.current.set(event.message.id, run.requestId);
   const latest = args.runtime.latestConversation.current;
-  const base = latest?.id === event.conversationId ? latest : completed;
-  const editIndex = run.editMessageId
-    ? base.messages.findIndex(({ id: messageId }) => messageId === run.editMessageId)
-    : -1;
-  const messages =
-    editIndex >= 0
-      ? base.messages.slice(0, editIndex)
-      : base.messages.filter(
-          (message) => message.id !== run.optimistic.id && message.id !== event.message.id,
-        );
-  const finalized = {
-    ...base,
-    id: event.conversationId,
-    branchId: event.branchId,
-    title: event.title ?? base.title,
-    expiresAt: event.expiresAt,
-    messages: [...messages, run.optimistic, event.message],
-  };
+  const finalized = completedConversation(
+    run,
+    event,
+    latest?.id === event.conversationId ? latest : completed,
+  );
   const deferredAnnotations = args.runtime.pendingAnnotations.current.get(event.message.id);
   const withAnnotations = deferredAnnotations
     ? {
@@ -312,19 +316,22 @@ function drainCompletedResponse(
   else if (event.message.annotations?.length)
     args.animateAnnotations(event.message.id, event.message.annotations);
   args.display.setOptimisticMessage(null);
-  args.runtime.optimisticMessageRef.current = null;
   args.display.setPendingEdit(null);
 }
 
 function handleSendDone(args: SendArgs, run: SendRun, event: Extract<ChatEvent, { type: 'done' }>) {
+  if (event.userMessageId) run.optimistic.id = event.userMessageId;
   track('chat_completed', {
     conversation_id: run.conversation.id,
-    turn_id: run.requestId,
+    request_id: run.requestId,
     duration_ms: Math.round(performance.now() - run.startedAt),
+    tool_count: event.message.tools?.length ?? 0,
+    source_count: event.message.sources?.length ?? 0,
+    had_note: Boolean(run.conversation.noteId),
   });
   args.turn.streamTarget.current = event.message.content;
   const latest = args.runtime.latestConversation.current;
-  const completed = buildCompletedConversation(
+  const completed = completedConversation(
     run,
     event,
     latest?.id === event.conversationId ? latest : run.conversation,
@@ -344,10 +351,15 @@ function handleSendError(
   run: SendRun,
   event: Extract<ChatEvent, { type: 'error' }>,
 ) {
+  if (event.userMessageId) run.optimistic.id = event.userMessageId;
   track('chat_failed', {
     conversation_id: run.conversation.id,
-    turn_id: run.requestId,
+    request_id: run.requestId,
     action: 'server_error',
+    failure_code: event.code ?? 'server_error',
+    stage: 'generation',
+    duration_ms: Math.round(performance.now() - run.startedAt),
+    had_partial_response: Boolean(event.partialMessage?.content),
   });
   if (event.partialMessage)
     args.adoptIncompleteResponse(
@@ -381,8 +393,47 @@ function handleIntervention(
     args.display.setIntervention(intervention);
 }
 
+function attachmentIdsForTurn(run: SendRun): string[] {
+  const retainedIds = run.editMessageId
+    ? (run.conversation.messages
+        .find(({ id }) => id === run.editMessageId)
+        ?.attachments?.map(({ id }) => id) ?? [])
+    : [];
+  return [...retainedIds, ...run.uploadedFiles.map(({ id }) => id)];
+}
+
+function finishSend(args: SendArgs, run: SendRun) {
+  if (
+    args.runtime.activeConversationId.current === run.conversation.id &&
+    args.runtime.activeRequestId.current === run.requestId
+  ) {
+    if (args.turn.onStreamDrained.current) args.turn.flushStream();
+    args.display.setSending(false);
+    args.display.dispatchLiveTurn({ type: 'status', text: '' });
+    if (args.runtime.mainAbort.current === run.requestController)
+      args.runtime.mainAbort.current = undefined;
+  }
+  if (args.runtime.activeRequestId.current === run.requestId)
+    args.runtime.streamConversationId.current = null;
+}
+
+function reportSendFailure(args: SendArgs, run: SendRun, cause: unknown) {
+  track('chat_failed', {
+    conversation_id: run.conversation.id,
+    request_id: run.requestId,
+    action: run.requestController.signal.aborted ? 'cancelled' : 'transport_error',
+    ...(run.requestController.signal.aborted
+      ? { failure_code: 'cancelled' }
+      : failureDetails(cause)),
+    stage: 'stream',
+    duration_ms: Math.round(performance.now() - run.startedAt),
+    had_partial_response: Boolean(args.turn.streamTarget.current),
+  });
+}
+
 async function runSend(args: SendArgs, run: SendRun) {
   try {
+    const attachmentIds = attachmentIdsForTurn(run);
     await streamChat(
       {
         requestId: run.requestId,
@@ -390,6 +441,7 @@ async function runSend(args: SendArgs, run: SendRun) {
         branchId: run.conversation.branchId,
         noteRevision: run.noteRevision,
         message: run.clean,
+        ...(attachmentIds.length ? { attachmentIds } : {}),
         personaId: args.effectivePersonaId,
         action: run.action,
         ...(run.learningCheckResponse ? { learningCheckResponse: run.learningCheckResponse } : {}),
@@ -399,38 +451,21 @@ async function runSend(args: SendArgs, run: SendRun) {
       run.requestController.signal,
     );
   } catch (cause) {
-    track('chat_failed', {
-      conversation_id: run.conversation.id,
-      turn_id: run.requestId,
-      action: run.requestController.signal.aborted ? 'cancelled' : 'transport_error',
-    });
+    reportSendFailure(args, run, cause);
     if (!run.requestController.signal.aborted)
       args.display.setError(
         cause instanceof Error ? cause.message : 'The response was interrupted.',
       );
     args.display.setPendingEdit(null);
   } finally {
-    run.clearDeadline();
-    if (
-      args.runtime.activeConversationId.current === run.conversation.id &&
-      args.runtime.activeRequestId.current === run.requestId
-    ) {
-      if (args.turn.onStreamDrained.current) args.turn.flushStream();
-      args.display.setSending(false);
-      args.runtime.sendingRef.current = false;
-      args.display.setStatus('');
-      if (args.runtime.mainAbort.current === run.requestController)
-        args.runtime.mainAbort.current = undefined;
-    }
-    if (args.runtime.activeRequestId.current === run.requestId)
-      args.runtime.streamConversationId.current = null;
+    finishSend(args, run);
   }
 }
 
-export function useChatSend(args: SendArgs) {
+export function chatSendActions(args: SendArgs) {
   async function send(
     message = args.display.input,
-    action: ChatAction = 'message',
+    action: ChatRequest['action'] = 'message',
     editMessageId?: string,
     learningCheckResponse?: LearningCheckResponse,
   ) {

@@ -18,8 +18,8 @@ highlightRoutes.put('/messages/:messageId/highlights', async (c) => {
          JOIN conversations c ON c.id=m.conversation_id AND c.owner_id=m.owner_id
          JOIN conversation_branches b ON b.id=m.origin_branch_id AND b.conversation_id=c.id AND b.owner_id=c.owner_id
          WHERE m.id=? AND m.owner_id=? AND m.role='assistant' AND m.incomplete=0
-         AND c.status='active' AND c.expires_at>? AND b.status='active' AND b.expires_at>?`,
-    ).bind(messageId, ownerId, now, now),
+         AND c.status='active' AND c.expires_at>? AND b.status='active'`,
+    ).bind(messageId, ownerId, now),
   );
   if (!message) throw new HttpError(404, 'Completed response not found');
   if (
@@ -33,7 +33,7 @@ highlightRoutes.put('/messages/:messageId/highlights', async (c) => {
        JOIN conversations c ON c.id=m.conversation_id AND c.owner_id=m.owner_id
        JOIN conversation_branches b ON b.id=m.origin_branch_id AND b.conversation_id=c.id AND b.owner_id=c.owner_id
        WHERE m.id=? AND m.owner_id=? AND m.role='assistant' AND m.incomplete=0 AND m.content=?
-       AND c.status='active' AND c.expires_at>? AND b.status='active' AND b.expires_at>?
+       AND c.status='active' AND c.expires_at>? AND b.status='active'
        ON CONFLICT(message_id,origin,start,end) DO UPDATE SET
          quote=excluded.quote,color=excluded.color,updated_at=excluded.updated_at
        WHERE message_highlights.owner_id=excluded.owner_id`,
@@ -47,7 +47,6 @@ highlightRoutes.put('/messages/:messageId/highlights', async (c) => {
       messageId,
       ownerId,
       message.content,
-      now,
       now,
     )
     .run();

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "b63d484f-9b4a-4dec-a2f4-ef8e6cbabc09",
+  "id": "e0dd9ef6-a2c3-4b66-be41-394e7e525cf5",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "account_privacy": {
@@ -76,90 +76,6 @@
         }
       }
     },
-    "billing_customers": {
-      "name": "billing_customers",
-      "columns": {
-        "owner_id": {
-          "name": "owner_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "customer_id": {
-          "name": "customer_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "subscription_id": {
-          "name": "subscription_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "billing_customers_customer_id_unique": {
-          "name": "billing_customers_customer_id_unique",
-          "columns": [
-            "customer_id"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "billing_customers_owner_id_users_id_fk": {
-          "name": "billing_customers_owner_id_users_id_fk",
-          "tableFrom": "billing_customers",
-          "tableTo": "users",
-          "columnsFrom": [
-            "owner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "billing_events": {
-      "name": "billing_events",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "processed_at": {
-          "name": "processed_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "conversation_branches": {
       "name": "conversation_branches",
       "columns": {
@@ -214,20 +130,6 @@
           "autoincrement": false,
           "default": "'active'"
         },
-        "last_user_activity_at": {
-          "name": "last_user_activity_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -245,11 +147,10 @@
           "isUnique": true,
           "where": "is_default=1"
         },
-        "conversation_branches_expiry": {
-          "name": "conversation_branches_expiry",
+        "conversation_branches_conversation": {
+          "name": "conversation_branches_conversation",
           "columns": [
-            "status",
-            "expires_at"
+            "conversation_id"
           ],
           "isUnique": false
         }
@@ -310,7 +211,12 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "conversation_branches_check_1": {
+          "name": "conversation_branches_check_1",
+          "value": "is_default IN (0,1)"
+        }
+      }
     },
     "conversations": {
       "name": "conversations",
@@ -338,13 +244,6 @@
         },
         "persona_id": {
           "name": "persona_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "persona_snapshot_json": {
-          "name": "persona_snapshot_json",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -413,10 +312,17 @@
           "isUnique": true,
           "where": "note_id IS NOT NULL"
         },
+        "conversations_owner_activity": {
+          "name": "conversations_owner_activity",
+          "columns": [
+            "owner_id",
+            "last_user_activity_at"
+          ],
+          "isUnique": false
+        },
         "conversations_expiry": {
           "name": "conversations_expiry",
           "columns": [
-            "status",
             "expires_at"
           ],
           "isUnique": false
@@ -456,6 +362,10 @@
         "conversations_check_1": {
           "name": "conversations_check_1",
           "value": "web_search_enabled IN (0,1)"
+        },
+        "conversations_check_2": {
+          "name": "conversations_check_2",
+          "value": "learning_checks_enabled IN (0,1)"
         }
       }
     },
@@ -576,11 +486,18 @@
           "name": "branch_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         }
       },
       "indexes": {
+        "interventions_turn": {
+          "name": "interventions_turn",
+          "columns": [
+            "turn_id"
+          ],
+          "isUnique": false
+        },
         "one_pending_intervention_per_branch": {
           "name": "one_pending_intervention_per_branch",
           "columns": [
@@ -724,14 +641,6 @@
             "message_id"
           ],
           "isUnique": false
-        },
-        "message_highlights_message_origin": {
-          "name": "message_highlights_message_origin",
-          "columns": [
-            "message_id",
-            "origin"
-          ],
-          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -846,13 +755,6 @@
           "autoincrement": false,
           "default": "0"
         },
-        "sequence": {
-          "name": "sequence",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -901,18 +803,23 @@
         "messages_conversation": {
           "name": "messages_conversation",
           "columns": [
-            "conversation_id",
-            "sequence"
+            "conversation_id"
           ],
           "isUnique": false
         },
-        "messages_conversation_id_sequence_unique": {
-          "name": "messages_conversation_id_sequence_unique",
+        "messages_turn": {
+          "name": "messages_turn",
           "columns": [
-            "conversation_id",
-            "sequence"
+            "turn_id"
           ],
-          "isUnique": true
+          "isUnique": false
+        },
+        "messages_parent": {
+          "name": "messages_parent",
+          "columns": [
+            "parent_message_id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -984,7 +891,12 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "messages_check_1": {
+          "name": "messages_check_1",
+          "value": "incomplete IN (0,1)"
+        }
+      }
     },
     "note_edits": {
       "name": "note_edits",
@@ -1031,13 +943,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "before_title": {
-          "name": "before_title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "before_markdown": {
           "name": "before_markdown",
           "type": "text",
@@ -1047,13 +952,6 @@
         },
         "before_provenance_json": {
           "name": "before_provenance_json",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "after_title": {
-          "name": "after_title",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -1088,35 +986,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'user_edit'"
-        },
-        "suggestion_id": {
-          "name": "suggestion_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "before_suggestion_status": {
-          "name": "before_suggestion_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "after_suggestion_status": {
-          "name": "after_suggestion_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "discarded": {
           "name": "discarded",
           "type": "integer",
@@ -1124,13 +993,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "0"
-        },
-        "undone_at": {
-          "name": "undone_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "suggestion_changes_json": {
           "name": "suggestion_changes_json",
@@ -1189,7 +1051,12 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "note_edits_check_1": {
+          "name": "note_edits_check_1",
+          "value": "undone IN (0,1) AND discarded IN (0,1)"
+        }
+      }
     },
     "note_history_requests": {
       "name": "note_history_requests",
@@ -1414,26 +1281,19 @@
           "name": "conversation_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "source_message_id": {
           "name": "source_message_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "base_revision": {
           "name": "base_revision",
           "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "base_markdown": {
-          "name": "base_markdown",
-          "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -1467,13 +1327,6 @@
           "autoincrement": false,
           "default": "'pending'"
         },
-        "decision_edit_id": {
-          "name": "decision_edit_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -1488,25 +1341,18 @@
           "notNull": true,
           "autoincrement": false
         },
-        "decided_at": {
-          "name": "decided_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "branch_id": {
           "name": "branch_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "generation_key": {
           "name": "generation_key",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         }
       },
@@ -1521,6 +1367,16 @@
           ],
           "isUnique": true,
           "where": "status='pending'"
+        },
+        "note_suggestions_generation": {
+          "name": "note_suggestions_generation",
+          "columns": [
+            "owner_id",
+            "conversation_id",
+            "branch_id",
+            "generation_key"
+          ],
+          "isUnique": false
         },
         "note_suggestions_note_status": {
           "name": "note_suggestions_note_status",
@@ -1701,6 +1557,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "brevity": {
           "name": "brevity",
           "type": "text",
@@ -1721,14 +1584,6 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "revision": {
-          "name": "revision",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "0"
         },
         "created_at": {
           "name": "created_at",
@@ -1801,73 +1656,6 @@
         }
       }
     },
-    "product_events": {
-      "name": "product_events",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "owner_id": {
-          "name": "owner_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "session_id": {
-          "name": "session_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "metadata_json": {
-          "name": "metadata_json",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'{}'"
-        },
-        "occurred_at": {
-          "name": "occurred_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "product_events_owner_id_users_id_fk": {
-          "name": "product_events_owner_id_users_id_fk",
-          "tableFrom": "product_events",
-          "tableTo": "users",
-          "columnsFrom": [
-            "owner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "telemetry_deletions": {
       "name": "telemetry_deletions",
       "columns": {
@@ -1888,6 +1676,113 @@
       },
       "indexes": {},
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "turn_cancellations": {
+      "name": "turn_cancellations",
+      "columns": {
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "request_id": {
+          "name": "request_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "turn_cancellations_owner_id_users_id_fk": {
+          "name": "turn_cancellations_owner_id_users_id_fk",
+          "tableFrom": "turn_cancellations",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "turn_cancellations_owner_id_request_id_pk": {
+          "columns": [
+            "owner_id",
+            "request_id"
+          ],
+          "name": "turn_cancellations_owner_id_request_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "turn_events": {
+      "name": "turn_events",
+      "columns": {
+        "seq": {
+          "name": "seq",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "turn_id": {
+          "name": "turn_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "event_json": {
+          "name": "event_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "turn_events_replay": {
+          "name": "turn_events_replay",
+          "columns": [
+            "turn_id",
+            "seq"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "turn_events_turn_id_turns_id_fk": {
+          "name": "turn_events_turn_id_turns_id_fk",
+          "tableFrom": "turn_events",
+          "tableTo": "turns",
+          "columnsFrom": [
+            "turn_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -1930,22 +1825,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "input_tokens": {
-          "name": "input_tokens",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "0"
-        },
-        "output_tokens": {
-          "name": "output_tokens",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "0"
-        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -1964,8 +1843,44 @@
           "name": "branch_id",
           "type": "text",
           "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_branch_id": {
+          "name": "source_branch_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "input_json": {
+          "name": "input_json",
+          "type": "text",
+          "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "request_json": {
+          "name": "request_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "user_message_id": {
+          "name": "user_message_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "execution_epoch": {
+          "name": "execution_epoch",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
@@ -1984,6 +1899,13 @@
             "request_id"
           ],
           "isUnique": true
+        },
+        "turns_conversation": {
+          "name": "turns_conversation",
+          "columns": [
+            "conversation_id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -2025,78 +1947,13 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "usage_periods": {
-      "name": "usage_periods",
-      "columns": {
-        "owner_id": {
-          "name": "owner_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": false,
-          "autoincrement": false
         },
-        "plan": {
-          "name": "plan",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'free'"
-        },
-        "used": {
-          "name": "used",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "0"
-        },
-        "unit_limit": {
-          "name": "unit_limit",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "10"
-        },
-        "resets_at": {
-          "name": "resets_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "input_tokens": {
-          "name": "input_tokens",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "0"
-        },
-        "output_tokens": {
-          "name": "output_tokens",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "0"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "usage_periods_owner_id_users_id_fk": {
-          "name": "usage_periods_owner_id_users_id_fk",
-          "tableFrom": "usage_periods",
-          "tableTo": "users",
+        "turns_source_branch_id_conversation_branches_id_fk": {
+          "name": "turns_source_branch_id_conversation_branches_id_fk",
+          "tableFrom": "turns",
+          "tableTo": "conversation_branches",
           "columnsFrom": [
-            "owner_id"
+            "source_branch_id"
           ],
           "columnsTo": [
             "id"
@@ -2161,7 +2018,12 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "users_check_1": {
+          "name": "users_check_1",
+          "value": "deletion_pending IN (0,1)"
+        }
+      }
     }
   },
   "views": {},

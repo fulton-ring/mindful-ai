@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { streamMemoryPreparation } from '../agent';
+import { streamMemoryPreparation } from '../agent-memory-stream';
 
 describe('memory preparation status', () => {
   it('streams native compaction start before preparation completes', async () => {

@@ -7,6 +7,9 @@ import type {
 } from '@walden/contracts';
 import { Pencil, RefreshCw } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { Streamdown } from 'streamdown';
+import { Attachments } from '../../../../components/ai-elements/attachments';
+import { math } from '../../../../components/ai-elements/math';
 
 import {
   Reasoning,
@@ -18,6 +21,7 @@ import { AnnotatedText } from '../../../highlights/AnnotatedText';
 import type { ContextualActionId } from '../../../highlights/contextual-actions';
 import { ContextCheckpoint } from '../../ContextCheckpoint';
 import { ResponseActivity, ResponseSources } from '../../ResponseActivity';
+import { AttachmentBadge } from './AttachmentBadge';
 
 type ActionStatus = {
   pending: boolean;
@@ -28,6 +32,7 @@ type ActionStatus = {
 } | null;
 
 type Props = {
+  conversationId?: string;
   message: Message;
   index: number;
   messages: Message[];
@@ -167,8 +172,22 @@ function UserMessage({ message, ...props }: Omit<Props, 'message'> & { message: 
       ) : props.editing ? (
         <EditMessage {...props} />
       ) : (
-        <p>{message.content}</p>
+        <div className="user-message-content">
+          <Streamdown skipHtml plugins={{ math }}>
+            {message.content}
+          </Streamdown>
+        </div>
       )}
+      {message.attachments?.length && props.conversationId ? (
+        <Attachments variant="inline" className="message-attachments">
+          {message.attachments.map((file) => (
+            <AttachmentBadge
+              key={file.id}
+              file={{ ...file, conversationId: props.conversationId! }}
+            />
+          ))}
+        </Attachments>
+      ) : null}
       {!message.learningCheckResponse &&
         !props.editing &&
         props.messages[props.index + 1]?.incomplete &&

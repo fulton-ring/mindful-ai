@@ -2,6 +2,7 @@ import type { ChatEvent, Conversation, Message } from '@walden/contracts';
 
 import { streamChat } from '../../../../../lib/api';
 import { id } from '../../../../../lib/ids';
+import { failureDetails, track } from '../../../../../lib/telemetry';
 import type { ChatPanelProps } from '../../chat-panel-types';
 import type { ChatDisplayState } from '../state/use-chat-display-state';
 import type { ChatRuntimeState } from '../state/use-chat-runtime-state';
@@ -41,7 +42,6 @@ function regenerationTarget(conversation: Conversation, message: Message) {
 
 function releaseRegeneration(args: RegenerateArgs, controller: AbortController, message?: string) {
   if (args.runtime.mainAbort.current === controller) args.runtime.mainAbort.current = undefined;
-  args.runtime.sendingRef.current = false;
   args.display.setSending(false);
   if (message) args.display.setError(message);
 }
@@ -51,10 +51,9 @@ async function prepareRegeneration(
   message: Message,
 ): Promise<Regeneration | null> {
   const conversation = args.runtime.latestConversation.current;
-  if (!conversation || args.runtime.sendingRef.current) return null;
+  if (!conversation || args.display.sendingRef.current) return null;
   const target = regenerationTarget(conversation, message);
   if (!target) return null;
-  args.runtime.sendingRef.current = true;
   args.display.setSending(true);
   args.runtime.proposalAbort.current?.abort();
   args.runtime.annotationControllers.current.get(message.id)?.abort();
@@ -83,19 +82,18 @@ async function prepareRegeneration(
   }
   args.display.setRegeneratingMessageId(message.id);
   args.display.setError('');
-  args.display.setStatus('Regenerating…');
-  args.display.setLiveAnnotations([]);
-  args.display.setReasoning('');
-  args.display.setLiveTools([]);
-  args.display.setLiveSources([]);
-  args.display.setLiveContextCompacted(false);
+  args.display.dispatchLiveTurn({ type: 'reset', status: 'Regenerating…' });
   args.turn.streamTarget.current = '';
   args.turn.streamCompletionId.current = null;
   args.turn.displayedStream.current = '';
-  args.display.setStreamed('');
   args.runtime.mainAbort.current = controller;
   const requestId = id('turn');
   args.runtime.activeRequestId.current = requestId;
+  track('chat_regeneration_started', {
+    conversation_id: conversation.id,
+    request_id: requestId,
+    persona_id: args.effectivePersonaId,
+  });
   return {
     conversation,
     priorUser: target.priorUser,
@@ -163,6 +161,12 @@ function handleRegenerationDone(
   run: Regeneration,
   event: Extract<ChatEvent, { type: 'done' }>,
 ) {
+  track('chat_regeneration_completed', {
+    conversation_id: run.conversation.id,
+    request_id: run.requestId,
+    tool_count: event.message.tools?.length ?? 0,
+    source_count: event.message.sources?.length ?? 0,
+  });
   args.turn.streamTarget.current = event.message.content;
   const current = args.runtime.latestConversation.current ?? run.conversation;
   const completed = buildRegeneratedConversation(run, event, current);
@@ -174,22 +178,26 @@ function handleRegenerationEvent(args: RegenerateArgs, run: Regeneration, event:
   if (!isCurrent(args, run)) return;
   if (handleLiveChatEvent(args, event)) return;
   if (event.type === 'done') handleRegenerationDone(args, run, event);
-  else if (event.type === 'error') args.display.setError(event.message);
+  else if (event.type === 'error') {
+    track('chat_regeneration_failed', {
+      conversation_id: run.conversation.id,
+      request_id: run.requestId,
+      stage: 'generation',
+      failure_code: event.code ?? 'server_error',
+    });
+    args.display.setError(event.message);
+  }
 }
 
 function finishRegeneration(args: RegenerateArgs, run: Regeneration) {
   if (args.runtime.activeRequestId.current !== run.requestId) return;
   if (args.turn.onStreamDrained.current) args.turn.flushStream();
   args.display.setSending(false);
-  args.runtime.sendingRef.current = false;
-  args.display.setStatus('');
-  if (!args.turn.onStreamDrained.current) {
+  if (args.turn.onStreamDrained.current)
+    args.display.dispatchLiveTurn({ type: 'status', text: '' });
+  else {
     args.display.setRegeneratingMessageId(null);
-    args.display.setStreamed('');
-    args.display.setReasoning('');
-    args.display.setLiveTools([]);
-    args.display.setLiveSources([]);
-    args.display.setLiveContextCompacted(false);
+    args.display.dispatchLiveTurn({ type: 'reset', status: '', keepAnnotations: true });
   }
   if (args.runtime.mainAbort.current === run.requestController)
     args.runtime.mainAbort.current = undefined;
@@ -204,6 +212,9 @@ async function runRegeneration(args: RegenerateArgs, run: Regeneration) {
         branchId: run.conversation.branchId,
         noteRevision: run.noteRevision,
         message: run.priorUser.content,
+        ...(run.priorUser.attachments?.length
+          ? { attachmentIds: run.priorUser.attachments.map(({ id }) => id) }
+          : {}),
         personaId: args.effectivePersonaId,
         action: 'message',
         regenerateMessageId: run.messageId,
@@ -212,6 +223,12 @@ async function runRegeneration(args: RegenerateArgs, run: Regeneration) {
       run.requestController.signal,
     );
   } catch (cause) {
+    track('chat_regeneration_failed', {
+      conversation_id: run.conversation.id,
+      request_id: run.requestId,
+      stage: 'stream',
+      ...failureDetails(cause),
+    });
     if (!run.requestController.signal.aborted)
       args.display.setError(
         cause instanceof Error ? cause.message : 'The response could not be regenerated.',
@@ -221,7 +238,7 @@ async function runRegeneration(args: RegenerateArgs, run: Regeneration) {
   }
 }
 
-export function useChatRegeneration(args: RegenerateArgs) {
+export function chatRegenerationActions(args: RegenerateArgs) {
   return {
     regenerateResponse: (message: Message) =>
       prepareRegeneration(args, message).then((run) =>

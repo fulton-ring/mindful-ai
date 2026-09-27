@@ -109,3 +109,17 @@ it('does not capture or identify when browser analytics is disabled', async () =
   expect(sdk.capture).not.toHaveBeenCalled();
   expect(sdk.init.mock.calls[0]?.[1].before_send({ properties: {} })).toBeNull();
 });
+
+it('reports bounded failure and file categories without exception text or filenames', async () => {
+  const telemetry = await import('../telemetry');
+  expect(telemetry.failureDetails({ status: 429, message: 'private prompt' })).toEqual({
+    failure_code: 'rate_limited',
+    http_status: 429,
+  });
+  expect(telemetry.failureDetails(new Error('private prompt'))).toEqual({
+    failure_code: 'network_or_client_error',
+  });
+  const file = new File(['content'], 'private-negotiation.pdf', { type: 'application/pdf' });
+  expect(telemetry.fileAnalytics(file)).toEqual({ file_type: 'pdf', size_bucket: '0-100kb' });
+  expect(JSON.stringify(telemetry.fileAnalytics(file))).not.toContain('private');
+});

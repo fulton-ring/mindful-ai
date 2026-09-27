@@ -1,42 +1,48 @@
 import { expect, it } from 'vitest';
+import type { AgentCheckpoints } from '../../../agent/checkpoints';
 import { createAgentService, DEFAULT_AI_MODEL } from '../agent';
+
+/** Live smoke tests run outside a Workflow, so each checkpoint just runs inline. */
+const inlineCheckpoints: AgentCheckpoints = { do: (_name, callback) => callback() };
 
 const token = process.env.CLOUDFLARE_API_TOKEN;
 const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
 
 it.skipIf(!token || !accountId)(
-  'Cloudflare live inference: streams a real Gemma response through Mastra',
+  'Cloudflare live inference: streams a real default-model response through Mastra',
   async () => {
     const service = createAgentService({
       AI_MODEL: DEFAULT_AI_MODEL,
       CLOUDFLARE_ACCOUNT_ID: accountId,
       CLOUDFLARE_API_TOKEN: token,
     });
-    const events = await service.streamTurn({
-      turnId: 'live-smoke-turn',
-      requestId: 'live-smoke-request',
-      conversation: {
-        id: 'live-smoke-conversation',
-        title: 'New conversation',
-        noteId: null,
-        messages: [],
-        expiresAt: new Date(Date.now() + 60_000).toISOString(),
-        learningChecksEnabled: false,
-        branchId: 'branch',
-        branches: [],
+    const events = await service.streamTurn(
+      {
+        turnId: 'live-smoke-turn',
+        requestId: 'live-smoke-request',
+        conversation: {
+          id: 'live-smoke-conversation',
+          title: 'New conversation',
+          noteId: null,
+          messages: [],
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          learningChecksEnabled: false,
+          branchId: 'branch',
+          branches: [],
+        },
+        note: null,
+        persona: {
+          id: 'live-smoke-persona',
+          name: 'Concise',
+          prompt: 'Reply directly and briefly.',
+          brevity: 'brief',
+          challenge: 'gentle',
+          tone: 'neutral',
+        },
+        message: 'Reply with exactly: walden live',
       },
-      note: null,
-      persona: {
-        id: 'live-smoke-persona',
-        name: 'Concise',
-        prompt: 'Reply directly and briefly.',
-        brevity: 'brief',
-        challenge: 'gentle',
-        tone: 'neutral',
-        revision: 0,
-      },
-      message: 'Reply with exactly: walden live',
-    });
+      inlineCheckpoints,
+    );
     let text = '';
     let finished = false;
     for await (const event of events) {
@@ -88,7 +94,6 @@ it.skipIf(!token || !accountId)(
           brevity: 'brief',
           challenge: 'gentle',
           tone: 'neutral',
-          revision: 0,
         },
         message: `For this fictional test, restate only this sentence: ${sentence} Do not propose a note automatically.`,
         noteProposalRequested: true,
@@ -152,7 +157,6 @@ it.skipIf(!token || !accountId)(
           brevity: 'brief',
           challenge: 'gentle',
           tone: 'neutral',
-          revision: 0,
         },
         message: 'The observatory opens at one now. Update just the opening time.',
         noteProposalRequested: true,

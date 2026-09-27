@@ -53,23 +53,23 @@ pnpm lint:fix
 
 Builds do not deploy. Live providers and hosted services require their own credentialed smoke checks.
 
-See [the implementation plan](docs/superpowers/plans/2026-09-17-walden-v1.md), [credential setup](docs/runbooks/credentials.md), and [follow-up log](docs/IMPLEMENTATION-ISSUES.md).
+See [credential setup](docs/runbooks/credentials.md). Completed plans and work logs are kept in [docs/archive](docs/archive/README.md).
 
 ## Hosted environment
 
 https://walden.jeremy-herzog.workers.dev
 
-The Worker, frontend assets, D1 schema, AI binding, and cleanup schedule are deployed. Clerk sign-in is required and supports email verification codes and Google using the linked development instance. Billing is disabled behind `BILLING_ENABLED=false`; Stripe is not configured. See the credential runbook for the remaining setup and keep application credentials separate from provisioning credentials.
+The Worker, frontend assets, D1 schema, AI binding, and cleanup schedule are deployed. Clerk sign-in is required and supports email verification codes and Google using the linked development instance. See the credential runbook for the remaining setup and keep application credentials separate from provisioning credentials.
 
 Chat requires **Workers Paid**. Workers Free can terminate Mastra chat and annotation requests for exceeding CPU time, leaving an interrupted response. On 2026-09-20 this was reproduced in production; a request was killed at about 2 seconds of CPU. Local Wrangler does not reproduce that production limit. Upgrade the account's Workers plan before treating signed-in chat as ready for use.
 
-Interrupted transports attempt to cancel their own turn before unlocking the composer. A persisted streaming turn older than 90 seconds is recoverable even when a terminated request left an in-memory controller behind. This is recovery from failure, not a substitute for sufficient runtime capacity.
+Chat turns run in a Cloudflare Workflow, not the request that started them. A dropped connection only detaches the client; it reattaches through the turn's event stream, and Stop cancels the turn durably. The workflow gives each turn a 15-minute execution budget. This is recovery from failure, not a substitute for sufficient runtime capacity.
 
 ## Local-first evaluation
 
 Continue development and evaluation locally. Do not deploy changes without an explicit request.
 
-A test Worker can use its own local D1 database. Browser tests require Clerk authentication and configured model inference:
+A test Worker can use its own local D1 database. The test Worker still needs Clerk keys (`CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`) in `apps/api/.dev.vars.test`; there is no authentication bypass.
 
 ```sh
 pnpm build
@@ -77,7 +77,8 @@ cp apps/api/.dev.vars.test.example apps/api/.dev.vars.test
 pnpm --filter @walden/api db:migrate:test
 pnpm --filter @walden/api dev:test
 # In another terminal:
-E2E_BASE_URL=http://localhost:8788 pnpm exec playwright test chat-first
+pnpm exec playwright install chromium
+E2E_BASE_URL=http://localhost:8788 pnpm test:e2e
 ```
 
-The test environment keeps billing disabled. All application routes require a signed-in Clerk user.
+Without further setup only the signed-out spec runs. The signed-in specs (`chat-first`, `workspace`) are skipped unless `E2E_STORAGE_STATE` points at a saved Clerk session for the test Worker, for example one saved with `pnpm exec playwright codegen --save-storage=.auth/e2e.json http://localhost:8788`, and the test Worker has model inference configured. They clean up only the threads and notes they create.

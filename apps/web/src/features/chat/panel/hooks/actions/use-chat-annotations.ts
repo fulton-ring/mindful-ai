@@ -1,7 +1,7 @@
-import type { Annotation, MessageHighlight } from '@walden/contracts';
+import type { Annotation, MessageFollowupRequest, MessageHighlight } from '@walden/contracts';
 import { useEffect } from 'react';
 
-import { api, type MessageFollowupRequest, streamMessageAnnotations } from '../../../../../lib/api';
+import { api, streamMessageAnnotations } from '../../../../../lib/api';
 import type { ChatPanelProps } from '../../chat-panel-types';
 import type { ChatDisplayState } from '../state/use-chat-display-state';
 import type { ChatRuntimeState } from '../state/use-chat-runtime-state';
@@ -126,14 +126,9 @@ function useCompletedStreamEffect(args: AnnotationArgs, turn: ChatTurnState) {
     if (!messageId || !props.conversation?.messages.some((message) => message.id === messageId))
       return;
     turn.streamCompletionId.current = null;
-    display.setStreamed('');
+    display.dispatchLiveTurn({ type: 'reset' });
     turn.displayedStream.current = '';
     turn.streamTarget.current = '';
-    display.setLiveAnnotations([]);
-    display.setReasoning('');
-    display.setLiveTools([]);
-    display.setLiveSources([]);
-    display.setLiveContextCompacted(false);
   }, [props.conversation]);
 }
 

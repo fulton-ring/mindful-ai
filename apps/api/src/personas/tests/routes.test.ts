@@ -16,7 +16,6 @@ function database() {
         brevity: 'brief',
         challenge: 'gentle',
         tone: 'warm',
-        revision: 0,
       },
     ],
   ]);

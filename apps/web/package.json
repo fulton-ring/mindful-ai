@@ -7,7 +7,6 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "test:unit": "vitest run",
     "test": "vitest run"
   },
   "dependencies": {
@@ -27,6 +26,7 @@
     "@tanstack/react-router": "^1.131.35",
     "@walden/contracts": "workspace:*",
     "@walden/domain": "workspace:*",
+    "cn": "^0.4.0",
     "katex": "^0.16.47",
     "lucide-react": "^0.544.0",
     "micromark-util-decode-string": "^2.0.1",

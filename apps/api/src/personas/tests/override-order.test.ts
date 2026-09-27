@@ -125,6 +125,37 @@ it('persists an icon on create and edit, and preserves it when omitted from a pa
   });
 });
 
+it('persists a model choice for each persona and uses GLM when none is saved', async () => {
+  const { app, db, list } = await fixture();
+  const request = (path: string, method: string, body: object) =>
+    app.request(
+      path,
+      { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
+      { DB: db } as Bindings,
+    );
+  const created = await request('/api/personas', 'POST', {
+    name: 'Coach',
+    prompt: 'Help me practice.',
+    brevity: 'brief',
+    challenge: 'balanced',
+    tone: 'neutral',
+    model: '@cf/google/gemma-4-26b-a4b-it',
+  });
+  expect(created.status).toBe(201);
+  const persona = (await created.json()) as Persona;
+  expect((await list()).find((item) => item.id === persona.id)?.model).toBe(
+    '@cf/google/gemma-4-26b-a4b-it',
+  );
+  const updated = await request(`/api/personas/${persona.id}`, 'PATCH', {
+    model: '@cf/zai-org/glm-5.3-flash',
+  });
+  expect(updated.status).toBe(200);
+  expect((await list()).find((item) => item.id === persona.id)?.model).toBe(
+    '@cf/zai-org/glm-5.3-flash',
+  );
+  expect((await list()).find((item) => item.id === 'thinking-partner')?.model).toBeUndefined();
+});
+
 it('rejects deleting the last persona, including simultaneous deletion requests', async () => {
   const { app, db, list } = await fixture();
   const remove = (id: string) =>
@@ -140,7 +171,7 @@ it('protects a last custom persona and ignores other owners personas', async () 
   for (const owner of ['owner', 'other']) {
     await db
       .prepare(
-        "INSERT INTO personas (id,owner_id,name,prompt,brevity,challenge,tone,revision,created_at,updated_at) VALUES (?,?,'Coach','Help','brief','balanced','neutral',0,'now','now')",
+        "INSERT INTO personas (id,owner_id,name,prompt,brevity,challenge,tone,created_at,updated_at) VALUES (?,?,'Coach','Help','brief','balanced','neutral','now','now')",
       )
       .bind(owner, owner)
       .run();
@@ -156,4 +187,30 @@ it('protects a last custom persona and ignores other owners personas', async () 
     (await app.request('/api/personas/owner', { method: 'DELETE' }, { DB: db } as Bindings)).status,
   ).toBe(409);
   expect(await list()).toHaveLength(1);
+});
+
+it('keeps an override in its built-in slot and icon when a patch tries to move it', async () => {
+  const { app, db, list } = await fixture();
+  const request = (path: string, method: string, body: object) =>
+    app.request(
+      path,
+      { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
+      { DB: db } as Bindings,
+    );
+  const created = await request('/api/personas', 'POST', {
+    name: 'Mentor',
+    prompt: 'Edited guidance.',
+    brevity: 'brief',
+    challenge: 'balanced',
+    tone: 'neutral',
+    replacesPersonaId: 'thinking-partner',
+  });
+  const persona = (await created.json()) as Persona;
+  expect(persona.icon).toBe('compass');
+  const patched = await request(`/api/personas/${persona.id}`, 'PATCH', {
+    name: 'Guide',
+    replacesPersonaId: 'critical-reader',
+  });
+  expect(await patched.json()).toMatchObject({ name: 'Guide', icon: 'compass' });
+  expect((await list()).map((p) => p.name)).toEqual(['Guide', 'Challenger', 'Study partner']);
 });

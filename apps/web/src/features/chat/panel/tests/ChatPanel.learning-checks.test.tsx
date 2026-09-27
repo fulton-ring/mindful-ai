@@ -3,7 +3,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { Annotation, AnnotationEvent, ChatEvent, Conversation } from '@walden/contracts';
 import { expect, it } from 'vitest';
-import { getTransport, props } from '../../tests/_ChatPanel.test-helpers';
+import { getTransport, props, setComposerValue } from '../../tests/_ChatPanel.test-helpers';
 
 const { ChatPanel } = await import('../../ChatPanel');
 
@@ -63,7 +63,7 @@ it('replaces a streamed multiple-choice reply with the completed learning check'
   values.onConversation.mockImplementation((next: Conversation) => {
     view.rerender(<ChatPanel {...values} conversation={next} />);
   });
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Quiz me' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Quiz me');
   fireEvent.click(screen.getByLabelText('Send message'));
 
   await waitFor(() =>
@@ -92,7 +92,7 @@ it('shows primary-stream highlights before completion without classifying twice'
   values.onConversation.mockImplementation((next: Conversation) => {
     rendered.rerender(<ChatPanel {...values} conversation={next} />);
   });
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Question');
   fireEvent.click(screen.getByLabelText('Send message'));
   await waitFor(() => expect(emit).toBeTypeOf('function'));
   const annotation: Annotation = {
@@ -166,7 +166,7 @@ it('keeps streamed highlights when the terminal classifier result is incomplete'
     rendered.rerender(<ChatPanel {...values} conversation={next} />);
   });
 
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Question');
   fireEvent.click(screen.getByLabelText('Send message'));
 
   await waitFor(() =>

@@ -1,12 +1,23 @@
-import { saveNoteSchema } from '@walden/contracts';
+import { type ProvenanceSpan, saveNoteSchema } from '@walden/contracts';
 import type { z } from 'zod';
 import { first } from '../db/client';
 import { HttpError, newId, nowIso } from '../http';
-import { assertValidProvenance } from './domain';
+import { dismissChange, hasNoteEdit } from './operations';
 import { type NoteRow, selectNote, toNote } from './repository';
 
 type SaveNoteInput = z.infer<typeof saveNoteSchema>;
-type SuggestionChange = { id: string; beforeStatus: string; afterStatus: string };
+
+export function assertValidProvenance(markdown: string, provenance: ProvenanceSpan[]): void {
+  let previousEnd = 0;
+  for (const span of [...provenance].sort((a, b) => a.from - b.from || a.to - b.to)) {
+    if (span.from > span.to || span.to > markdown.length)
+      throw new HttpError(400, 'Invalid provenance range');
+    if (span.from < previousEnd) throw new HttpError(400, 'Provenance spans overlap');
+    if (span.origin === 'user' && span.verbatim)
+      throw new HttpError(400, 'User provenance cannot be verbatim agent text');
+    previousEnd = span.to;
+  }
+}
 
 const loadDismissedSuggestionIds = async (
   db: D1Database,
@@ -14,13 +25,7 @@ const loadDismissedSuggestionIds = async (
   noteId: string,
   input: SaveNoteInput,
 ) => {
-  const ids = [
-    ...new Set([
-      ...(input.dismissSuggestionIds ?? []),
-      ...(input.dismissSuggestionId ? [input.dismissSuggestionId] : []),
-    ]),
-  ];
-  if (ids.length > 20) throw new HttpError(400, 'Too many suggestions to dismiss');
+  const ids = [...new Set(input.dismissSuggestionIds ?? [])];
   const suggestions = await Promise.all(
     ids.map((id) =>
       first<{ status: string }>(
@@ -45,11 +50,7 @@ const buildSaveStatements = (
   now: string,
 ) => {
   const provenanceJson = JSON.stringify(input.provenance);
-  const changes: SuggestionChange[] = dismissedIds.map((id) => ({
-    id,
-    beforeStatus: 'pending',
-    afterStatus: 'dismissed',
-  }));
+  const changes = dismissedIds.map(dismissChange);
   const pendingIdsCondition = dismissedIds.length
     ? ` AND (SELECT COUNT(*) FROM note_suggestions WHERE note_id=notes.id AND owner_id=notes.owner_id AND status='pending' AND id IN (${dismissedIds.map(() => '?').join(',')}))=?`
     : '';
@@ -90,9 +91,9 @@ const buildSaveStatements = (
     ...dismissedIds.map((id) =>
       db
         .prepare(
-          "UPDATE note_suggestions SET status='dismissed',decided_at=?,updated_at=? WHERE id=? AND note_id=? AND owner_id=? AND status='pending' AND EXISTS (SELECT 1 FROM note_edits WHERE owner_id=? AND note_id=? AND operation_id=?)",
+          "UPDATE note_suggestions SET status='dismissed',updated_at=? WHERE id=? AND note_id=? AND owner_id=? AND status='pending' AND EXISTS (SELECT 1 FROM note_edits WHERE owner_id=? AND note_id=? AND operation_id=?)",
         )
-        .bind(now, now, id, noteId, ownerId, ownerId, noteId, input.operationId),
+        .bind(now, id, noteId, ownerId, ownerId, noteId, input.operationId),
     ),
     db
       .prepare(
@@ -102,36 +103,22 @@ const buildSaveStatements = (
   ];
 };
 
+/** A save that already landed (a retry, or a concurrent duplicate) answers with the current note. */
 async function replaySavedNote(db: D1Database, ownerId: string, noteId: string) {
   const replay = await selectNote(db, ownerId, noteId);
   if (!replay) throw new HttpError(404, 'Note not found');
   return toNote(replay);
 }
 
-async function replaySaveRace(db: D1Database, ownerId: string, noteId: string) {
-  const replay = await selectNote(db, ownerId, noteId);
-  if (replay) return toNote(replay);
-  throw new HttpError(409, 'Note revision conflict');
-}
-
 async function runSaveBatch(
   db: D1Database,
   statements: D1PreparedStatement[],
-  ownerId: string,
-  noteId: string,
-  operationId: string,
+  key: { ownerId: string; noteId: string; operationId: string },
 ) {
   try {
     return await db.batch(statements);
   } catch {
-    const replayed = await first<{ result_revision: number }>(
-      db
-        .prepare(
-          'SELECT result_revision FROM note_edits WHERE owner_id=? AND note_id=? AND operation_id=?',
-        )
-        .bind(ownerId, noteId, operationId),
-    );
-    if (replayed) return null;
+    if (await hasNoteEdit(db, key)) return null;
     throw new HttpError(409, 'Note revision conflict');
   }
 }
@@ -142,14 +129,8 @@ export async function saveNote(
   noteId: string,
   input: SaveNoteInput,
 ) {
-  const existing = await first<{ result_revision: number }>(
-    db
-      .prepare(
-        'SELECT result_revision FROM note_edits WHERE owner_id=? AND note_id=? AND operation_id=?',
-      )
-      .bind(ownerId, noteId, input.operationId),
-  );
-  if (existing) return replaySavedNote(db, ownerId, noteId);
+  const key = { ownerId, noteId, operationId: input.operationId };
+  if (await hasNoteEdit(db, key)) return replaySavedNote(db, ownerId, noteId);
   const current = await selectNote(db, ownerId, noteId);
   if (!current) throw new HttpError(404, 'Note not found');
   if (current.revision !== input.baseRevision)
@@ -160,11 +141,9 @@ export async function saveNote(
   const results = await runSaveBatch(
     db,
     buildSaveStatements(db, ownerId, noteId, current, input, dismissedIds, now),
-    ownerId,
-    noteId,
-    input.operationId,
+    key,
   );
-  if (!results) return replaySaveRace(db, ownerId, noteId);
+  if (!results) return replaySavedNote(db, ownerId, noteId);
   const failed =
     results[0]?.meta.changes !== 1 ||
     results[1]?.meta.changes !== 1 ||

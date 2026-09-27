@@ -2,7 +2,7 @@ import { Agent } from '@mastra/core/agent';
 import { ToolCallFilter } from '@mastra/core/processors';
 import type { ChunkType } from '@mastra/core/stream';
 import { createTool } from '@mastra/core/tools';
-import type { Workspace } from '@mastra/core/workspace';
+import { createWorkspaceTools, type Workspace } from '@mastra/core/workspace';
 import type { Memory } from '@mastra/memory';
 import type {
   ChatEvent,
@@ -14,6 +14,7 @@ import type {
 import type { McpTools } from '../services/mcp';
 import { publicUrl } from '../services/research/research';
 import type { AgentTurnInput } from '../services/types';
+import { type AgentCheckpoints, checkpointTools } from './checkpoints';
 import { buildTurnContext, contextBudgetProcessor } from './context';
 import { stableId, TurnProposals } from './interventions';
 import {
@@ -32,12 +33,18 @@ import {
   SAFETY_INSTRUCTIONS,
   WEB_SEARCH_INSTRUCTIONS,
 } from './prompts';
-import { AgentTraceContext, isLengthLimitedFinalChunk, visibleStreamEvent } from './stream-events';
+import {
+  type AgentTraceContext,
+  isLengthLimitedFinalChunk,
+  visibleStreamEvent,
+} from './stream-events';
 import { askInputSchema, learningCheckInputSchema } from './tool-schemas';
 
 export type AgentRuntime = {
   memory?: { memory: Memory; threadId: string; resourceId: string };
   workspace?: Workspace;
+  checkpoints?: AgentCheckpoints;
+  onToolResult?: (name: string, result: unknown) => void;
 };
 
 type MastraResponse = Awaited<ReturnType<Agent['stream']>>;
@@ -114,9 +121,9 @@ function createPendingContext(input: AgentTurnInput) {
   return 'Pending intervention: none.';
 }
 
-function createMastraTools(input: AgentTurnInput, mcpTools: McpTools, proposals: TurnProposals) {
+function createMastraTools(input: AgentTurnInput, tools: McpTools, proposals: TurnProposals) {
   return {
-    ...mcpTools,
+    ...tools,
     ...(input.note ? noteTools(input.note) : {}),
     proposeAsk: createTool({
       id: 'propose_ask',
@@ -147,7 +154,7 @@ function createMastraTools(input: AgentTurnInput, mcpTools: McpTools, proposals:
 function createMastraAgent(
   input: AgentTurnInput,
   model: ConstructorParameters<typeof Agent>[0]['model'],
-  mcpTools: McpTools,
+  externalTools: McpTools,
   runtime: AgentRuntime,
   trace: AgentTraceContext | undefined,
   tools: ReturnType<typeof createMastraTools>,
@@ -157,6 +164,7 @@ function createMastraAgent(
     note: input.note,
     messages: input.conversation.messages,
     currentMessage: input.message,
+    attachments: input.attachments,
     requestId: input.requestId,
     dynamicContext: `Requested action: ${input.action ?? 'message'}.\nLearning checks: ${input.conversation.learningChecksEnabled ? 'permitted, but judge whether one is warranted' : 'turned off by the user'}.\n${createPendingContext(input)}`,
   });
@@ -167,14 +175,20 @@ function createMastraAgent(
       CORE_INSTRUCTIONS,
       SAFETY_INSTRUCTIONS,
       `Current date: ${new Date().toISOString().slice(0, 10)}.`,
-      ...('readWebPage' in mcpTools || 'searchSources' in mcpTools ? [RESEARCH_INSTRUCTIONS] : []),
-      ...('searchWeb' in mcpTools ? [WEB_SEARCH_INSTRUCTIONS] : []),
+      ...('readWebPage' in externalTools || 'searchSources' in externalTools
+        ? [RESEARCH_INSTRUCTIONS]
+        : []),
+      ...('searchWeb' in externalTools ? [WEB_SEARCH_INSTRUCTIONS] : []),
       ...(input.conversation.webSearchEnabled === false
         ? [
             'Web search is disabled for this conversation. Do not search the public web. If fresh evidence is needed, explain that the user can enable Web search in Chat tools or supply a source URL. Do not claim to have searched.',
           ]
         : []),
-      ...(!('readWebPage' in mcpTools || 'searchSources' in mcpTools || 'searchWeb' in mcpTools)
+      ...(!(
+        'readWebPage' in externalTools ||
+        'searchSources' in externalTools ||
+        'searchWeb' in externalTools
+      )
         ? [NO_RESEARCH_INSTRUCTIONS]
         : []),
       personaInstructions(input.persona),
@@ -521,21 +535,40 @@ function doneEvent(
   };
 }
 
-export async function* streamMastraTurn(
-  input: AgentTurnInput,
-  model: ConstructorParameters<typeof Agent>[0]['model'],
-  signal: AbortSignal,
-  mcpTools: McpTools = {},
-  trace?: AgentTraceContext,
-  runtime: AgentRuntime = {},
-): AsyncIterable<ChatEvent> {
+export type MastraTurnOptions = {
+  input: AgentTurnInput;
+  model: ConstructorParameters<typeof Agent>[0]['model'];
+  signal: AbortSignal;
+  /** MCP, research, web-search, and document tools offered to the agent. */
+  tools?: McpTools;
+  trace?: AgentTraceContext;
+  runtime?: AgentRuntime;
+};
+
+export async function* streamMastraTurn({
+  input,
+  model,
+  signal,
+  tools = {},
+  trace,
+  runtime = {},
+}: MastraTurnOptions): AsyncIterable<ChatEvent> {
   if (input.conversation.webSearchEnabled === false) {
-    mcpTools = { ...mcpTools };
-    delete mcpTools.searchWeb;
+    tools = { ...tools };
+    delete tools.searchWeb;
+  }
+  if (runtime.checkpoints) {
+    const workspaceTools = runtime.workspace ? await createWorkspaceTools(runtime.workspace) : {};
+    runtime.workspace?.setToolsConfig({ enabled: false });
+    tools = checkpointTools(
+      { ...tools, ...workspaceTools },
+      runtime.checkpoints,
+      runtime.onToolResult,
+    );
   }
   const proposals = new TurnProposals();
-  const tools = createMastraTools(input, mcpTools, proposals);
-  const { agent, turnContext } = createMastraAgent(input, model, mcpTools, runtime, trace, tools);
+  const agentTools = createMastraTools(input, tools, proposals);
+  const { agent, turnContext } = createMastraAgent(input, model, tools, runtime, trace, agentTools);
   const response = await agent.stream(
     turnContext.messages,
     responseOptions(input, signal, trace, runtime, turnContext, proposals),

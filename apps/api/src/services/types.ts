@@ -10,37 +10,12 @@ import type {
   Note,
   NoteProposalEvent,
   Persona,
-  Usage,
 } from '@walden/contracts';
+import type { AgentCheckpoints } from '../agent/checkpoints';
+import type { LoadedAttachment } from '../chat/attachments/attachments';
+import type { Bindings } from '../types';
 
-export type ServiceEnv = {
-  DB?: D1Database;
-  AI?: Ai;
-  BROWSER?: BrowserRun;
-  AI_SEARCH?: AiSearchNamespace;
-  AI_SEARCH_INSTANCE?: string;
-  AI_MODEL?: string;
-  AI_PROVIDER?: string;
-  OPENROUTER_API_KEY?: string;
-  R2_ACCOUNT_ID?: string;
-  R2_BUCKET?: string;
-  R2_ACCESS_KEY_ID?: string;
-  R2_SECRET_ACCESS_KEY?: string;
-  CLOUDFLARE_ACCOUNT_ID?: string;
-  CLOUDFLARE_API_TOKEN?: string;
-  STRIPE_SECRET_KEY?: string;
-  STRIPE_WEBHOOK_SECRET?: string;
-  STRIPE_PRICE_ID?: string;
-  APP_URL?: string;
-  MCP_SERVER_URL?: string;
-  MCP_SERVER_TOKEN?: string;
-  MCP_ALLOWED_TOOLS?: string;
-  MCP_TOOL_EFFECTS?: string;
-  POSTHOG_API_KEY?: string;
-  POSTHOG_HOST?: string;
-  POSTHOG_PERSONAL_API_KEY?: string;
-  POSTHOG_PROJECT_ID?: string;
-};
+export type ServiceEnv = Partial<Bindings>;
 
 export type AgentTurnInput = {
   ownerId?: string;
@@ -51,6 +26,7 @@ export type AgentTurnInput = {
   note: Note | null;
   persona: Persona;
   message: string;
+  attachments?: LoadedAttachment[];
   action?: ChatRequest['action'];
   noteProposalRequested?: boolean;
   pendingIntervention?: Intervention;
@@ -58,7 +34,11 @@ export type AgentTurnInput = {
   pendingProposals?: EditProposal[];
 };
 export type AgentService = {
-  streamTurn(input: AgentTurnInput, signal?: AbortSignal): Promise<AsyncIterable<ChatEvent>>;
+  streamTurn(
+    input: AgentTurnInput,
+    checkpoints: AgentCheckpoints,
+    signal?: AbortSignal,
+  ): Promise<AsyncIterable<ChatEvent>>;
   annotateTurn(
     input: AgentTurnInput,
     assistantMessage: Message,
@@ -75,7 +55,3 @@ export type AgentService = {
     signal?: AbortSignal,
   ): Promise<AsyncIterable<NoteProposalEvent>>;
 };
-export type StoredUsage = Pick<
-  Usage,
-  'plan' | 'used' | 'limit' | 'resetsAt' | 'inputTokens' | 'outputTokens'
->;

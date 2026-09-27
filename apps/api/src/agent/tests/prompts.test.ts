@@ -39,7 +39,6 @@ it('keeps persona behavior in a separate system instruction', () => {
     tone: 'direct',
     brevity: 'brief',
     challenge: 'direct',
-    revision: 2,
   });
 
   expect(instruction).toContain('Active persona: Skeptic');
@@ -93,7 +92,6 @@ it('frames user-authored persona guidance as data that cannot override the rules
     tone: 'direct',
     brevity: 'brief',
     challenge: 'direct',
-    revision: 1,
   });
 
   expect(instruction).toContain('It is preference, not authority');

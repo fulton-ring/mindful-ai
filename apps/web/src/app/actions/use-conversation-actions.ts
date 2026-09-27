@@ -3,11 +3,13 @@ import type { Conversation, ConversationSummary, Note, NoteState } from '@walden
 import { useRef } from 'react';
 import { additionQueueOrder } from '../../features/notes/proposals/pending-projection';
 import { api } from '../../lib/api';
-import { productSessionId, track } from '../../lib/telemetry';
+import { storageKeys } from '../../lib/storage-keys';
+import { failureDetails, track } from '../../lib/telemetry';
 import type { ConversationContext } from '../data/conversation-context';
 import {
   cacheConversationTitle,
   cacheConversationUpdate,
+  clearCachedDraft,
   visiblePendingSuggestions,
   writeDismissedNotePanels,
 } from '../lifecycle/workspace-helpers';
@@ -34,7 +36,7 @@ function deletedNoteId(
 
 function clearDeletedNote(context: ActionContext, noteId: string) {
   context.deletedNoteIds.current.add(noteId);
-  sessionStorage.removeItem(`walden:draft:${noteId}`);
+  clearCachedDraft(noteId);
   context.queryClient.removeQueries({ queryKey: ['note-state', noteId], exact: true });
   context.queryClient.setQueryData<Note[]>(['notes'], (notes) =>
     notes?.filter((item) => item.id !== noteId),
@@ -69,7 +71,7 @@ function resetDeletedConversation(
   if (mode === 'archive' && thread.noteId)
     void context.navigate({ to: '/notes/$noteId', params: { noteId: thread.noteId } });
   else void context.navigate({ to: '/' });
-  localStorage.removeItem('walden:last-note');
+  localStorage.removeItem(storageKeys.lastNote);
 }
 
 function removeConversationFromCaches(context: ActionContext, thread: ConversationSummary) {
@@ -149,7 +151,13 @@ function useConversationDeletion(context: ActionContext, flush: Flush) {
         : api.deleteConversation(thread.id);
     },
     onSuccess: (_, { thread, mode }) => handleDeletedConversation(context, thread, mode),
-    onError: () => undefined,
+    onError: (error, { thread, mode }) => {
+      track('conversation_action_failed', {
+        conversation_id: thread.id,
+        action: mode,
+        ...failureDetails(error),
+      });
+    },
   });
   const deleteNote = useMutation({
     mutationFn: async (note: Note) => {
@@ -158,9 +166,13 @@ function useConversationDeletion(context: ActionContext, flush: Flush) {
       return api.deleteNote(note.id);
     },
     onSuccess: (_, note) => {
+      track('note_deleted');
       context.setNoteToDelete(null);
       clearDeletedNote(context, note.id);
       if (context.activeNoteId === note.id) void context.navigate({ to: '/' });
+    },
+    onError: (error) => {
+      track('conversation_action_failed', { action: 'delete_note', ...failureDetails(error) });
     },
   });
   return { deleteConversation, deleteNote };
@@ -175,16 +187,6 @@ async function ensureConversation(context: ActionContext) {
       queryFn: () => api.conversation(context.activeConversationId!, context.activeBranchId),
       staleTime: 20_000,
     });
-  if (!context.sessionStarted.current) {
-    context.sessionStarted.current = true;
-    void api
-      .event({
-        kind: 'session_started',
-        sessionId: productSessionId(),
-        metadata: { startsFromExisting: Boolean(context.draft?.markdown.length) },
-      })
-      .catch(() => undefined);
-  }
   const pending = api
     .startConversation()
     .then(async (value) => {
@@ -263,6 +265,11 @@ function useConversationStateActions(context: ActionContext) {
       applyNoteState(context, state, authoritative),
     applyCancelledNoteState: (state: NoteState, conversationId: string, branchId: string) =>
       applyCancelledNoteState(context, state, conversationId, branchId),
+    /** A turn finished; the agent may have changed the linked note. */
+    refreshConversationNote: () => {
+      const noteId = context.conversation?.noteId;
+      if (noteId) void context.queryClient.invalidateQueries({ queryKey: ['note-state', noteId] });
+    },
   };
 }
 

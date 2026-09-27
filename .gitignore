@@ -16,4 +16,6 @@ test-results/
 .cache/
 .pnpm-store/
 .worktrees/
+.superpowers/
 *.tsbuildinfo
+.auth/

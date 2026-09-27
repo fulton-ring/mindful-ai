@@ -3,11 +3,13 @@ import type { Note } from '@walden/contracts';
 import { type Dispatch, type RefObject, type SetStateAction, useCallback } from 'react';
 import { ApiError, api } from '../../lib/api';
 import { id } from '../../lib/ids';
+import { failureDetails, track } from '../../lib/telemetry';
 import {
-  type CachedNoteDraft,
+  clearCachedDraft,
   type NoteMutationScope,
   noteMutationBelongsToRoute,
   type SaveState,
+  writeCachedDraft,
 } from '../lifecycle/workspace-helpers';
 
 type SaveContext = {
@@ -44,16 +46,7 @@ function cacheRebasedDraft(context: SaveContext, draft: Note) {
   context.draftRef.current = draft;
   context.setDraft(draft);
   context.setSaveState('dirty');
-  sessionStorage.setItem(
-    `walden:draft:${draft.id}`,
-    JSON.stringify({
-      version: 1,
-      baseRevision: draft.revision,
-      markdown: draft.markdown,
-      provenance: draft.provenance,
-      dismissedSuggestionIds: [...context.dismissSuggestionsOnSave.current],
-    } satisfies CachedNoteDraft),
-  );
+  writeCachedDraft(draft, context.dismissSuggestionsOnSave.current);
 }
 
 async function applySaveResult(
@@ -83,13 +76,18 @@ async function applySaveResult(
   context.draftRef.current = saved;
   context.setDraft(saved);
   context.setSaveState('saved');
+  track('note_saved', { conversation_id: scope.conversationId ?? undefined });
   void context.queryClient.invalidateQueries({ queryKey: ['note-state', current.id] });
-  sessionStorage.removeItem(`walden:draft:${current.id}`);
+  clearCachedDraft(current.id);
   return true;
 }
 
 function saveError(context: SaveContext, scope: NoteMutationScope, noteId: string, error: unknown) {
   if (!isCurrentNote(context, scope, noteId)) return false;
+  track('note_save_failed', {
+    conversation_id: scope.conversationId ?? undefined,
+    ...failureDetails(error),
+  });
   context.setSaveState(error instanceof ApiError && error.status === 409 ? 'conflict' : 'error');
   return false;
 }
@@ -106,7 +104,7 @@ export function useNoteSaveActions(context: SaveContext) {
     const dismissed = [...context.dismissSuggestionsOnSave.current];
     let running: Promise<boolean>;
     running = api
-      .saveNote(current, id('save'), current.markdown, current.provenance, undefined, dismissed)
+      .saveNote(current, id('save'), current.markdown, current.provenance, dismissed)
       .then((result) => applySaveResult(context, current, scope, dismissed, result))
       .catch((error) => saveError(context, scope, current.id, error))
       .finally(() => {

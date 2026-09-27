@@ -1,5 +1,7 @@
+import type { NoteState } from '@walden/contracts';
 import { api } from '../../lib/api';
 import { id } from '../../lib/ids';
+import { failureDetails, track } from '../../lib/telemetry';
 import type { ConversationContext } from '../data/conversation-context';
 import { type NoteMutationScope, noteMutationBelongsToRoute } from '../lifecycle/workspace-helpers';
 
@@ -7,7 +9,7 @@ type HistoryContext = ConversationContext;
 
 export type HistoryDependencies = {
   flush: () => Promise<number | null | false>;
-  applyNoteState: (state: import('@walden/contracts').NoteState, authoritative?: boolean) => void;
+  applyNoteState: (state: NoteState, authoritative?: boolean) => void;
 };
 
 async function moveNoteHistory(
@@ -43,10 +45,12 @@ async function moveNoteHistory(
         return false;
       }
       dependencies.applyNoteState(state, true);
+      track('note_history_used', { action, conversation_id: scope.conversationId ?? undefined });
       return true;
     })
     .catch((error) => {
       if (!isCurrent()) return false;
+      track('note_history_failed', { action, ...failureDetails(error) });
       context.setNotice(error instanceof Error ? error.message : `The note could not ${action}.`);
       return false;
     })

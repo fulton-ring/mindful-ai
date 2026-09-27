@@ -1,36 +1,34 @@
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import type { Message } from '@walden/contracts';
+import { type Message, PERSONA_MODELS, type Persona } from '@walden/contracts';
 import { createWorkersAI } from 'workers-ai-provider';
-import {
-  annotateResponse,
-  streamAnnotationResponse,
-  streamMastraTurn,
-  streamNoteProposal,
-} from '../../agent';
+import type { AgentCheckpoints } from '../../agent/checkpoints';
+import { streamNoteProposal } from '../../agent/note-proposals/note-proposal-stream';
+import { agentTrace, annotateResponse, streamAnnotationResponse } from '../../agent/stream-events';
+import { ServiceUnavailableError } from '../../http';
 import { createApiTelemetry } from '../../observability';
-import { ServiceUnavailableError } from '../billing/billing';
 import type { AgentService, AgentTurnInput, ServiceEnv } from '../types';
-import { streamTurnEvents, type TurnStreamContext } from './agent-stream';
+import { streamTurnEvents } from './agent-stream';
 
-export const DEFAULT_AI_MODEL = '@cf/google/gemma-4-26b-a4b-it';
+export const DEFAULT_AI_MODEL = PERSONA_MODELS[0].id;
 export const OPENROUTER_DEFAULT_MODEL = 'google/gemma-4-26b-a4b-it';
 
 type ConfiguredModel = {
   modelName: string;
   model: ReturnType<typeof createConfiguredModel>;
 };
-type ConfigureModel = () => ConfiguredModel;
+type ConfigureModel = (persona: Persona) => ConfiguredModel;
 type SecondaryContext = ReturnType<typeof createSecondaryContext>;
-
-export { streamMemoryPreparation } from './agent-memory-stream';
+type Background = (task: Promise<void>) => void;
 
 export function createCloudflareModel(env: ServiceEnv, modelName: string) {
-  // Gemma can otherwise spend the entire output budget on hidden reasoning,
-  // producing a successful response with no user-visible text.
-  const modelSettings = {
-    reasoning_effort: null,
-    chat_template_kwargs: { enable_thinking: false },
-  } as const;
+  // Gemma needs thinking disabled to leave room for visible output. GLM 5.3
+  // Flash does not support disabling reasoning, so use its lowest effort.
+  const modelSettings =
+    modelName === '@cf/google/gemma-4-26b-a4b-it'
+      ? ({ reasoning_effort: null, chat_template_kwargs: { enable_thinking: false } } as const)
+      : modelName === DEFAULT_AI_MODEL
+        ? ({ reasoning_effort: 'low' } as const)
+        : {};
   if (env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN) {
     return createWorkersAI({
       accountId: env.CLOUDFLARE_ACCOUNT_ID,
@@ -57,50 +55,68 @@ export function createConfiguredModel(env: ServiceEnv, modelName: string) {
   return createCloudflareModel(env, modelName);
 }
 
+export function modelNameForPersona(env: ServiceEnv, persona: Persona): string {
+  if ((env.AI_PROVIDER ?? 'cloudflare') === 'openrouter')
+    return env.AI_MODEL ?? OPENROUTER_DEFAULT_MODEL;
+  return persona.model ?? env.AI_MODEL ?? DEFAULT_AI_MODEL;
+}
+
+/** Abort on the caller's signal or once `ms` elapses, whichever comes first. */
+function withDeadline(signal: AbortSignal | undefined, ms: number): AbortSignal {
+  const deadline = AbortSignal.timeout(ms);
+  return signal ? AbortSignal.any([signal, deadline]) : deadline;
+}
+
 function createSecondaryContext(
   env: ServiceEnv,
-  background: ((task: Promise<void>) => void) | undefined,
+  background: Background | undefined,
   input: AgentTurnInput,
+  modelName: string,
   signal: AbortSignal | undefined,
-  ms: number,
 ) {
-  const controller = new AbortController();
-  const abort = () => controller.abort(signal?.reason);
-  if (signal?.aborted) abort();
-  else signal?.addEventListener('abort', abort, { once: true });
-  const deadline = setTimeout(() => controller.abort('generation deadline exceeded'), ms);
   const telemetry = input.telemetryUserId ? createApiTelemetry(env) : null;
   const finish = async () => {
-    clearTimeout(deadline);
-    signal?.removeEventListener('abort', abort);
     if (!telemetry) return;
     const cleanup = telemetry.flush();
     if (background) background(cleanup);
     else await cleanup;
   };
-  return { controller, telemetry, finish };
+  return {
+    signal: withDeadline(signal, 25_000),
+    trace: agentTrace(telemetry, input.telemetryUserId, modelName),
+    finish,
+  };
 }
 
 function createSecondaryOperations(
   env: ServiceEnv,
-  background: ((task: Promise<void>) => void) | undefined,
+  background: Background | undefined,
   configuredModel: ConfigureModel,
 ): Pick<AgentService, 'annotateTurn' | 'streamAnnotations' | 'streamNoteProposal'> {
+  const annotationRequest = (
+    input: AgentTurnInput,
+    assistantMessage: Message,
+    signal: AbortSignal | undefined,
+  ) => {
+    const { modelName, model } = configuredModel(input.persona);
+    const secondary = createSecondaryContext(env, background, input, modelName, signal);
+    const request = {
+      text: assistantMessage.content,
+      turnId: input.turnId,
+      conversationId: input.conversation.id,
+      model,
+      signal: secondary.signal,
+      trace: secondary.trace,
+      excludedQuotes: assistantMessage.annotations?.map(({ quote }) => quote) ?? [],
+    };
+    return { secondary, request };
+  };
   return {
     async annotateTurn(input: AgentTurnInput, assistantMessage: Message, signal?: AbortSignal) {
       if (!assistantMessage.content.trim()) return [];
-      const { modelName, model } = configuredModel();
-      const secondary = createSecondaryContext(env, background, input, signal, 25_000);
+      const { secondary, request } = annotationRequest(input, assistantMessage, signal);
       try {
-        return await annotateResponse(
-          assistantMessage.content,
-          input.turnId,
-          model,
-          secondary.controller.signal,
-          input.conversation.id,
-          secondaryTrace(secondary, input, modelName),
-          assistantMessage.annotations?.map(({ quote }) => quote) ?? [],
-        );
+        return await annotateResponse(request);
       } finally {
         await secondary.finish();
       }
@@ -110,43 +126,26 @@ function createSecondaryOperations(
       assistantMessage: Message,
       signal?: AbortSignal,
     ) {
-      const { modelName, model } = configuredModel();
-      const secondary = createSecondaryContext(env, background, input, signal, 25_000);
-      const stream = streamAnnotationResponse(
-        assistantMessage.content,
-        input.turnId,
-        model,
-        secondary.controller.signal,
-        input.conversation.id,
-        secondaryTrace(secondary, input, modelName),
-        false,
-        assistantMessage.annotations?.map(({ quote }) => quote) ?? [],
-      );
-      return streamWithSecondaryCleanup(stream, secondary);
+      const { secondary, request } = annotationRequest(input, assistantMessage, signal);
+      return streamWithSecondaryCleanup(streamAnnotationResponse(request), secondary);
     },
     async streamNoteProposal(
       input: AgentTurnInput,
       assistantMessage: Message,
       signal?: AbortSignal,
     ) {
-      const { modelName, model } = configuredModel();
-      const secondary = createSecondaryContext(env, background, input, signal, 25_000);
+      const { modelName, model } = configuredModel(input.persona);
+      const secondary = createSecondaryContext(env, background, input, modelName, signal);
       const stream = streamNoteProposal(
         input,
         assistantMessage,
         model,
-        secondary.controller.signal,
-        secondaryTrace(secondary, input, modelName),
+        secondary.signal,
+        secondary.trace,
       );
       return streamWithSecondaryCleanup(stream, secondary);
     },
   };
-}
-
-function secondaryTrace(secondary: SecondaryContext, input: AgentTurnInput, modelName: string) {
-  return secondary.telemetry && input.telemetryUserId
-    ? { telemetry: secondary.telemetry, userId: input.telemetryUserId, model: modelName }
-    : undefined;
 }
 
 function streamWithSecondaryCleanup<T>(
@@ -162,40 +161,28 @@ function streamWithSecondaryCleanup<T>(
   })();
 }
 
-export function createAgentService(
-  env: ServiceEnv,
-  background?: (task: Promise<void>) => void,
-): AgentService {
-  const configuredModel = () => {
-    const provider = env.AI_PROVIDER ?? 'cloudflare';
-    const modelName =
-      env.AI_MODEL ?? (provider === 'openrouter' ? OPENROUTER_DEFAULT_MODEL : DEFAULT_AI_MODEL);
+/** A durable turn may run across Workflow steps, so its deadline is generous. */
+const TURN_DEADLINE_MS = 15 * 60_000;
+
+/**
+ * `background` defers telemetry flushes past the response (request handlers
+ * pass `waitUntil`); without it they are awaited inline.
+ */
+export function createAgentService(env: ServiceEnv, background?: Background): AgentService {
+  const configuredModel: ConfigureModel = (persona) => {
+    const modelName = modelNameForPersona(env, persona);
     return { modelName, model: createConfiguredModel(env, modelName) };
   };
   return {
-    async streamTurn(input: AgentTurnInput, signal?: AbortSignal) {
-      const { modelName, model } = configuredModel();
-      const controller = new AbortController();
-      const abort = () => controller.abort(signal?.reason);
-      if (signal?.aborted) abort();
-      else signal?.addEventListener('abort', abort, { once: true });
-      const deadline = setTimeout(() => controller.abort('generation deadline exceeded'), 300_000);
-      const context: TurnStreamContext = {
-        controller,
-        cleanup: () => {
-          clearTimeout(deadline);
-          signal?.removeEventListener('abort', abort);
-        },
-      };
+    async streamTurn(input: AgentTurnInput, checkpoints: AgentCheckpoints, signal?: AbortSignal) {
+      const { modelName, model } = configuredModel(input.persona);
       return streamTurnEvents({
         env,
         input,
         modelName,
         model,
-        context,
-        background,
-        streamMastraTurn,
-        streamAnnotationResponse,
+        signal: withDeadline(signal, TURN_DEADLINE_MS),
+        checkpoints,
       });
     },
     ...createSecondaryOperations(env, background, configuredModel),

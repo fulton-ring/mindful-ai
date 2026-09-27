@@ -1,35 +1,28 @@
-import type { AppConfig } from '@walden/contracts';
 import { Menu } from 'lucide-react';
 import { ResizablePanel } from '../../components/ui/resizable';
-import type { WorkspaceData } from '../data/app-types';
+import { useNoteDocument, useWorkspaceShell } from '../data/workspace-context';
 import { ConversationPanels } from './ConversationPanels';
 import { WorkspaceOverlays } from './WorkspaceOverlays';
 
-export function WorkspacePanel({ data, config }: { data: WorkspaceData; config: AppConfig }) {
+export function WorkspacePanel() {
+  const { noteOpen, mobilePane } = useWorkspaceShell();
   return (
     <ResizablePanel className="workspace-panel" minSize="420px">
       <div
-        className={`app-workspace with-chat ${data.noteOpen ? '' : 'without-note'} mobile-${data.mobilePane}`}
+        className={`app-workspace with-chat ${noteOpen ? '' : 'without-note'} mobile-${mobilePane}`}
       >
-        <MobileHeader data={data} />
-        <ConversationPanels data={data} />
-        <WorkspaceOverlays data={data} config={config} />
+        <MobileHeader />
+        <ConversationPanels />
+        <WorkspaceOverlays />
       </div>
     </ResizablePanel>
   );
 }
 
-function MobileHeader({ data }: { data: WorkspaceData }) {
-  const {
-    setSidebar,
-    conversation,
-    draft,
-    noteOnly,
-    startChatFromNote,
-    mobilePane,
-    closeNote,
-    showNote,
-  } = data;
+function MobileHeader() {
+  const { setSidebar, conversation, noteOnly, startChatFromNote, mobilePane, closeNote, showNote } =
+    useWorkspaceShell();
+  const { draft } = useNoteDocument();
   return (
     <header className="mobile-header">
       <button className="icon-button" aria-label="Open sidebar" onClick={() => setSidebar(true)}>

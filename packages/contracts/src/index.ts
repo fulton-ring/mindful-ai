@@ -67,6 +67,7 @@ export const noteDecisionSchema = z.object({
    */
   markdown: z.string().max(200_000).optional(),
 });
+export type NoteDecision = z.infer<typeof noteDecisionSchema>;
 export const noteHistoryActionSchema = z.object({
   baseRevision: z.number().int().nonnegative(),
   operationId: z.string().min(1),
@@ -81,15 +82,24 @@ export const personaIconSchema = z.enum([
   'pencil',
   'user',
 ]);
+export const PERSONA_MODELS = [
+  { id: '@cf/zai-org/glm-5.3-flash', label: 'GLM 5.3 Flash' },
+  { id: '@cf/google/gemma-4-26b-a4b-it', label: 'Gemma 4' },
+] as const;
+export type PersonaModel = (typeof PERSONA_MODELS)[number]['id'];
+const personaModelIds = PERSONA_MODELS.map((model) => model.id) as [
+  PersonaModel,
+  ...PersonaModel[],
+];
 export const personaSchema = z.object({
   id: z.string(),
   name: z.string().min(1).max(80),
   prompt: z.string().max(4000),
+  model: z.enum(personaModelIds).optional(),
   icon: personaIconSchema.optional(),
   brevity: z.enum(['brief', 'balanced', 'detailed']),
   challenge: z.enum(['gentle', 'balanced', 'direct']),
   tone: z.enum(['warm', 'neutral', 'direct']),
-  revision: z.number().int().nonnegative(),
 });
 export type Persona = z.infer<typeof personaSchema>;
 export const ACTIVE_ANNOTATION_KINDS = [
@@ -172,6 +182,7 @@ export type Message = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  attachments?: Array<{ id: string; name: string; mimeType: string; size: number }>;
   /** Persona that produced an assistant reply, as named when it was written. */
   personaName?: string;
   reasoning?: string;
@@ -216,6 +227,8 @@ export type ConversationSummary = {
   expiresAt: string;
 };
 export type ChatEvent =
+  | { type: 'reset' }
+  | { type: 'text-snapshot'; text: string; reasoning: string }
   | { type: 'text'; text: string }
   | { type: 'reasoning'; text: string }
   | { type: 'status'; text: string }
@@ -226,6 +239,7 @@ export type ChatEvent =
   | { type: 'intervention'; intervention: Intervention }
   | {
       type: 'done';
+      userMessageId?: string;
       message: Message;
       conversationId: string;
       branchId: string;
@@ -234,7 +248,23 @@ export type ChatEvent =
       annotationsHandled?: boolean;
     }
   | { type: 'usage'; usage: { inputTokens: number; outputTokens: number } }
-  | { type: 'error'; message: string; partialMessage?: Message };
+  | {
+      type: 'error';
+      message: string;
+      code?: ChatFailureCode;
+      partialMessage?: Message;
+      userMessageId?: string;
+      branchId?: string;
+    };
+export type ChatFailureCode =
+  | 'cancelled'
+  | 'timeout'
+  | 'rate_limited'
+  | 'quota_exhausted'
+  | 'provider_unavailable'
+  | 'provider_error'
+  | 'output_limit'
+  | 'internal_error';
 export type NoteProposalEvent =
   | { type: 'preview'; proposal: EditProposal; operationIndex?: number }
   | { type: 'done'; proposal: EditProposal | null; proposals?: EditProposal[]; reason?: string }
@@ -248,71 +278,75 @@ export const saveNoteSchema = z.object({
   baseRevision: z.number().int().nonnegative(),
   markdown: z.string().max(200000),
   provenance: z.array(provenanceSpanSchema).max(10000),
-  dismissSuggestionId: z.string().min(1).max(200).optional(),
   dismissSuggestionIds: z.array(z.string().min(1).max(200)).max(20).optional(),
 });
-export const chatRequestSchema = z.object({
-  requestId: z.string().min(1),
-  conversationId: z.string(),
-  branchId: z.string().min(1),
-  noteRevision: z.number().int().nonnegative().nullable(),
-  message: z.string().min(1).max(16000),
-  learningCheckResponse: z
-    .object({
-      checkId: z.string().min(1).max(200),
-      answers: z.record(
-        z.string().min(1).max(100),
-        z.object({ answers: z.array(z.string().min(1).max(1000)).min(1).max(2) }),
-      ),
-    })
-    .optional(),
-  personaId: z.string(),
-  regenerateMessageId: z.string().min(1).optional(),
-  editMessageId: z.string().min(1).optional(),
-  action: z
-    .enum(['message', 'challenge', 'source', 'capture', 'feedback', 'stop_checks'])
-    .default('message'),
-});
+export const chatRequestSchema = z
+  .object({
+    requestId: z.string().min(1),
+    conversationId: z.string(),
+    branchId: z.string().min(1),
+    noteRevision: z.number().int().nonnegative().nullable(),
+    message: z.string().max(16000),
+    attachmentIds: z.array(z.string().uuid()).max(5).optional(),
+    learningCheckResponse: z
+      .object({
+        checkId: z.string().min(1).max(200),
+        answers: z.record(
+          z.string().min(1).max(100),
+          z.object({ answers: z.array(z.string().min(1).max(1000)).min(1).max(2) }),
+        ),
+      })
+      .optional(),
+    personaId: z.string(),
+    regenerateMessageId: z.string().min(1).optional(),
+    editMessageId: z.string().min(1).optional(),
+    action: z
+      .enum(['message', 'challenge', 'source', 'capture', 'feedback', 'stop_checks'])
+      .default('message'),
+  })
+  .refine(
+    (request) => request.message.trim().length > 0 || Boolean(request.attachmentIds?.length),
+    {
+      message: 'Enter a message or attach a file.',
+      path: ['message'],
+    },
+  )
+  .refine(
+    (request) =>
+      request.message.length <= 2000 ||
+      Boolean(request.regenerateMessageId || request.editMessageId),
+    {
+      message: 'Messages are limited to 2,000 characters.',
+      path: ['message'],
+    },
+  );
 export type ChatRequest = z.infer<typeof chatRequestSchema>;
+/** Body of the per-message follow-up routes (annotations and note proposals). */
+export const messageFollowupRequestSchema = z
+  .object({
+    conversationId: z.string().min(1),
+    branchId: z.string().min(1),
+    personaId: z.string(),
+    noteRevision: z.number().int().nonnegative().nullable(),
+    noteProposalRequested: z.boolean().optional(),
+    action: z.literal('capture').optional(),
+    captureText: z.string().min(1).max(20_000).optional(),
+  })
+  .superRefine((value, context) => {
+    if ((value.action === 'capture') !== (typeof value.captureText === 'string'))
+      context.addIssue({
+        code: 'custom',
+        message: 'Capture action and text must be supplied together',
+      });
+  });
+export type MessageFollowupRequest = z.infer<typeof messageFollowupRequestSchema>;
 export type AppConfig = {
   authConfigured: boolean;
-  billingEnabled?: boolean;
-  billingConfigured: boolean;
   modelConfigured: boolean;
   clerkPublishableKey?: string;
   telemetry?: { key: string; host: string };
 };
-/**
- * Product analytics events. The server validates `kind` against this list, and
- * the client builds its payloads from the same type, so the two cannot drift —
- * they silently had, and every event was rejected for months.
- */
-export const PRODUCT_EVENT_KINDS = [
-  'session_started',
-  'session_ended',
-  'note_selected',
-  'own_words_saved',
-  'note_undo',
-  'conversation_opened',
-] as const;
-export type ProductEventKind = (typeof PRODUCT_EVENT_KINDS)[number];
-export type ProductEvent = {
-  kind: ProductEventKind;
-  sessionId: string;
-  id?: string;
-  occurredAt?: string;
-  metadata?: Record<string, boolean | number | string>;
-};
-
 export type Usage = {
-  plan: 'free' | 'personal';
-  used: number;
-  limit: number;
-  resetsAt: string;
-  provider: string;
-  model: string;
-  inputTokens: number;
-  outputTokens: number;
   /** Messages you have sent, across every thread that still exists. */
   messagesSent: number;
   /** The persona used in the most threads, or null when nothing stands out. */
@@ -328,7 +362,6 @@ export const DEFAULT_PERSONAS: Persona[] = [
     brevity: 'brief',
     challenge: 'balanced',
     tone: 'neutral',
-    revision: 0,
   },
   {
     id: 'critical-reader',
@@ -339,7 +372,6 @@ export const DEFAULT_PERSONAS: Persona[] = [
     brevity: 'balanced',
     challenge: 'direct',
     tone: 'direct',
-    revision: 0,
   },
   {
     id: 'study-partner',
@@ -350,6 +382,5 @@ export const DEFAULT_PERSONAS: Persona[] = [
     brevity: 'balanced',
     challenge: 'balanced',
     tone: 'neutral',
-    revision: 0,
   },
 ];

@@ -7,11 +7,18 @@ import {
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { all } from '../db/client';
-import { HttpError, jsonBody, newId, nowIso } from '../http';
+import { HttpError, newId, nowIso, parseBody } from '../http';
 import type { Bindings, Variables } from '../types';
 import { loadNoteState } from './history/history';
 import { moveNoteHistory } from './history/history-actions';
-import { NOTE_PROJECTION, type NoteRow, selectNote, toNote } from './repository';
+import {
+  DEFAULT_NOTE_TITLE,
+  insertNoteStatement,
+  NOTE_PROJECTION,
+  type NoteRow,
+  selectNote,
+  toNote,
+} from './repository';
 import { saveNote } from './save-note';
 import { decideSuggestion } from './suggestions/suggestion-decisions';
 
@@ -48,31 +55,31 @@ notesRoutes.get('/', async (c) =>
 );
 
 notesRoutes.post('/', async (c) => {
-  const parsed = createNoteSchema.safeParse(await jsonBody<unknown>(c));
-  if (!parsed.success) throw new HttpError(400, 'Invalid note', parsed.error.flatten());
+  const input = await parseBody(c, createNoteSchema, 'Invalid note');
   const now = nowIso();
   const note: Note = {
     id: newId(),
-    title: 'Untitled note',
-    markdown: parsed.data.markdown ?? '',
+    title: DEFAULT_NOTE_TITLE,
+    markdown: input.markdown ?? '',
     revision: 0,
     provenance: [],
     createdAt: now,
     updatedAt: now,
   };
-  await c.env.DB.prepare(
-    'INSERT INTO notes (id,owner_id,markdown,revision,provenance_json,created_at,updated_at,title) VALUES (?,?,?,?,?,?,?,?)',
-  )
-    .bind(note.id, c.get('userId'), note.markdown, 0, '[]', now, now, note.title)
-    .run();
+  await insertNoteStatement(c.env.DB, {
+    id: note.id,
+    ownerId: c.get('userId'),
+    now,
+    title: note.title,
+    markdown: note.markdown,
+  }).run();
   return c.json(note, 201);
 });
 
 /** Rename metadata without changing the content revision or undo chain. */
 notesRoutes.patch('/:id/title', async (c) => {
-  const parsed = renameNoteSchema.safeParse(await jsonBody<unknown>(c));
-  if (!parsed.success) throw new HttpError(400, 'Invalid note title', parsed.error.flatten());
-  const title = parsed.data.title.replace(/\s+/gu, ' ').trim();
+  const input = await parseBody(c, renameNoteSchema, 'Invalid note title');
+  const title = input.title.replace(/\s+/gu, ' ').trim();
   const result = await c.env.DB.prepare(
     'UPDATE notes SET title=?,updated_at=? WHERE id=? AND owner_id=?',
   )
@@ -100,9 +107,8 @@ notesRoutes.get('/:id/export', async (c) => {
 });
 
 notesRoutes.patch('/:id', async (c) => {
-  const parsed = saveNoteSchema.safeParse(await jsonBody<unknown>(c));
-  if (!parsed.success) throw new HttpError(400, 'Invalid note save', parsed.error.flatten());
-  return c.json(await saveNote(c.env.DB, c.get('userId'), c.req.param('id'), parsed.data));
+  const input = await parseBody(c, saveNoteSchema, 'Invalid note save');
+  return c.json(await saveNote(c.env.DB, c.get('userId'), c.req.param('id'), input));
 });
 
 notesRoutes.get('/:id/state', async (c) =>
@@ -110,33 +116,26 @@ notesRoutes.get('/:id/state', async (c) =>
 );
 
 notesRoutes.post('/:id/suggestions/:suggestionId/decision', async (c) => {
-  const parsed = noteDecisionSchema.safeParse(await jsonBody<unknown>(c));
-  if (!parsed.success) throw new HttpError(400, 'Invalid suggestion decision');
+  const input = await parseBody(c, noteDecisionSchema, 'Invalid suggestion decision');
   return c.json(
     await decideSuggestion(
       c.env.DB,
       c.get('userId'),
       c.req.param('id'),
       c.req.param('suggestionId'),
-      parsed.data,
+      input,
     ),
   );
 });
 
 notesRoutes.post('/:id/undo', async (c) => {
-  const parsed = noteHistoryActionSchema.safeParse(await jsonBody<unknown>(c));
-  if (!parsed.success) throw new HttpError(400, 'Invalid undo request');
-  return c.json(
-    await moveNoteHistory(c.env.DB, c.get('userId'), c.req.param('id'), 'undo', parsed.data),
-  );
+  const input = await parseBody(c, noteHistoryActionSchema, 'Invalid undo request');
+  return c.json(await moveNoteHistory(c.env.DB, c.get('userId'), c.req.param('id'), 'undo', input));
 });
 
 notesRoutes.post('/:id/redo', async (c) => {
-  const parsed = noteHistoryActionSchema.safeParse(await jsonBody<unknown>(c));
-  if (!parsed.success) throw new HttpError(400, 'Invalid redo request');
-  return c.json(
-    await moveNoteHistory(c.env.DB, c.get('userId'), c.req.param('id'), 'redo', parsed.data),
-  );
+  const input = await parseBody(c, noteHistoryActionSchema, 'Invalid redo request');
+  return c.json(await moveNoteHistory(c.env.DB, c.get('userId'), c.req.param('id'), 'redo', input));
 });
 
 notesRoutes.delete('/:id', async (c) => {

@@ -1,4 +1,4 @@
-import type { EditProposal, Note } from '@walden/contracts';
+import type { EditProposal, Note, NoteDecision, NoteState } from '@walden/contracts';
 import { additionEdit, rebaseQueueAfterAcceptance, resolveEdit } from '@walden/domain';
 import {
   acceptedProposalMarkdown,
@@ -7,21 +7,21 @@ import {
 import { proposalStillApplies } from '../../features/notes/proposals/proposal-scope';
 import { api } from '../../lib/api';
 import { id } from '../../lib/ids';
-import { track } from '../../lib/telemetry';
+import { failureDetails, track } from '../../lib/telemetry';
 import type { ConversationContext } from '../data/conversation-context';
-import type { ProposalRequest } from '../data/use-conversation-shell';
+import { NO_PREVIEWS, type ProposalRequest } from '../data/use-conversation-shell';
 import {
   cacheConversationUpdate,
   type NoteMutationScope,
   noteMutationBelongsToRoute,
+  writeCachedDraft,
 } from '../lifecycle/workspace-helpers';
 
-const NO_PREVIEWS: ReadonlySet<string> = new Set();
 type ProposalContext = ConversationContext;
 
 export type ProposalDependencies = {
   flush: () => Promise<number | null | false>;
-  applyNoteState: (state: import('@walden/contracts').NoteState, authoritative?: boolean) => void;
+  applyNoteState: (state: NoteState, authoritative?: boolean) => void;
 };
 
 async function prepareDecision(
@@ -42,7 +42,7 @@ async function runDecision(
   context: ProposalContext,
   dependencies: ProposalDependencies,
   value: EditProposal,
-  decision: 'accept' | 'reject',
+  decision: NoteDecision['decision'],
   current: Note,
   reviewedMarkdown: string | null,
 ) {
@@ -85,6 +85,11 @@ async function runDecision(
     })
     .catch((error) => {
       if (context.deletedNoteIds.current.has(value.noteId) || !isCurrent()) return false;
+      track('note_suggestion_failed', {
+        conversation_id: context.conversation?.id,
+        action: decision,
+        ...failureDetails(error),
+      });
       context.setNotice(
         error instanceof Error ? error.message : 'The suggestion could not be updated.',
       );
@@ -101,14 +106,17 @@ async function decideSuggestion(
   context: ProposalContext,
   dependencies: ProposalDependencies,
   value: EditProposal,
-  decision: 'accept' | 'reject',
+  decision: NoteDecision['decision'],
 ) {
   if (context.suggestionDecisionPromise.current) return context.suggestionDecisionPromise.current;
   if (context.suggestionDecisionPreparing.current) return false;
   context.suggestionDecisionPreparing.current = true;
   context.setDecisionPending(true);
   const current = await prepareDecision(context, dependencies, value);
-  if (!current) return resetDecision(context);
+  if (!current) {
+    track('action_blocked', { action: `suggestion_${decision}`, failure_code: 'note_not_ready' });
+    return resetDecision(context);
+  }
   if (decision === 'accept' && !value.oldText)
     context.queueOrderRef.current = pinAdditionQueue(
       current.markdown,
@@ -125,6 +133,7 @@ async function decideSuggestion(
         )
       : null;
   if (decision === 'accept' && reviewedMarkdown === null) {
+    track('action_blocked', { action: 'suggestion_accept', failure_code: 'proposal_conflict' });
     context.setNotice('This suggestion no longer matches the note. Refresh and review it again.');
     return resetDecision(context);
   }
@@ -252,6 +261,53 @@ function completeProposals(
     });
 }
 
+export type SuggestionDismissReason = 'typing' | 'reject';
+
+/**
+ * The reader dismissed a suggestion in the editor. A still-streaming preview cancels the whole
+ * request; typing over a suggestion hides it locally and records the dismissal with the next
+ * save; an explicit dismissal rejects it on the server.
+ */
+function dismissSuggestion(
+  context: ProposalContext,
+  dependencies: ProposalDependencies,
+  cancelProposalRequest: () => void,
+  reason: SuggestionDismissReason | undefined,
+  candidate: EditProposal | undefined,
+) {
+  const target = candidate ?? context.proposalRef.current;
+  if (!target) return;
+  const isActive = context.proposalRef.current?.id === target.id;
+  if (context.proposalRequestRef.current?.previewIds.has(target.id)) {
+    cancelProposalRequest();
+    return;
+  }
+  track('note_suggestion_rejected', { conversation_id: context.conversation?.id });
+  if (reason === 'typing') {
+    context.dismissedSuggestionIds.current.add(target.id);
+    context.setProposals((items) => items.filter((item) => item.id !== target.id));
+    if (isActive) context.setProposal(null);
+    context.dismissSuggestionsOnSave.current.add(target.id);
+    const current = context.draftRef.current;
+    if (current) writeCachedDraft(current, context.dismissSuggestionsOnSave.current);
+    return;
+  }
+  void decideSuggestion(context, dependencies, target, 'reject').then((updated) => {
+    if (updated && isActive) context.setProposal(null);
+  });
+}
+
+function startProposalRequest(context: ProposalContext, sourceId: string, capturedText?: string) {
+  context.setProposal(null);
+  context.setProposalRequest({
+    sourceId,
+    noteId: context.draftRef.current?.id ?? 'unsaved-note',
+    ...(capturedText ? { capturedText } : {}),
+    phase: 'streaming',
+    previewIds: NO_PREVIEWS,
+  });
+}
+
 export function useProposalActions(context: ProposalContext) {
   const acceptProposal = async (value: EditProposal, dependencies: ProposalDependencies) => {
     const request = context.proposalRequestRef.current;
@@ -298,6 +354,16 @@ export function useProposalActions(context: ProposalContext) {
     acceptProposal,
     cancelProposalRequest,
     previewProposal,
+    startProposalRequest: (sourceId: string, capturedText?: string) =>
+      startProposalRequest(context, sourceId, capturedText),
+    setProposalCanceler: (cancel: (() => Promise<NoteState | null>) | null) => {
+      context.cancelProposal.current = cancel;
+    },
+    dismissSuggestion: (
+      reason: SuggestionDismissReason | undefined,
+      candidate: EditProposal | undefined,
+      dependencies: ProposalDependencies,
+    ) => dismissSuggestion(context, dependencies, cancelProposalRequest, reason, candidate),
     completeProposals: (
       values: EditProposal[],
       sourceId: string,
@@ -305,7 +371,7 @@ export function useProposalActions(context: ProposalContext) {
     ) => completeProposals(context, dependencies, values, sourceId),
     decideSuggestion: (
       value: EditProposal,
-      decision: 'accept' | 'reject',
+      decision: NoteDecision['decision'],
       dependencies: ProposalDependencies,
     ) => decideSuggestion(context, dependencies, value, decision),
   };

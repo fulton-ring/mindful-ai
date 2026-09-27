@@ -33,12 +33,17 @@ async function fixture(markdown: string) {
     .run();
   await db
     .prepare(
-      "INSERT INTO messages (id,conversation_id,owner_id,role,content,sequence,created_at) VALUES ('source','conversation','owner','assistant','Source',1,'now')",
+      "INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,created_at) VALUES ('branch','conversation','owner',1,'now')",
     )
     .run();
   await db
     .prepare(
-      "INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,base_revision,old_text,new_text,reason,status,created_at,updated_at) VALUES ('suggestion','note','owner','conversation','source',1,'Keep cash.','Keep cash. Three months of expenses.','Save the target.','pending','1','1')",
+      "INSERT INTO messages (id,conversation_id,owner_id,role,content,created_at,origin_branch_id) VALUES ('source','conversation','owner','assistant','Source','now','branch')",
+    )
+    .run();
+  await db
+    .prepare(
+      "INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,branch_id,generation_key,base_revision,old_text,new_text,reason,status,created_at,updated_at) VALUES ('suggestion','note','owner','conversation','source','branch','source',1,'Keep cash.','Keep cash. Three months of expenses.','Save the target.','pending','1','1')",
     )
     .run();
   const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -102,7 +107,7 @@ describe('suggestions after concurrent note typing', () => {
       expect((await decide(decision)).status).toBe(200);
       await db
         .prepare(
-          "INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,base_revision,old_text,new_text,reason,status,created_at,updated_at) VALUES ('newer','note','owner','conversation','source',3,'Keep cash.','Keep cash. Newer.','Useful','pending','2','2')",
+          "INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,branch_id,generation_key,base_revision,old_text,new_text,reason,status,created_at,updated_at) VALUES ('newer','note','owner','conversation','source','branch','newer',3,'Keep cash.','Keep cash. Newer.','Useful','pending','2','2')",
         )
         .run();
 

@@ -24,7 +24,6 @@ function renderSettings(onClose = vi.fn()) {
   const view = render(
     <QueryClientProvider client={queryClient}>
       <SettingsPanel
-        config={{ authConfigured: false, billingConfigured: false, modelConfigured: true }}
         personas={[]}
         onEditPersona={vi.fn()}
         onCreatePersona={vi.fn()}
@@ -70,6 +69,14 @@ it('shows account controls and removes unavailable sections', () => {
   expect(view.getByRole('link', { name: 'Terms of Service' })).toBeTruthy();
 });
 
+it('keeps unavailable connectors disabled', () => {
+  const view = renderSettings();
+  const connectors = view.getByRole('button', { name: 'Connectors' });
+  expect(connectors.getAttribute('aria-disabled')).toBe('true');
+  fireEvent.click(connectors);
+  expect(view.getByRole('heading', { name: 'Account' })).toBeTruthy();
+});
+
 it('requires explicit confirmation before account deletion', () => {
   const view = renderSettings();
   fireEvent.click(view.getByRole('button', { name: 'Delete account' }));
@@ -83,23 +90,11 @@ it('requires explicit confirmation before account deletion', () => {
   expect(view.queryByRole('button', { name: 'Permanently delete account' })).toBeNull();
 });
 
-it('shows usage without provider, model, or tokens and never loads connections', async () => {
-  const connections = vi.spyOn(api, 'connections');
-  vi.spyOn(api, 'usage').mockResolvedValue({
-    used: 3,
-    messagesSent: 4,
-    favoritePersona: 'Mentor',
-    resetsAt: '2026-10-01',
-    provider: 'cloudflare',
-    model: 'gemma',
-    inputTokens: 500,
-    outputTokens: 200,
-  } as Awaited<ReturnType<typeof api.usage>>);
+it('shows usage', async () => {
+  vi.spyOn(api, 'usage').mockResolvedValue({ messagesSent: 4, favoritePersona: 'Mentor' });
   const view = renderSettings();
   fireEvent.click(view.getByRole('button', { name: /usage/i }));
   expect(await view.findByText('Messages sent')).toBeTruthy();
-  expect(view.queryByText(/Provider|Input tokens|Output tokens|gemma/i)).toBeNull();
-  expect(connections).not.toHaveBeenCalled();
 });
 
 it('keeps account deletion failures visible and retryable', async () => {

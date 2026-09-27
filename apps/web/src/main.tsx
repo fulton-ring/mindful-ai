@@ -7,6 +7,7 @@ import { createRoot } from 'react-dom/client';
 import 'katex/dist/katex.min.css';
 import { LegalLinks, LegalPage } from './features/legal/LegalPage';
 import { setTokenProvider } from './lib/api';
+import { isIdentityScopedDraftKey, storageKeys } from './lib/storage-keys';
 import { identifyTelemetry, initializeTelemetry, track } from './lib/telemetry';
 import { router } from './router';
 import './styles/tokens.css';
@@ -14,12 +15,10 @@ import './styles/tokens.css';
 const root = createRoot(document.getElementById('root')!);
 if (import.meta.hot) import.meta.hot.dispose(() => root.unmount());
 function Workspace({
-  config,
   identity,
   getToken,
   controls,
 }: {
-  config: AppConfig;
   identity: string;
   getToken?: () => Promise<string | null>;
   controls?: ReactNode;
@@ -30,14 +29,13 @@ function Workspace({
   const [ready, setReady] = useState(false);
   useEffect(() => {
     setTokenProvider(getToken ?? null);
-    const previous = sessionStorage.getItem('walden:identity');
+    const previous = sessionStorage.getItem(storageKeys.identity);
     if (previous && previous !== identity) {
       for (const key of Object.keys(sessionStorage))
-        if (key.startsWith('walden:draft:') || key.startsWith('walden:proposal:'))
-          sessionStorage.removeItem(key);
-      localStorage.removeItem('walden:last-note');
+        if (isIdentityScopedDraftKey(key)) sessionStorage.removeItem(key);
+      localStorage.removeItem(storageKeys.lastNote);
     }
-    sessionStorage.setItem('walden:identity', identity);
+    sessionStorage.setItem(storageKeys.identity, identity);
     setReady(true);
     return () => {
       setTokenProvider(null);
@@ -53,12 +51,12 @@ function Workspace({
   return (
     <>
       <QueryClientProvider client={client}>
-        <RouterProvider router={router} context={{ config, authControls: controls, identity }} />
+        <RouterProvider router={router} context={{ authControls: controls, identity }} />
       </QueryClientProvider>
     </>
   );
 }
-function ClerkWorkspace({ config }: { config: AppConfig }) {
+function ClerkWorkspace() {
   const { isLoaded, isSignedIn, userId, getToken } = useAuth();
   useEffect(() => {
     if (isLoaded) identifyTelemetry(isSignedIn ? userId : null);
@@ -90,15 +88,7 @@ function ClerkWorkspace({ config }: { config: AppConfig }) {
         <LegalLinks />
       </main>
     );
-  return (
-    <Workspace
-      key={userId}
-      identity={userId}
-      config={config}
-      getToken={getToken}
-      controls={controls}
-    />
-  );
+  return <Workspace key={userId} identity={userId} getToken={getToken} controls={controls} />;
 }
 async function boot() {
   if (location.pathname === '/privacy' || location.pathname === '/terms') {
@@ -124,7 +114,7 @@ async function boot() {
     root.render(
       <StrictMode>
         <ClerkProvider publishableKey={config.clerkPublishableKey} afterSignOutUrl="/">
-          <ClerkWorkspace config={config} />
+          <ClerkWorkspace />
         </ClerkProvider>
       </StrictMode>,
     );

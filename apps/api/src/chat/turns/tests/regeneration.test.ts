@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { batchIfAny, editContext, regenerationContext } from '../routes';
+import { batchIfAny, editContext, regenerationContext } from '../turn-support';
 
 const message = (id: string, role: 'user' | 'assistant', content: string, incomplete = false) => ({
   id,

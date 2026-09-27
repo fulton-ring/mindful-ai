@@ -2,14 +2,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import type { Conversation, ConversationSummary } from '@walden/contracts';
 import { useCallback, useEffect, useRef } from 'react';
+import { storageKeys } from '../../lib/storage-keys';
 import { cacheConversationUpdate, writeDismissedNotePanels } from '../lifecycle/workspace-helpers';
 import type {
   useConversationQueries,
   usePanelState,
   useRouteState,
 } from './use-conversation-shell';
-
-const LAST_NOTE = 'walden:last-note';
 
 type NavigationContext = {
   identity?: string;
@@ -79,7 +78,7 @@ export function useConversationNavigation({ identity, route, panel, query }: Nav
   );
   useEffect(() => {
     if (conversationQuery.data && !conversationQuery.data.noteId)
-      localStorage.removeItem(LAST_NOTE);
+      localStorage.removeItem(storageKeys.lastNote);
   }, [conversationQuery.data?.id, conversationQuery.data?.noteId]);
-  return { queryClient, navigate, setConversation, adoptingConversationId };
+  return { navigate, setConversation, adoptingConversationId };
 }

@@ -30,10 +30,10 @@ vi.mock('../../../http', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../http')>()),
   newId: () => 'proposal-attempt',
 }));
-vi.mock('../../conversations/conversations', () => ({
+vi.mock('../../conversations/repository', () => ({
   loadConversation: mocks.loadConversation,
 }));
-vi.mock('../../turns/routes', () => ({
+vi.mock('../../turns/turn-support', () => ({
   personaFor: mocks.personaFor,
 }));
 vi.mock('../../../notes/suggestions/suggestions', () => ({

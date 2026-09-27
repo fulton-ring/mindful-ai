@@ -173,9 +173,6 @@
     max-width: min(34rem, 82%);
     margin-bottom: 2.25rem;
   }
-  .message.user .message-role {
-    display: none;
-  }
   .message.user p {
     margin: 0;
     line-height: 1.5;
@@ -298,14 +295,6 @@
     padding: 0.25rem 0.65rem;
     border-radius: 0.5rem;
     font-size: 0.8rem;
-  }
-  .message-role {
-    display: block;
-    color: var(--muted);
-    font-size: 0.68rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
   }
   .wash {
     color: inherit;

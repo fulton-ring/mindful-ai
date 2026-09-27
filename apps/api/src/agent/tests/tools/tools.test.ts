@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { noteProposalFromCandidate } from '../../index';
+import { noteProposalFromCandidate } from '../../note-proposals/note-proposals';
 
 const note = {
   id: 'note-1',

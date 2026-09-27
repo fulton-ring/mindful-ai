@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouterState } from '@tanstack/react-router';
+import { useMatch } from '@tanstack/react-router';
 import type {
   Conversation,
   ConversationSummary,
@@ -12,10 +12,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePanelRef } from 'react-resizable-panels';
 import { matchesSearch, sidebarGroups } from '../../features/chat/thread-list';
 import { api } from '../../lib/api';
+import { storageKeys } from '../../lib/storage-keys';
 import { track } from '../../lib/telemetry';
-import { isExpiredNoteConversation, readDismissedNotePanels } from '../lifecycle/workspace-helpers';
+import type { CaptureAttempt } from '../actions/capture-note';
+import {
+  isExpiredNoteConversation,
+  readDismissedNotePanels,
+  type SaveState,
+} from '../lifecycle/workspace-helpers';
 
-const NO_PREVIEWS: ReadonlySet<string> = new Set();
+export const NO_PREVIEWS: ReadonlySet<string> = new Set();
 
 export type ProposalRequest = {
   sourceId: string;
@@ -26,22 +32,23 @@ export type ProposalRequest = {
 };
 
 export function useRouteState() {
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const activeBranchId = useRouterState({
-    select: (state) =>
-      typeof (state.location.search as { branch?: unknown }).branch === 'string'
-        ? ((state.location.search as { branch: string }).branch ?? null)
-        : null,
+  // The workspace renders from the root route, so it reads the child route matches by id.
+  const conversationRoute = useMatch({
+    from: '/conversations/$conversationId',
+    shouldThrow: false,
+    select: (match) => ({ id: match.params.conversationId, branch: match.search.branch }),
   });
-  const activeConversationId = pathname.startsWith('/conversations/')
-    ? decodePathPart(pathname.slice('/conversations/'.length))
-    : null;
-  const activeNoteId = pathname.startsWith('/notes/')
-    ? decodePathPart(pathname.slice('/notes/'.length))
-    : null;
+  const activeNoteId =
+    useMatch({
+      from: '/notes/$noteId',
+      shouldThrow: false,
+      select: (match) => match.params.noteId,
+    }) ?? null;
+  const activeConversationId = conversationRoute?.id ?? null;
+  const activeBranchId = conversationRoute?.branch ?? null;
   const activeRoute = useRef({ conversationId: activeConversationId, branchId: activeBranchId });
   activeRoute.current = { conversationId: activeConversationId, branchId: activeBranchId };
-  return { pathname, activeBranchId, activeConversationId, activeNoteId, activeRoute };
+  return { activeBranchId, activeConversationId, activeNoteId, activeRoute };
 }
 
 export function usePanelState(identity?: string) {
@@ -53,7 +60,7 @@ export function usePanelState(identity?: string) {
   const [desktop, setDesktop] = useState(() => matchMedia('(min-width: 761px)').matches);
   const [mobilePane, setMobilePane] = useState<'note' | 'chat'>('chat');
   const notePanelRef = usePanelRef();
-  const noteWidth = useRef(Number(localStorage.getItem('walden:note-width')) || 45);
+  const noteWidth = useRef(Number(localStorage.getItem(storageKeys.noteWidth)) || 45);
   useEffect(() => {
     if (noteOpen) notePanelRef.current?.resize(`${noteWidth.current}%`);
     else notePanelRef.current?.collapse();
@@ -85,7 +92,7 @@ export function usePanelState(identity?: string) {
 
 export function useThemeState() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() =>
-    localStorage.getItem('walden:theme') === 'dark' ? 'dark' : 'light',
+    localStorage.getItem(storageKeys.theme) === 'dark' ? 'dark' : 'light',
   );
   function changeTheme(value: 'light' | 'dark') {
     setTheme(value);
@@ -93,7 +100,7 @@ export function useThemeState() {
   }
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    localStorage.setItem('walden:theme', theme);
+    localStorage.setItem(storageKeys.theme, theme);
   }, [theme]);
   return { theme, setTheme, changeTheme };
 }
@@ -107,10 +114,9 @@ function useDraftState() {
   });
   const unsavedDraftRef = useRef(unsavedDraft);
   const unsavedPersistPromise = useRef<Promise<boolean> | null>(null);
-  const [saveState, setSaveStateValue] =
-    useState<import('../lifecycle/workspace-helpers').SaveState>('idle');
-  const saveStateRef = useRef<import('../lifecycle/workspace-helpers').SaveState>('idle');
-  const setSaveState = useCallback((value: import('../lifecycle/workspace-helpers').SaveState) => {
+  const [saveState, setSaveStateValue] = useState<SaveState>('idle');
+  const saveStateRef = useRef<SaveState>('idle');
+  const setSaveState = useCallback((value: SaveState) => {
     saveStateRef.current = value;
     setSaveStateValue(value);
   }, []);
@@ -206,10 +212,7 @@ function useEditorActivityState() {
   } | null>(null);
   const [noteToDelete, setNoteToDelete] = useState<Note | null>(null);
   const [threadOptionsId, setThreadOptionsId] = useState<string | null>(null);
-  const sessionStarted = useRef(false);
-  const ownWordsRecorded = useRef(false);
   const conversationPromise = useRef<Promise<Conversation> | null>(null);
-  const adoptingConversationId = useRef<string | null>(null);
   return {
     dismissSuggestionsOnSave,
     suggestionDecisionPromise,
@@ -226,10 +229,7 @@ function useEditorActivityState() {
     setNoteToDelete,
     threadOptionsId,
     setThreadOptionsId,
-    sessionStarted,
-    ownWordsRecorded,
     conversationPromise,
-    adoptingConversationId,
   };
 }
 
@@ -240,7 +240,7 @@ export function useEditorState() {
   const deletedNoteIds = useRef(new Set<string>());
   const deletedThreadIds = useRef(new Set<string>());
   const capturePromise = useRef<Promise<boolean> | null>(null);
-  const captureAttempt = useRef<import('../actions/capture-note').CaptureAttempt | null>(null);
+  const captureAttempt = useRef<CaptureAttempt | null>(null);
   return {
     ...draft,
     ...proposal,
@@ -348,12 +348,4 @@ export function useConversationQueries(
     noteStateQuery,
     noteConversationKey,
   };
-}
-
-function decodePathPart(value: string) {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
 }

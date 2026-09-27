@@ -1,26 +1,29 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { message, noteEditor, sendMessage, signedIn as test } from './support';
 
-test('note autosave survives reload and chat leaves the note intact', async ({ page }) => {
+test('note autosave survives reload and chat leaves the note intact', async ({
+  page,
+  api,
+}, testInfo) => {
   page.on('pageerror', (error) => console.error(error.message));
-  await page.goto('/');
-  await page.getByRole('button', { name: 'New note', exact: true }).click();
+  const created = (await (await api.send('POST', '/api/notes', {})).json()) as { id: string };
   const title = `Smoke ${Date.now()}`;
-  await page.getByRole('textbox', { name: 'Note title' }).fill(title);
-  await page.locator('.cm-content').fill('My own starting thought.');
-  await expect
-    .poll(async () => {
-      const response = await page.request.get('/api/notes');
-      const notes = await response.json();
-      return notes.find((note: { title: string }) => note.title === title)?.markdown;
-    })
-    .toBe('My own starting thought.');
-  await page.reload();
-  await page.getByRole('button', { name: new RegExp(title) }).click();
-  await expect(page.locator('.cm-content')).toContainText('My own starting thought.');
-  await page.getByRole('button', { name: 'Open conversation', exact: true }).last().click();
-  await page.getByRole('textbox', { name: 'Message' }).fill('Help me consider this thought.');
-  await page.getByRole('button', { name: 'Send message' }).click();
-  await expect(page.getByRole('button', { name: 'Send message' })).toBeVisible({ timeout: 15000 });
-  await expect(page.locator('.cm-content')).toContainText('My own starting thought.');
-  await page.screenshot({ path: '/tmp/walden-workspace.png', fullPage: true });
+  await api.send('PATCH', `/api/notes/${created.id}/title`, { title });
+  try {
+    await page.reload();
+    await page.getByRole('button', { name: `Open note: ${title}`, exact: true }).click();
+    await noteEditor(page).fill('My own starting thought.');
+    await expect
+      .poll(async () => (await api.get<{ markdown: string }>(`/api/notes/${created.id}`)).markdown)
+      .toBe('My own starting thought.');
+    await page.reload();
+    await page.getByRole('button', { name: `Open note: ${title}`, exact: true }).click();
+    await expect(noteEditor(page)).toContainText('My own starting thought.');
+    await expect(message(page)).toBeVisible();
+    await sendMessage(page, 'Help me consider this thought.');
+    await expect(noteEditor(page)).toContainText('My own starting thought.');
+    await page.screenshot({ path: testInfo.outputPath('workspace.png'), fullPage: true });
+  } finally {
+    await api.send('DELETE', `/api/notes/${created.id}`);
+  }
 });

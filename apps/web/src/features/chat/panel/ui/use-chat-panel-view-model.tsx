@@ -1,7 +1,11 @@
-import type { LearningCheck, LearningCheckResponse, Message } from '@walden/contracts';
+import type {
+  LearningCheck,
+  LearningCheckResponse,
+  Message,
+  MessageFollowupRequest,
+} from '@walden/contracts';
 import type { ReactNode } from 'react';
 
-import type { MessageFollowupRequest as ApiMessageFollowupRequest } from '../../../../lib/api';
 import {
   type ContextualActionId,
   contextualActionRequest,
@@ -117,7 +121,7 @@ function contextual(
 function highlightMessage(controller: ChatPanelController, messageId: string) {
   const conversationId = controller.activeConversationId.current;
   if (!conversationId || controller.annotationControllers.current.has(messageId)) return;
-  const input: ApiMessageFollowupRequest = {
+  const input: MessageFollowupRequest = {
     conversationId,
     branchId: controller.latestConversation.current?.branchId ?? '',
     personaId: controller.effectivePersonaId,

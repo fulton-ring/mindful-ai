@@ -22,16 +22,6 @@
     .app-workspace.mobile-chat .note-surface {
       visibility: hidden;
     }
-    .auth-view {
-      grid-template-columns: 1fr;
-      gap: 1rem;
-    }
-    .auth-copy {
-      text-align: center;
-    }
-    .auth-copy p {
-      margin: auto;
-    }
     .settings-layout {
       gap: 2rem;
     }
@@ -93,7 +83,7 @@
       display: flex;
       position: fixed;
       z-index: 18;
-      top: 0;
+      top: var(--visible-viewport-top, 0px);
       left: 0;
       right: 0;
       height: 52px;
@@ -150,8 +140,9 @@
       display: none;
     }
     .chat-panel {
-      inset: 52px 0 0 0;
-      height: calc(100dvh - 52px);
+      inset: calc(var(--visible-viewport-top, 0px) + 52px) 0 auto 0;
+      height: calc(var(--visible-viewport-height, 100dvh) - 52px);
+      max-height: calc(var(--visible-viewport-height, 100dvh) - 52px);
       z-index: 14;
     }
     .app-workspace.mobile-note .chat-panel {
@@ -188,12 +179,6 @@
     }
     .field-grid {
       grid-template-columns: 1fr;
-    }
-    .auth-view {
-      padding: 1.25rem;
-    }
-    .auth-copy h1 {
-      font-size: 2.4rem;
     }
   }
 }

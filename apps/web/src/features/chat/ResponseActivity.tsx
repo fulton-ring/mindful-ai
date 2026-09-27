@@ -12,7 +12,17 @@ import {
   SourcesContent,
   SourcesTrigger,
 } from '../../components/ai-elements/sources';
-import { toolLabel } from '../../components/ai-elements/tool';
+
+function toolLabel(name: string) {
+  if (name === 'readWebPage') return 'Read page';
+  if (name === 'searchSources') return 'Search sources';
+  if (name === 'searchWeb') return 'Search web';
+  const words = name
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .trim();
+  return words ? words[0]!.toUpperCase() + words.slice(1) : 'Tool';
+}
 
 function safeSource(source: MessageSource): (MessageSource & { domain: string }) | null {
   try {

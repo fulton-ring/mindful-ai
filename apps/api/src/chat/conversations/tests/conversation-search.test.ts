@@ -25,10 +25,10 @@ it('searches owned thread titles, messages, and note text while respecting expir
         ('note-thread','owner','note','Old title','now','2999-01-01','active','now'),
         ('expired-thread','owner',NULL,'Old','now','2000-01-01','expired','now'),
         ('other-thread','other',NULL,'Private','now','2999-01-01','active','now');
-      INSERT INTO messages (id,conversation_id,owner_id,role,content,sequence,created_at) VALUES
-        ('m1','message-thread','owner','user','The Calvin cycle fixes carbon.',1,'now'),
-        ('m2','expired-thread','owner','user','The Calvin cycle expired.',1,'now'),
-        ('m3','other-thread','other','user','The Calvin cycle is private.',1,'now');`,
+      INSERT INTO messages (id,conversation_id,owner_id,role,content,created_at) VALUES
+        ('m1','message-thread','owner','user','The Calvin cycle fixes carbon.','now'),
+        ('m2','expired-thread','owner','user','The Calvin cycle expired.','now'),
+        ('m3','other-thread','other','user','The Calvin cycle is private.','now');`,
   });
   const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
   app.use('*', async (c, next) => {

@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { sqliteD1Binding } from '../../../agent/memory/tests/d1-test-binding';
 import { HttpError } from '../../../http';
 import type { Bindings, Variables } from '../../../types';
-import { loadConversation } from '../../conversations/conversations';
+import { loadConversation } from '../../conversations/repository';
 import { highlightRoutes } from '../highlights';
 
 let db: D1Database;
@@ -53,12 +53,12 @@ async function createHighlightsDatabase(): Promise<D1Database> {
     .run();
   await database
     .prepare(
-      "INSERT INTO conversation_branches (id,conversation_id,owner_id,head_message_id,is_default,status,last_user_activity_at,expires_at,created_at) VALUES ('branch','conversation','owner',NULL,1,'active','now','2999-01-01','now')",
+      "INSERT INTO conversation_branches (id,conversation_id,owner_id,head_message_id,is_default,status,created_at) VALUES ('branch','conversation','owner',NULL,1,'active','now')",
     )
     .run();
   await database
     .prepare(
-      "INSERT INTO messages (id,conversation_id,owner_id,role,content,sequence,created_at,origin_branch_id) VALUES ('message','conversation','owner','assistant','A😀B answer',1,'now','branch')",
+      "INSERT INTO messages (id,conversation_id,owner_id,role,content,created_at,origin_branch_id) VALUES ('message','conversation','owner','assistant','A😀B answer','now','branch')",
     )
     .run();
   await database

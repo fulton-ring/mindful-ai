@@ -1,10 +1,4 @@
-export type MarkdownBlock = { id: number; start: number; end: number; text: string };
-
-export type MarkdownPlacement = {
-  blockId: number;
-  position: 'before' | 'after';
-  text: string;
-};
+type MarkdownBlock = { id: number; start: number; end: number; text: string };
 
 export const markdownBlocks = (markdown: string): MarkdownBlock[] => {
   const blocks: MarkdownBlock[] = [];
@@ -24,46 +18,6 @@ export const markdownBlocks = (markdown: string): MarkdownBlock[] => {
     blocks.push({ id: blocks.length, start, end, text: markdown.slice(start, end) });
   return blocks;
 };
-
-const occurrenceCount = (value: string, needle: string) => {
-  let count = 0;
-  let offset = 0;
-  while (true) {
-    offset = value.indexOf(needle, offset);
-    if (offset < 0) break;
-    count += 1;
-    offset += Math.max(1, needle.length);
-  }
-  return count;
-};
-
-export function resolveMarkdownPlacement(
-  markdown: string,
-  placement: MarkdownPlacement,
-): { oldText: string; newText: string } | null {
-  if (!placement.text) return null;
-  const blocks = markdownBlocks(markdown);
-  const selected = blocks[placement.blockId];
-  if (!selected) return null;
-  let left = placement.blockId;
-  let right = placement.blockId;
-  let oldText = selected.text;
-  while (occurrenceCount(markdown, oldText) !== 1) {
-    if (left > 0) left -= 1;
-    else if (right < blocks.length - 1) right += 1;
-    else return null;
-    oldText = markdown.slice(blocks[left].start, blocks[right].end);
-  }
-  const insertion =
-    placement.position === 'before'
-      ? selected.start - blocks[left].start
-      : selected.end - blocks[left].start;
-  const newText =
-    placement.position === 'before'
-      ? `${oldText.slice(0, insertion)}${placement.text}\n\n${oldText.slice(insertion)}`
-      : `${oldText.slice(0, insertion)}\n\n${placement.text}${oldText.slice(insertion)}`;
-  return { oldText, newText };
-}
 
 /**
  * Words that carry no identifying content. A candidate note addition is only
@@ -89,7 +43,7 @@ const stem = (word: string) =>
   word.replace(/(?:ing|ed|es|s)$/u, '').replace(/([bcdfghjklmnpqrstvwxz])\1$/u, '$1');
 
 /** Meaningful word stems in a fragment of Markdown, ignoring list/heading syntax. */
-export const significantStems = (text: string): Set<string> => {
+const significantStems = (text: string): Set<string> => {
   const stems = new Set<string>();
   for (const word of text.toLowerCase().split(/[^\p{L}\p{N}]+/u)) {
     if (!word || STOP_WORDS.has(word)) continue;

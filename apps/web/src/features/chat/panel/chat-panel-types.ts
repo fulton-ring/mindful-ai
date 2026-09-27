@@ -36,11 +36,3 @@ export type ChatPanelProps = {
   ): void;
   onGhostBatch?(values: EditProposal[], sourceId: string): void;
 };
-
-export type ChatAction =
-  | 'message'
-  | 'challenge'
-  | 'source'
-  | 'capture'
-  | 'feedback'
-  | 'stop_checks';

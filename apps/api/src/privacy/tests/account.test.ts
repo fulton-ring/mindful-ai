@@ -95,13 +95,13 @@ it('exports only current owned transcripts even before cleanup, while preserving
         .run();
       await db
         .prepare(
-          "INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,status,last_user_activity_at,expires_at,created_at) VALUES (?,?,?,1,?,'now',?,'now')",
+          "INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,status,created_at) VALUES (?,?,?,1,?,'now')",
         )
-        .bind(id, id, owner, status, expiry)
+        .bind(id, id, owner, status)
         .run();
       await db
         .prepare(
-          "INSERT INTO messages (id,conversation_id,owner_id,role,content,sequence,created_at,origin_branch_id) VALUES (?,?,?,'assistant','Transcript',1,'now',?)",
+          "INSERT INTO messages (id,conversation_id,owner_id,role,content,created_at,origin_branch_id) VALUES (?,?,?,'assistant','Transcript','now',?)",
         )
         .bind(id, id, owner, id)
         .run();

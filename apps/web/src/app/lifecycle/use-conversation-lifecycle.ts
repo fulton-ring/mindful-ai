@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { additionQueueOrder } from '../../features/notes/proposals/pending-projection';
+import { storageKeys } from '../../lib/storage-keys';
 import type {
   useConversationQueries,
   useEditorState,
@@ -8,7 +9,9 @@ import type {
 } from '../data/use-conversation-shell';
 import {
   cachedDismissedSuggestionIds,
+  clearCachedDraft,
   isLazyConversationAdoption,
+  readCachedDraft,
   restoreCachedNoteDraft,
   visiblePendingSuggestions,
 } from './workspace-helpers';
@@ -126,12 +129,11 @@ function useDraftLifecycle({ editor, query }: Pick<LifecycleContext, 'editor' | 
       return;
     }
     if (unsavedPersistPromise.current && editor.unsavedDraftRef.current.markdown) return;
-    const storageKey = `walden:draft:${selected.id}`;
-    const stored = sessionStorage.getItem(storageKey);
+    const stored = readCachedDraft(selected.id);
     const restored = restoreCachedNoteDraft(selected, stored);
     dismissedSuggestionIds.current.clear();
     dismissSuggestionsOnSave.current.clear();
-    if (stored && restored.state === 'idle') sessionStorage.removeItem(storageKey);
+    if (stored && restored.state === 'idle') clearCachedDraft(selected.id);
     else {
       for (const id of cachedDismissedSuggestionIds(stored)) {
         dismissedSuggestionIds.current.add(id);
@@ -141,7 +143,7 @@ function useDraftLifecycle({ editor, query }: Pick<LifecycleContext, 'editor' | 
     setDraft(restored.draft);
     draftRef.current = restored.draft;
     setSaveState(restored.state);
-    localStorage.setItem('walden:last-note', selected.id);
+    localStorage.setItem(storageKeys.lastNote, selected.id);
   }, [
     selected?.id,
     dismissSuggestionsOnSave,

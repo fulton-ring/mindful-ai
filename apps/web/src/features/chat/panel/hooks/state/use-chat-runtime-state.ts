@@ -2,8 +2,6 @@ import type { Annotation, Conversation } from '@walden/contracts';
 import { useRef } from 'react';
 
 export function useChatRuntimeState(conversation: Conversation | null, scopeId: string | null) {
-  const optimisticMessageRef = useRef<import('@walden/contracts').Message | null>(null);
-  const sendingRef = useRef(false);
   const pendingTurnCancellation = useRef<Promise<unknown>>(Promise.resolve());
   const mainAbort = useRef<AbortController | undefined>(undefined);
   const annotationControllers = useRef(new Map<string, AbortController>());
@@ -28,8 +26,6 @@ export function useChatRuntimeState(conversation: Conversation | null, scopeId: 
   const followingResponse = useRef(true);
 
   return {
-    optimisticMessageRef,
-    sendingRef,
     pendingTurnCancellation,
     mainAbort,
     annotationControllers,

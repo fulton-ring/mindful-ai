@@ -10,7 +10,8 @@ import { HttpError, newId, nowIso } from '../../http';
 import { selectNote, toNote } from '../../notes/repository';
 import { persistNoteSuggestion } from '../../notes/suggestions/suggestions';
 import type { AgentService, AgentTurnInput } from '../../services/types';
-import { loadConversation } from '../conversations/conversations';
+import { loadConversation } from '../conversations/repository';
+import { createBackgroundSseStream } from '../sse';
 
 type NoteProposalGeneration = {
   db: D1Database;
@@ -190,13 +191,13 @@ function emitPersistenceConflict(emit: EmitProposal) {
 async function processFinalProposal(
   generation: NoteProposalGeneration,
   event: Extract<NoteProposalEvent, { type: 'done' }>,
-  controller: AbortController,
+  signal: AbortSignal,
   emit: EmitProposal,
   ids: AttemptIds,
   proposalAttemptId: string,
   undelivered: PendingSuggestion[],
 ) {
-  const state = await latestProposalNote(generation, controller.signal, emit);
+  const state = await latestProposalNote(generation, signal, emit);
   if (!state) return;
   const proposals = proposalsFrom(event);
   try {
@@ -214,7 +215,7 @@ async function processFinalProposal(
       proposalAttemptId,
       undelivered,
     );
-    if (controller.signal.aborted) return;
+    if (signal.aborted) return;
     const delivered = emit({
       type: 'done',
       proposal: persisted.at(-1) ?? null,
@@ -229,7 +230,7 @@ async function processFinalProposal(
 
 async function runProposalStream(
   generation: NoteProposalGeneration,
-  controller: AbortController,
+  signal: AbortSignal,
   emit: EmitProposal,
   proposalAttemptId: string,
   undelivered: PendingSuggestion[],
@@ -238,10 +239,10 @@ async function runProposalStream(
   const events = await generation.agent.streamNoteProposal(
     generation.input,
     generation.assistantMessage,
-    controller.signal,
+    signal,
   );
   for await (const event of events) {
-    if (controller.signal.aborted) return;
+    if (signal.aborted) return;
     const attemptEvent = withAttemptIds(event, ids);
     if (
       attemptEvent.type !== 'done' ||
@@ -253,7 +254,7 @@ async function runProposalStream(
     await processFinalProposal(
       generation,
       attemptEvent,
-      controller,
+      signal,
       emit,
       ids,
       proposalAttemptId,
@@ -271,49 +272,17 @@ async function cleanupProposalStream(
     await removeCancelledPendingSuggestion(generation.db, suggestion);
 }
 
-function closeStream(output: ReadableStreamDefaultController<Uint8Array>) {
-  try {
-    output.close();
-  } catch {
-    /* Reader already left. */
-  }
-}
-
 export function createNoteProposalStream(
   generation: NoteProposalGeneration,
 ): ReadableStream<Uint8Array> {
-  const controller = new AbortController();
   const proposalAttemptId = newId();
-  const abort = () => controller.abort('client disconnected');
-  generation.requestSignal.addEventListener('abort', abort, { once: true });
-  if (generation.requestSignal.aborted) abort();
-  const encoder = new TextEncoder();
-  return new ReadableStream<Uint8Array>({
-    start(output) {
-      const emit: EmitProposal = (event) => {
-        try {
-          output.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-          return true;
-        } catch {
-          controller.abort('response stream closed');
-          return false;
-        }
-      };
-      const undelivered: PendingSuggestion[] = [];
-      const run = async () => {
-        try {
-          await runProposalStream(generation, controller, emit, proposalAttemptId, undelivered);
-        } catch {
-          if (!controller.signal.aborted)
-            emit({ type: 'error', message: 'Could not prepare a note suggestion.' });
-        } finally {
-          await cleanupProposalStream(generation, undelivered);
-          generation.requestSignal.removeEventListener('abort', abort);
-          closeStream(output);
-        }
-      };
-      generation.waitUntil(run());
-    },
-    cancel: abort,
+  const undelivered: PendingSuggestion[] = [];
+  return createBackgroundSseStream<NoteProposalEvent>({
+    requestSignal: generation.requestSignal,
+    waitUntil: generation.waitUntil,
+    errorEvent: { type: 'error', message: 'Could not prepare a note suggestion.' },
+    run: (signal, emit) =>
+      runProposalStream(generation, signal, emit, proposalAttemptId, undelivered),
+    cleanup: () => cleanupProposalStream(generation, undelivered),
   });
 }

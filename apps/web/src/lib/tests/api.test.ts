@@ -52,23 +52,33 @@ describe('authenticated API transport', () => {
 });
 
 describe('authenticated API followups', () => {
-  it('requests annotations with the note revision captured for the turn', async () => {
-    const annotations = [
-      { id: 'annotation-1', quote: 'Clear answer', kind: 'claim', whose: 'assistant' },
-    ];
-    const fetchMock = vi.fn().mockResolvedValue(Response.json({ annotations }));
+  it('encodes ids and parses CRLF, multi-line server-sent event frames', async () => {
+    const annotation = { id: 'a-1', quote: 'Clear', kind: 'claim', whose: 'assistant' } as const;
+    const done = JSON.stringify({ type: 'done', annotations: [annotation] }, null, 1);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          `: comment\r\n\r\n${done.replace(/^/gm, 'data: ').replace(/\n/g, '\r\n')}\r\n\r\n`,
+        ),
+      );
     vi.stubGlobal('fetch', fetchMock);
+    const events: unknown[] = [];
 
-    await expect(
-      api.messageAnnotations('message-1', {
+    await streamMessageAnnotations(
+      'message/1',
+      {
         conversationId: 'conversation-1',
         branchId: 'branch-1',
         personaId: 'thinking-partner',
         noteRevision: 3,
-      }),
-    ).resolves.toEqual(annotations);
+      },
+      (event) => events.push(event),
+      new AbortController().signal,
+    );
+
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/chat/messages/message-1/annotations',
+      '/api/chat/messages/message%2F1/annotations?stream=1',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
@@ -79,6 +89,7 @@ describe('authenticated API followups', () => {
         }),
       }),
     );
+    expect(events).toEqual([{ type: 'done', annotations: [annotation] }]);
   });
 
   it('cancels a turn with a keepalive request for page teardown', async () => {
@@ -154,7 +165,7 @@ describe('note persistence API transport', () => {
       .mockResolvedValueOnce(Response.json(state));
     vi.stubGlobal('fetch', fetchMock);
 
-    await api.saveNote(note, 'save-1', 'Wednesday', [], 'suggestion-1');
+    await api.saveNote(note, 'save-1', 'Wednesday', [], ['suggestion-1']);
     await api.noteHistory('note-1', 'undo', 3, 'undo-1');
     await api.noteHistory('note-1', 'redo', 4, 'redo-1');
 
@@ -168,7 +179,7 @@ describe('note persistence API transport', () => {
           baseRevision: 2,
           markdown: 'Wednesday',
           provenance: [],
-          dismissSuggestionId: 'suggestion-1',
+          dismissSuggestionIds: ['suggestion-1'],
         }),
       }),
     );
@@ -205,10 +216,7 @@ describe('atomic note persistence API transport', () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json(note));
     vi.stubGlobal('fetch', fetchMock);
 
-    await api.saveNote(note, 'save-2', 'Wednesday', [], undefined, [
-      'suggestion-1',
-      'suggestion-2',
-    ]);
+    await api.saveNote(note, 'save-2', 'Wednesday', [], ['suggestion-1', 'suggestion-2']);
 
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/notes/note-1',
@@ -357,123 +365,114 @@ describe('stream interruption errors', () => {
   });
 });
 
-describe('stream cancellation transport', () => {
-  it('cancels its turn when the Worker dies before sending stream headers', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(new Response('Worker exceeded resource limits', { status: 500 }))
-      .mockResolvedValueOnce(Response.json({ cancelled: true }));
-    vi.stubGlobal('fetch', fetchMock);
-    await expect(
-      streamChat(
-        {
-          requestId: 'worker-killed',
-          conversationId: 'conversation-1',
-          branchId: 'branch-1',
-          noteRevision: null,
-          message: 'Synthetic test',
-          personaId: 'thinking-partner',
-          action: 'message',
-        },
-        () => undefined,
-        new AbortController().signal,
-      ),
-    ).rejects.toThrow();
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      '/api/chat/turns/worker-killed/cancel',
-      expect.any(Object),
-    );
-  });
+const durableInput = {
+  requestId: 'durable-request',
+  conversationId: 'conversation-1',
+  branchId: 'branch-1',
+  noteRevision: null,
+  message: 'Synthetic test',
+  personaId: 'thinking-partner',
+  action: 'message' as const,
+};
 
-  it('waits for server cancellation before releasing an interrupted turn', async () => {
-    let finishCancel: (() => void) | undefined;
+describe('durable chat transport', () => {
+  it('reattaches after a stream closes and resumes from its last event ID', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(new Response('data: {"type":"text","text":"Partial"}\n\n'))
-      .mockImplementationOnce(
-        () =>
-          new Promise<Response>((resolve) => {
-            finishCancel = () => resolve(Response.json({ cancelled: true }));
-          }),
+      .mockResolvedValueOnce(Response.json({ turnId: 'turn-1' }))
+      .mockResolvedValueOnce(
+        new Response('id: 1\ndata: {"type":"text-snapshot","text":"Partial","reasoning":""}\n\n'),
+      )
+      .mockResolvedValueOnce(
+        new Response('id: 2\ndata: {"type":"done","message":{"content":"Answer"}}\n\n'),
       );
     vi.stubGlobal('fetch', fetchMock);
-    let settled = false;
-    const result = streamChat(
-      {
-        requestId: 'interrupted',
-        conversationId: 'conversation-1',
-        branchId: 'branch-1',
-        noteRevision: null,
-        message: 'Synthetic test',
-        personaId: 'thinking-partner',
-        action: 'message',
-      },
-      () => undefined,
+    const events: string[] = [];
+    await streamChat(
+      durableInput,
+      (event) => events.push(event.type),
       new AbortController().signal,
-    ).catch((error) => {
-      settled = true;
-      return error;
-    });
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/chat/turns/interrupted/cancel');
-    expect(settled).toBe(false);
-    finishCancel?.();
-    expect(await result).toBeInstanceOf(Error);
-    expect(settled).toBe(true);
+    );
+    expect(events).toEqual(['text-snapshot', 'done']);
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      '/api/chat/turns',
+      '/api/chat/turns/turn-1/events?after=0',
+      '/api/chat/turns/turn-1/events?after=1',
+    ]);
   });
 });
 
-describe('stream completion transport', () => {
-  it('does not cancel after a terminal event callback throws', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response('data: {"type":"done"}\n\n'));
+describe('durable chat network recovery', () => {
+  it('replays from the last cursor after a network outage', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ turnId: 'turn-1' }))
+      .mockResolvedValueOnce(
+        new Response('id: 1\ndata: {"type":"text-snapshot","text":"Partial","reasoning":""}\n\n'),
+      )
+      .mockRejectedValueOnce(new TypeError('Network connection lost'))
+      .mockResolvedValueOnce(
+        new Response(
+          'id: 2\ndata: {"type":"text-snapshot","text":"Partial answer","reasoning":""}\n\nid: 3\ndata: {"type":"done"}\n\n',
+        ),
+      );
     vi.stubGlobal('fetch', fetchMock);
+    const events: string[] = [];
 
+    await streamChat(
+      durableInput,
+      (event) => events.push(event.type),
+      new AbortController().signal,
+    );
+
+    expect(events).toEqual(['text-snapshot', 'text-snapshot', 'done']);
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      '/api/chat/turns',
+      '/api/chat/turns/turn-1/events?after=0',
+      '/api/chat/turns/turn-1/events?after=1',
+      '/api/chat/turns/turn-1/events?after=1',
+    ]);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/cancel'))).toBe(false);
+  });
+});
+
+describe('durable chat observer cancellation', () => {
+  it('does not cancel a turn when an observer callback fails', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ turnId: 'turn-1' }))
+      .mockResolvedValueOnce(new Response('id: 1\ndata: {"type":"done"}\n\n'));
+    vi.stubGlobal('fetch', fetchMock);
     await expect(
       streamChat(
-        {
-          requestId: 'terminal-callback-error',
-          conversationId: 'conversation-1',
-          branchId: 'branch-1',
-          noteRevision: null,
-          message: 'Synthetic test',
-          personaId: 'thinking-partner',
-          action: 'message',
-        },
+        durableInput,
         () => {
           throw new Error('callback failed');
         },
         new AbortController().signal,
       ),
     ).rejects.toThrow('callback failed');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('reports a stream that closes without completion instead of silently succeeding', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response('data: {"type":"text","text":"Partial"}\n\n')),
-    );
+  it('does not cancel on a navigation abort', async () => {
+    const controller = new AbortController();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ turnId: 'turn-1' }))
+      .mockResolvedValueOnce(
+        new Response('id: 1\ndata: {"type":"text-snapshot","text":"Partial","reasoning":""}\n\n'),
+      );
+    vi.stubGlobal('fetch', fetchMock);
     await expect(
-      streamChat(
-        {
-          requestId: 'interrupted',
-          conversationId: 'conversation-1',
-          branchId: 'branch-1',
-          noteRevision: null,
-          message: 'Synthetic test',
-          personaId: 'thinking-partner',
-          action: 'message',
-        },
-        () => undefined,
-        new AbortController().signal,
-      ),
-    ).rejects.toThrow('response was interrupted');
+      streamChat(durableInput, () => controller.abort(), controller.signal),
+    ).rejects.toThrow();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/cancel'))).toBe(false);
   });
 });
 
 describe('conversation API transport', () => {
-  it('creates note-free conversations and links notes explicitly', async () => {
+  it('creates note-free conversations', async () => {
     const conversation = {
       id: 'conversation-1',
       noteId: null,
@@ -481,24 +480,14 @@ describe('conversation API transport', () => {
       expiresAt: '2026-09-25T00:00:00.000Z',
       learningChecksEnabled: false,
     };
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(Response.json({ data: conversation }))
-      .mockResolvedValueOnce(Response.json({ data: { ...conversation, noteId: 'note-1' } }));
+    const fetchMock = vi.fn().mockResolvedValueOnce(Response.json({ data: conversation }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await api.startConversation();
-    await api.linkConversationNote('conversation-1', 'note-1');
+    await expect(api.startConversation()).resolves.toEqual(conversation);
 
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
+    expect(fetchMock).toHaveBeenCalledWith(
       '/api/conversations',
       expect.objectContaining({ method: 'POST', body: '{}' }),
-    );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      '/api/conversations/conversation-1/note',
-      expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ noteId: 'note-1' }) }),
     );
   });
 });
@@ -551,7 +540,8 @@ describe('authenticated conversation transport', () => {
   it('uses bearer authentication for chat streams', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(new Response('data: [DONE]\n\n', { status: 200 }));
+      .mockResolvedValueOnce(Response.json({ turnId: 'turn-1' }))
+      .mockResolvedValueOnce(new Response('id: 1\ndata: {"type":"done"}\n\n', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     setTokenProvider(async () => 'fresh-token');
 

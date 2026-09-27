@@ -41,7 +41,6 @@ describe('PersonaPicker', () => {
       ...DEFAULT_PERSONAS[0]!,
       id: 'custom-coach',
       name: 'Writing coach',
-      revision: 1,
     };
     const personas = [...DEFAULT_PERSONAS, custom];
     const view = render(<PersonaPicker personas={personas} value={custom.id} onChange={vi.fn()} />);

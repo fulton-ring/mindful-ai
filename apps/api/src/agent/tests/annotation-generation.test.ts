@@ -11,9 +11,13 @@ vi.mock('@mastra/core/agent', () => ({
   },
 }));
 
-import { AnnotationGenerationError, annotateResponse, streamAnnotationResponse } from '../index';
+import {
+  AnnotationGenerationError,
+  annotateResponse,
+  streamAnnotationResponse,
+} from '../stream-events';
 
-const model = {} as Parameters<typeof annotateResponse>[2];
+const model = {} as Parameters<typeof annotateResponse>[0]['model'];
 const signal = () => new AbortController().signal;
 function objectStream(...values: unknown[]) {
   return new ReadableStream({
@@ -47,13 +51,13 @@ it('emits complete exact-quote classifications before the final object resolves'
     ),
     object: final,
   });
-  const iterator = streamAnnotationResponse(
-    'Use the smaller deployment.',
-    'turn-1',
+  const iterator = streamAnnotationResponse({
+    text: 'Use the smaller deployment.',
+    turnId: 'turn-1',
     model,
-    signal(),
-    'c-1',
-  )[Symbol.asyncIterator]();
+    signal: signal(),
+    conversationId: 'c-1',
+  })[Symbol.asyncIterator]();
 
   await expect(iterator.next()).resolves.toEqual({
     done: false,
@@ -86,13 +90,13 @@ it('deduplicates partial annotations and omits quotes absent from the response',
     object: Promise.resolve({ annotations: [candidate] }),
   });
   const result = [];
-  for await (const event of streamAnnotationResponse(
-    'Ordinary prose.',
-    'turn-1',
+  for await (const event of streamAnnotationResponse({
+    text: 'Ordinary prose.',
+    turnId: 'turn-1',
     model,
-    signal(),
-    'c-1',
-  ))
+    signal: signal(),
+    conversationId: 'c-1',
+  }))
     result.push(event);
   expect(result.map((event) => event.type)).toEqual(['annotation', 'done']);
   expect(result.filter((event) => event.type === 'annotation')).toHaveLength(1);
@@ -104,7 +108,13 @@ it('preserves a valid empty classification for the JSON compatibility path', asy
     object: Promise.resolve({ annotations: [] }),
   });
   await expect(
-    annotateResponse('Ordinary prose.', 'turn-1', model, signal(), 'c-1'),
+    annotateResponse({
+      text: 'Ordinary prose.',
+      turnId: 'turn-1',
+      model,
+      signal: signal(),
+      conversationId: 'c-1',
+    }),
   ).resolves.toEqual([]);
   const options = mocks.stream.mock.calls[0]?.[1];
   expect(options.modelSettings.maxOutputTokens).toBe(2_400);
@@ -126,19 +136,25 @@ it('preserves a valid empty classification for the JSON compatibility path', asy
 it('surfaces structured-output failure as an error event and compatibility error', async () => {
   mocks.stream.mockRejectedValue(new Error('structured output was truncated'));
   const streamed = [];
-  for await (const event of streamAnnotationResponse(
-    'A meaningful claim.',
-    'turn-1',
+  for await (const event of streamAnnotationResponse({
+    text: 'A meaningful claim.',
+    turnId: 'turn-1',
     model,
-    signal(),
-    'c-1',
-  ))
+    signal: signal(),
+    conversationId: 'c-1',
+  }))
     streamed.push(event);
   expect(streamed).toEqual([
     { type: 'error', message: 'Highlights could not be generated. Please try again.' },
   ]);
   await expect(
-    annotateResponse('A meaningful claim.', 'turn-1', model, signal(), 'c-1'),
+    annotateResponse({
+      text: 'A meaningful claim.',
+      turnId: 'turn-1',
+      model,
+      signal: signal(),
+      conversationId: 'c-1',
+    }),
   ).rejects.toBeInstanceOf(AnnotationGenerationError);
 });
 
@@ -147,13 +163,13 @@ it('reports a provider allowance failure without exposing its payload', async ()
     new Error('Workers AI API error (429 Too Many Requests): daily free allocation exceeded'),
   );
   const events = [];
-  for await (const event of streamAnnotationResponse(
-    'Ice floats.',
-    'turn',
+  for await (const event of streamAnnotationResponse({
+    text: 'Ice floats.',
+    turnId: 'turn',
     model,
-    signal(),
-    'thread',
-  ))
+    signal: signal(),
+    conversationId: 'thread',
+  }))
     events.push(event);
   expect(events).toEqual([
     {
@@ -169,7 +185,13 @@ it('propagates cancellation without emitting an error event', async () => {
   controller.abort('cancelled');
   mocks.stream.mockRejectedValue(controller.signal.reason);
   await expect(
-    streamAnnotationResponse('A meaningful claim.', 'turn-1', model, controller.signal, 'c-1')
+    streamAnnotationResponse({
+      text: 'A meaningful claim.',
+      turnId: 'turn-1',
+      model,
+      signal: controller.signal,
+      conversationId: 'c-1',
+    })
       [Symbol.asyncIterator]()
       .next(),
   ).rejects.toBe('cancelled');
@@ -180,7 +202,13 @@ describe('annotation discernment', () => {
       objectStream: objectStream({ annotations: [] }),
       object: Promise.resolve({ annotations: [] }),
     });
-    await annotateResponse('Ordinary prose.', 'turn-1', model, signal(), 'c-1');
+    await annotateResponse({
+      text: 'Ordinary prose.',
+      turnId: 'turn-1',
+      model,
+      signal: signal(),
+      conversationId: 'c-1',
+    });
     const instructions = mocks.options.mock.calls.at(-1)?.[0].instructions as string;
     // A real exchange highlighted "If you can copy and paste the text here, I
     // will summarize it for you." - a request to the reader, not substance.

@@ -9,11 +9,10 @@
     }
   },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch --preserveWatchOutput",
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:unit": "vitest run"
+    "test": "vitest run"
   },
   "dependencies": {
     "@walden/contracts": "workspace:*"

@@ -1,4 +1,5 @@
-import { cleanup } from '@testing-library/react';
+import { EditorView } from '@codemirror/view';
+import { act, cleanup } from '@testing-library/react';
 import type { Annotation, Conversation, MessageHighlight } from '@walden/contracts';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, vi } from 'vitest';
@@ -7,10 +8,20 @@ const transport = vi.hoisted(() => ({
   setWebSearch: vi.fn(),
   setLearningChecks: vi.fn(),
   cancelTurn: vi.fn().mockResolvedValue({ cancelled: true }),
+  activeTurn: vi.fn().mockResolvedValue({ turn: null }),
+  conversation: vi.fn(),
+  attachChatTurn: vi.fn(),
   cancelNoteProposal: vi.fn().mockResolvedValue({ cancelledSuggestionIds: [], noteState: null }),
-  messageAnnotations: vi.fn(),
+  // Resolves the annotations the mocked streamMessageAnnotations reports as done.
+  annotationResults: vi.fn(),
   saveHighlight: vi.fn(),
   streamChat: vi.fn(),
+  uploadAttachment: vi.fn().mockResolvedValue({
+    id: 'uploaded',
+    name: 'paper.docx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    size: 5,
+  }),
   streamMessageAnnotations: vi.fn(),
   streamNoteProposal: vi.fn(),
 }));
@@ -19,20 +30,36 @@ export function getTransport() {
   return transport;
 }
 
+export function setComposerValue(element: HTMLElement, value: string) {
+  const editor = EditorView.findFromDOM(element);
+  if (!editor) throw new Error('Message editor was not mounted');
+  act(() => editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: value } }));
+}
+
+export function composerValue(element: HTMLElement) {
+  return EditorView.findFromDOM(element)?.state.doc.toString();
+}
+
 vi.mock('../../../lib/api', () => ({
   api: {
     setWebSearch: transport.setWebSearch,
     setLearningChecks: transport.setLearningChecks,
     cancelTurn: transport.cancelTurn,
+    activeTurn: transport.activeTurn,
+    conversation: transport.conversation,
     cancelNoteProposal: transport.cancelNoteProposal,
-    messageAnnotations: transport.messageAnnotations,
     saveHighlight: transport.saveHighlight,
   },
   streamChat: transport.streamChat,
+  attachChatTurn: transport.attachChatTurn,
+  uploadAttachment: transport.uploadAttachment,
   streamMessageAnnotations: transport.streamMessageAnnotations,
   streamNoteProposal: transport.streamNoteProposal,
 }));
-vi.mock('../../../lib/telemetry', () => ({ track: vi.fn() }));
+vi.mock('../../../lib/telemetry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../lib/telemetry')>()),
+  track: vi.fn(),
+}));
 vi.mock('../../highlights/AnnotatedText', () => ({
   AnnotatedText: ({
     text,
@@ -196,6 +223,9 @@ export function props(value = conversation('conversation-1')) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  transport.activeTurn.mockResolvedValue({ turn: null });
+  transport.attachChatTurn.mockReset();
+  transport.conversation.mockReset();
   transport.streamMessageAnnotations.mockImplementation(
     async (
       messageId: string,
@@ -203,11 +233,14 @@ beforeEach(() => {
       onEvent: (event: unknown) => void,
       signal: AbortSignal,
     ) => {
-      const annotations = await transport.messageAnnotations(messageId, input, signal);
+      const annotations = await transport.annotationResults(messageId, input, signal);
       onEvent({ type: 'done', annotations });
     },
   );
-  vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }));
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn().mockReturnValue({ matches: true, addListener: vi.fn(), removeListener: vi.fn() }),
+  );
   Object.defineProperty(navigator, 'clipboard', {
     configurable: true,
     value: { writeText: vi.fn().mockResolvedValue(undefined) },

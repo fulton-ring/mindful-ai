@@ -1,31 +1,21 @@
 import type {
-  Annotation,
   AnnotationEvent,
-  AppConfig,
   ChatEvent,
   ChatRequest,
   Conversation,
   ConversationSummary,
   EditProposal,
+  Message,
+  MessageFollowupRequest,
   MessageHighlight,
   Note,
+  NoteDecision,
   NoteProposalEvent,
   NoteState,
   Persona,
-  ProductEvent,
   ProvenanceSpan,
   Usage,
 } from '@walden/contracts';
-
-export type MessageFollowupRequest = {
-  conversationId: string;
-  branchId: string;
-  personaId: string;
-  noteRevision: number | null;
-  noteProposalRequested?: boolean;
-  action?: 'capture';
-  captureText?: string;
-};
 
 export class ApiError extends Error {
   constructor(
@@ -46,7 +36,9 @@ export function setTokenProvider(provider: TokenProvider | null) {
 
 async function fetchWithFreshAuth(path: string, init?: RequestInit): Promise<Response> {
   const firstToken = await tokenProvider?.();
-  const headers = new Headers({ 'content-type': 'application/json', ...init?.headers });
+  const headers = new Headers(init?.headers);
+  if (!(init?.body instanceof FormData) && !headers.has('content-type'))
+    headers.set('content-type', 'application/json');
   if (firstToken) headers.set('authorization', `Bearer ${firstToken}`);
   const response = await fetch(path, { ...init, headers });
   if (response.status !== 401 || !firstToken || !tokenProvider) return response;
@@ -55,6 +47,150 @@ async function fetchWithFreshAuth(path: string, init?: RequestInit): Promise<Res
   const retryHeaders = new Headers(headers);
   retryHeaders.set('authorization', `Bearer ${refreshedToken}`);
   return fetch(path, { ...init, headers: retryHeaders });
+}
+
+function sendWithProgress(
+  url: string,
+  file: File | FormData,
+  method: 'PUT' | 'POST',
+  headers: Record<string, string>,
+  signal: AbortSignal | undefined,
+  onProgress: (percent: number) => void,
+): Promise<{ status: number; body: unknown }> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Upload cancelled.', 'AbortError'));
+      return;
+    }
+    const request = new XMLHttpRequest();
+    request.open(method, url);
+    for (const [name, value] of Object.entries(headers)) request.setRequestHeader(name, value);
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable)
+        onProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)));
+    };
+    request.onload = () => {
+      let body: unknown;
+      try {
+        body = JSON.parse(request.responseText);
+      } catch {
+        body = undefined;
+      }
+      resolve({ status: request.status, body });
+    };
+    request.onerror = () => reject(new Error('Could not upload file.'));
+    request.onabort = () => reject(new DOMException('Upload cancelled.', 'AbortError'));
+    signal?.addEventListener('abort', () => request.abort(), { once: true });
+    request.send(file);
+  });
+}
+
+type UploadProgress = (percent: number) => void;
+type AttachmentMetadata = NonNullable<Message['attachments']>[number];
+
+async function uploadPresigned(
+  base: string,
+  intent: { id: string; uploadUrl: string; headers?: Record<string, string> },
+  file: File,
+  signal?: AbortSignal,
+  onProgress?: UploadProgress,
+): Promise<AttachmentMetadata> {
+  const uploaded = onProgress
+    ? await sendWithProgress(
+        intent.uploadUrl,
+        file,
+        'PUT',
+        intent.headers ?? {},
+        signal,
+        onProgress,
+      )
+    : await fetch(intent.uploadUrl, { method: 'PUT', headers: intent.headers, body: file, signal });
+  if (uploaded.status < 200 || uploaded.status >= 300)
+    throw new ApiError(uploaded.status, 'Could not upload file to storage.');
+  const completed = await fetchWithFreshAuth(base + path`/${intent.id}/complete`, {
+    method: 'POST',
+    body: JSON.stringify({ name: file.name }),
+    signal,
+  });
+  const metadata = await completed.json().catch(() => undefined);
+  if (!completed.ok)
+    throw new ApiError(completed.status, metadata?.error ?? 'Could not verify uploaded file.');
+  onProgress?.(100);
+  return metadata as AttachmentMetadata;
+}
+
+async function uploadLocal(
+  base: string,
+  file: File,
+  signal?: AbortSignal,
+  onProgress?: UploadProgress,
+): Promise<AttachmentMetadata> {
+  const form = new FormData();
+  form.set('file', file);
+  const token = await tokenProvider?.();
+  let response = onProgress
+    ? await sendWithProgress(
+        base,
+        form,
+        'POST',
+        token ? { authorization: `Bearer ${token}` } : {},
+        signal,
+        onProgress,
+      )
+    : await fetchWithFreshAuth(base, { method: 'POST', body: form, signal });
+  if (response.status === 401 && onProgress && token && tokenProvider) {
+    const refreshed = await tokenProvider({ skipCache: true });
+    if (refreshed && refreshed !== token)
+      response = await sendWithProgress(
+        base,
+        form,
+        'POST',
+        { authorization: `Bearer ${refreshed}` },
+        signal,
+        onProgress,
+      );
+  }
+  const body =
+    response instanceof Response
+      ? await response.json().catch(() => undefined)
+      : (response.body as { error?: string } | undefined);
+  if (response.status < 200 || response.status >= 300)
+    throw new ApiError(response.status, body?.error ?? 'Could not upload file.');
+  onProgress?.(100);
+  return body as AttachmentMetadata;
+}
+
+export async function uploadAttachment(
+  conversationId: string,
+  file: File,
+  signal?: AbortSignal,
+  onProgress?: (percent: number) => void,
+) {
+  const base = path`/api/chat/attachments/${conversationId}`;
+  const initiation = await fetchWithFreshAuth(`${base}/initiate`, {
+    method: 'POST',
+    body: JSON.stringify({ name: file.name, mimeType: file.type, size: file.size }),
+    signal,
+  });
+  const intent = await initiation.json().catch(() => undefined);
+  if (!initiation.ok)
+    throw new ApiError(initiation.status, intent?.error ?? 'Could not prepare file upload.');
+  if (intent?.mode === 'presigned') return uploadPresigned(base, intent, file, signal, onProgress);
+  if (intent?.mode !== 'local') throw new ApiError(503, 'File uploads are unavailable.');
+  return uploadLocal(base, file, signal, onProgress);
+}
+
+export async function fetchAttachment(
+  conversationId: string,
+  attachmentId: string,
+  signal?: AbortSignal,
+) {
+  const response = await fetchWithFreshAuth(
+    path`/api/chat/attachments/${conversationId}/${attachmentId}`,
+    { signal },
+  );
+  if (!response.ok) throw new ApiError(response.status, 'Could not open this file.');
+  return response.blob();
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -71,60 +207,82 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return ((body as { data?: T } | undefined)?.data ?? body) as T;
 }
 
-type StreamEventHandler<T> = (event: T) => void;
+type SseFrame = { id?: string; data: string };
 
-function parseStreamFrame<T>(
-  frame: string,
-  onEvent: StreamEventHandler<T>,
-  isTerminal: (event: T) => boolean,
-  onError?: (event: T) => void,
-) {
-  let terminal = false;
-  for (const line of frame.split('\n')) {
-    if (!line.startsWith('data:')) continue;
-    const data = line.slice(5).trim();
-    if (data === '[DONE]') {
-      terminal = true;
-      continue;
+function parseSseFrame(frame: string): SseFrame | null {
+  const lines = frame.split(/\r?\n/);
+  const data = lines
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice(5).trimStart())
+    .join('\n');
+  if (!data) return null;
+  const id = lines
+    .find((line) => line.startsWith('id:'))
+    ?.slice(3)
+    .trim();
+  return { id, data };
+}
+
+// Yields each server-sent event frame. Aborting the signal cancels the body, which ends
+// the iteration; a transport failure while reading also ends it rather than throwing, so
+// callers decide whether a stream that closed without a terminal event is an error.
+async function* readSseFrames(response: Response, signal: AbortSignal): AsyncGenerator<SseFrame> {
+  if (!response.body) return;
+  const reader = response.body.getReader();
+  const abort = () => {
+    void reader.cancel().catch(() => undefined);
+  };
+  signal.addEventListener('abort', abort, { once: true });
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    while (true) {
+      let chunk: ReadableStreamReadResult<Uint8Array>;
+      try {
+        chunk = await reader.read();
+      } catch {
+        return;
+      }
+      if (chunk.done) return;
+      buffer += decoder.decode(chunk.value, { stream: true });
+      const frames = buffer.split(/\r?\n\r?\n/);
+      buffer = frames.pop() ?? '';
+      for (const frame of frames) {
+        const parsed = parseSseFrame(frame);
+        if (parsed) yield parsed;
+      }
     }
-    if (!data) continue;
-    const event = JSON.parse(data) as T;
-    if (isTerminal(event)) terminal = true;
-    onEvent(event);
-    onError?.(event);
+  } finally {
+    signal.removeEventListener('abort', abort);
+    void reader.cancel().catch(() => undefined);
+    reader.releaseLock();
   }
-  return terminal;
 }
 
 async function consumeEventStream<T>(
   response: Response,
-  onEvent: StreamEventHandler<T>,
+  onEvent: (event: T) => void,
   isTerminal: (event: T) => boolean,
   signal: AbortSignal,
   interruptionMessage: string,
-  onError?: (event: T) => void,
 ) {
-  const reader = response.body?.getReader();
-  if (!reader) return false;
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let terminal = false;
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const frames = buffer.split(/\n\n/);
-      buffer = frames.pop() ?? '';
-      for (const frame of frames) {
-        terminal = parseStreamFrame(frame, onEvent, isTerminal, onError) || terminal;
-      }
-    }
-  } finally {
-    reader.releaseLock();
+  for await (const frame of readSseFrames(response, signal)) {
+    if (frame.data === '[DONE]') return;
+    const event = JSON.parse(frame.data) as T;
+    onEvent(event);
+    if (isTerminal(event)) return;
   }
-  if (!terminal && !signal.aborted) throw new Error(interruptionMessage);
-  return terminal;
+  signal.throwIfAborted();
+  throw new Error(interruptionMessage);
+}
+
+/** Encodes every interpolated value as a URI component: path`/api/notes/${id}`. */
+function path(strings: TemplateStringsArray, ...segments: Array<string | number>) {
+  return strings.reduce(
+    (url, part, index) =>
+      url + part + (index < segments.length ? encodeURIComponent(segments[index]!) : ''),
+    '',
+  );
 }
 
 async function streamError(response: Response, fallback: string): Promise<never> {
@@ -147,22 +305,19 @@ export const api = {
   exportAccount: () => request<unknown>('/api/account/export'),
   deleteAccount: () => request<void>('/api/account', { method: 'DELETE' }),
   setWebSearch: (conversationId: string, enabled: boolean) =>
-    request<{ webSearchEnabled: boolean }>(`/api/conversations/${conversationId}/web-search`, {
+    request<{ webSearchEnabled: boolean }>(path`/api/conversations/${conversationId}/web-search`, {
       method: 'PATCH',
       body: JSON.stringify({ enabled }),
     }),
   setLearningChecks: (conversationId: string, enabled: boolean) =>
     request<{ learningChecksEnabled: boolean }>(
-      `/api/conversations/${conversationId}/learning-checks`,
+      path`/api/conversations/${conversationId}/learning-checks`,
       { method: 'PATCH', body: JSON.stringify({ enabled }) },
     ),
-  config: () => request<AppConfig>('/api/config'),
   notes: () => request<Note[]>('/api/notes'),
-  createNote: () => request<Note>('/api/notes', { method: 'POST', body: '{}' }),
-  note: (id: string) => request<Note>(`/api/notes/${id}`),
-  noteState: (id: string) => request<NoteState>(`/api/notes/${id}/state`),
+  noteState: (id: string) => request<NoteState>(path`/api/notes/${id}/state`),
   renameNote: (id: string, title: string) =>
-    request<{ title: string }>(`/api/notes/${id}/title`, {
+    request<{ title: string }>(path`/api/notes/${id}/title`, {
       method: 'PATCH',
       body: JSON.stringify({ title }),
     }),
@@ -171,48 +326,44 @@ export const api = {
     operationId: string,
     markdown: string,
     provenance: ProvenanceSpan[],
-    dismissSuggestionId?: string,
     dismissSuggestionIds?: string[],
   ) =>
-    request<Note | { revision: number; operationId: string }>(`/api/notes/${note.id}`, {
+    request<Note | { revision: number; operationId: string }>(path`/api/notes/${note.id}`, {
       method: 'PATCH',
       body: JSON.stringify({
         operationId,
         baseRevision: note.revision,
         markdown,
         provenance,
-        ...(dismissSuggestionId ? { dismissSuggestionId } : {}),
         ...(dismissSuggestionIds?.length ? { dismissSuggestionIds } : {}),
       }),
     }),
-  deleteNote: (id: string) => request<void>(`/api/notes/${id}`, { method: 'DELETE' }),
+  deleteNote: (id: string) => request<void>(path`/api/notes/${id}`, { method: 'DELETE' }),
   decideSuggestion: (
     noteId: string,
     suggestionId: string,
-    decision: 'accept' | 'reject',
+    decision: NoteDecision['decision'],
     baseRevision: number,
     operationId: string,
     markdown?: string,
   ) =>
-    request<NoteState>(`/api/notes/${noteId}/suggestions/${suggestionId}/decision`, {
+    request<NoteState>(path`/api/notes/${noteId}/suggestions/${suggestionId}/decision`, {
       method: 'POST',
       body: JSON.stringify({ decision, baseRevision, operationId, markdown }),
     }),
   noteHistory: (id: string, action: 'undo' | 'redo', baseRevision: number, operationId: string) =>
-    request<NoteState>(`/api/notes/${id}/${action}`, {
+    request<NoteState>(path`/api/notes/${id}/${action}`, {
       method: 'POST',
       body: JSON.stringify({ baseRevision, operationId }),
     }),
   startConversation: (noteId?: string) =>
-    request<Conversation>(noteId ? `/api/notes/${noteId}/conversations` : '/api/conversations', {
-      method: 'POST',
-      body: '{}',
-    }),
-  linkConversationNote: (conversationId: string, noteId: string | null) =>
-    request<Conversation>(`/api/conversations/${conversationId}/note`, {
-      method: 'PATCH',
-      body: JSON.stringify({ noteId }),
-    }),
+    request<Conversation>(
+      noteId ? path`/api/notes/${noteId}/conversations` : '/api/conversations',
+      {
+        method: 'POST',
+        body: '{}',
+      },
+    ),
   captureFirstNote: (
     conversationId: string,
     text: string,
@@ -220,7 +371,7 @@ export const api = {
     operationId: string,
   ) =>
     request<{ conversation: Conversation; note: Note }>(
-      `/api/conversations/${encodeURIComponent(conversationId)}/capture`,
+      path`/api/conversations/${conversationId}/capture`,
       { method: 'POST', body: JSON.stringify({ text, verbatim, operationId }) },
     ),
   capturePlacement: (
@@ -230,109 +381,182 @@ export const api = {
     signal?: AbortSignal,
   ) =>
     request<{ proposal: EditProposal | null }>(
-      `/api/conversations/${encodeURIComponent(conversationId)}/capture-placement`,
+      path`/api/conversations/${conversationId}/capture-placement`,
       { method: 'POST', body: JSON.stringify({ text, noteRevision }), signal },
     ),
   conversation: (id: string, branchId?: string | null) =>
     request<Conversation>(
-      `/api/conversations/${encodeURIComponent(id)}${branchId ? `?branch=${encodeURIComponent(branchId)}` : ''}`,
+      path`/api/conversations/${id}` + (branchId ? path`?branch=${branchId}` : ''),
     ),
   conversations: (query?: string) =>
     request<ConversationSummary[]>(
-      query ? `/api/conversations?q=${encodeURIComponent(query)}` : '/api/conversations',
+      query ? path`/api/conversations?q=${query}` : '/api/conversations',
     ),
   renameConversation: (id: string, title: string) =>
-    request<Conversation>(`/api/conversations/${id}`, {
+    request<Conversation>(path`/api/conversations/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ title }),
     }),
   deleteConversation: (id: string) =>
-    request<void>(`/api/conversations/${id}`, { method: 'DELETE' }),
+    request<void>(path`/api/conversations/${id}`, { method: 'DELETE' }),
   archiveConversation: (id: string) =>
-    request<void>(`/api/conversations/${id}?keepNote=1`, { method: 'DELETE' }),
-  messageAnnotations: (messageId: string, input: MessageFollowupRequest, signal?: AbortSignal) =>
-    request<{ annotations: Annotation[] }>(`/api/chat/messages/${messageId}/annotations`, {
-      method: 'POST',
-      body: JSON.stringify(input),
-      signal,
-    }).then(({ annotations }) => annotations),
+    request<void>(path`/api/conversations/${id}?keepNote=1`, { method: 'DELETE' }),
   cancelNoteProposal: (
     messageId: string,
     input: { conversationId: string; branchId: string; attemptId: string },
   ) =>
     request<{ cancelledSuggestionIds: string[]; noteState: NoteState | null }>(
-      `/api/chat/messages/${encodeURIComponent(messageId)}/note-proposal/cancel`,
+      path`/api/chat/messages/${messageId}/note-proposal/cancel`,
       { method: 'POST', body: JSON.stringify(input) },
     ),
   saveHighlight: (messageId: string, highlight: MessageHighlight) =>
-    request<MessageHighlight>(`/api/chat/messages/${encodeURIComponent(messageId)}/highlights`, {
+    request<MessageHighlight>(path`/api/chat/messages/${messageId}/highlights`, {
       method: 'PUT',
       body: JSON.stringify(highlight),
     }),
+  activeTurn: (conversationId: string, branchId: string) =>
+    request<{
+      turn: {
+        id: string;
+        requestId: string;
+        conversationId: string;
+        branchId: string;
+        userMessageId: string | null;
+        regenerateMessageId?: string;
+        editMessageId?: string;
+      } | null;
+    }>(path`/api/chat/turns?conversationId=${conversationId}&branchId=${branchId}`),
   cancelTurn: (requestId: string, keepalive = false) =>
-    request<{ cancelled: boolean }>(`/api/chat/turns/${encodeURIComponent(requestId)}/cancel`, {
+    request<{ cancelled: boolean }>(path`/api/chat/turns/${requestId}/cancel`, {
       method: 'POST',
       body: '{}',
       keepalive,
     }),
   personas: () => request<Persona[]>('/api/personas'),
-  createPersona: (value: Omit<Persona, 'id' | 'revision'> & { replacesPersonaId?: string }) =>
+  createPersona: (value: Omit<Persona, 'id'> & { replacesPersonaId?: string }) =>
     request<Persona>('/api/personas', { method: 'POST', body: JSON.stringify(value) }),
   updatePersona: (value: Persona) =>
-    request<Persona>(`/api/personas/${value.id}`, { method: 'PATCH', body: JSON.stringify(value) }),
-  deletePersona: (id: string) => request<void>(`/api/personas/${id}`, { method: 'DELETE' }),
+    request<Persona>(path`/api/personas/${value.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(value),
+    }),
+  deletePersona: (id: string) => request<void>(path`/api/personas/${id}`, { method: 'DELETE' }),
   usage: () => request<Usage>('/api/usage'),
-  connections: () =>
-    request<Array<{ id: string; name: string; status: string; description?: string }>>(
-      '/api/connections',
-    ),
-  event: (value: ProductEvent) =>
-    request<void>('/api/events', { method: 'POST', body: JSON.stringify(value) }),
-  billing: (kind: 'checkout' | 'portal') =>
-    request<{ url: string }>(`/api/billing/${kind}`, { method: 'POST', body: '{}' }),
 };
+
+// Transport failures leave the durable turn running. Only an explicit Stop cancels it.
+function retryDelay(attempt: number, signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const abort = () => {
+      clearTimeout(timer);
+      reject(signal.reason);
+    };
+    const timer = setTimeout(
+      () => {
+        signal.removeEventListener('abort', abort);
+        resolve();
+      },
+      Math.min(500 * 2 ** Math.min(attempt, 4), 5_000),
+    );
+    signal.addEventListener('abort', abort, { once: true });
+  });
+}
+
+function canRetry(error: unknown) {
+  return (
+    error instanceof TypeError ||
+    (error instanceof ApiError &&
+      (error.status >= 500 || error.status === 408 || error.status === 429))
+  );
+}
 
 export async function streamChat(
   input: ChatRequest,
   onEvent: (event: ChatEvent) => void,
   signal: AbortSignal,
 ) {
-  let receivedTerminalEvent = false;
-  try {
-    const response = await fetchWithFreshAuth('/api/chat/turns', {
-      method: 'POST',
-      signal,
-      headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
-      body: JSON.stringify(input),
-    });
-    if (!response.ok || !response.body) {
-      if (response.status < 500) receivedTerminalEvent = true;
-      const body = await response.json().catch(() => undefined);
-      throw new ApiError(
-        response.status,
-        typeof body?.error === 'string'
-          ? body.error
-          : 'The thread could not start. Please try again.',
-        body,
-      );
-    }
-    receivedTerminalEvent =
-      (await consumeEventStream<ChatEvent>(
-        response,
-        (event) => {
-          if (event.type === 'done' || event.type === 'error') receivedTerminalEvent = true;
-          onEvent(event);
-        },
-        (event) => event.type === 'done' || event.type === 'error',
+  let attempt = 0;
+  let turn: { turnId: string };
+  while (true) {
+    signal.throwIfAborted();
+    try {
+      turn = await request<{ turnId: string }>('/api/chat/turns', {
+        method: 'POST',
         signal,
-        'The response was interrupted. Please try again.',
-      )) || receivedTerminalEvent;
-  } finally {
-    // The Worker may outlive a broken connection. Release its database turn
-    // before the caller unlocks the composer, including failed regeneration.
-    if (!receivedTerminalEvent && !signal.aborted) {
-      await api.cancelTurn(input.requestId).catch(() => undefined);
+        body: JSON.stringify(input),
+      });
+      if (!turn || typeof turn.turnId !== 'string')
+        throw new TypeError('The start response was incomplete.');
+      break;
+    } catch (error) {
+      signal.throwIfAborted();
+      if ((!canRetry(error) && !(error instanceof SyntaxError)) || attempt >= 5) throw error;
+      await retryDelay(attempt++, signal);
     }
+  }
+  await attachChatTurn(turn.turnId, onEvent, signal);
+}
+
+function acceptTurnFrame(
+  frame: SseFrame,
+  cursor: { value: number },
+  onEvent: (event: ChatEvent) => void,
+): boolean {
+  const sequence = frame.id && /^\d+$/.test(frame.id) ? Number(frame.id) : undefined;
+  if (sequence !== undefined && sequence <= cursor.value) return false;
+  if (frame.data === '[DONE]') return true;
+  const event = JSON.parse(frame.data) as ChatEvent;
+  onEvent(event);
+  if (sequence !== undefined) cursor.value = sequence;
+  return event.type === 'done' || event.type === 'error';
+}
+
+async function observeTurnResponse(
+  response: Response,
+  cursor: { value: number },
+  onEvent: (event: ChatEvent) => void,
+  signal: AbortSignal,
+): Promise<boolean> {
+  for await (const frame of readSseFrames(response, signal)) {
+    signal.throwIfAborted();
+    if (acceptTurnFrame(frame, cursor, onEvent)) return true;
+  }
+  signal.throwIfAborted();
+  return false;
+}
+
+async function openTurnEvents(turnId: string, after: number, signal: AbortSignal) {
+  const response = await fetchWithFreshAuth(path`/api/chat/turns/${turnId}/events?after=${after}`, {
+    signal,
+    headers: { accept: 'text/event-stream' },
+  });
+  if (response.ok) return response;
+  const body = await response.json().catch(() => undefined);
+  throw new ApiError(response.status, body?.error ?? 'The response could not be loaded.', body);
+}
+
+export async function attachChatTurn(
+  turnId: string,
+  onEvent: (event: ChatEvent) => void,
+  signal: AbortSignal,
+) {
+  const cursor = { value: 0 };
+  let attempt = 0;
+  while (true) {
+    signal.throwIfAborted();
+    let response: Response;
+    try {
+      response = await openTurnEvents(turnId, cursor.value, signal);
+    } catch (error) {
+      signal.throwIfAborted();
+      if (!canRetry(error)) throw error;
+      await retryDelay(attempt++, signal);
+      continue;
+    }
+    if (await observeTurnResponse(response, cursor, onEvent, signal)) return;
+    if (cursor.value) attempt = 0;
+    await retryDelay(attempt++, signal);
   }
 }
 
@@ -342,7 +566,7 @@ export async function streamNoteProposal(
   onEvent: (event: NoteProposalEvent) => void,
   signal: AbortSignal,
 ) {
-  const response = await fetchWithFreshAuth(`/api/chat/messages/${messageId}/note-proposal`, {
+  const response = await fetchWithFreshAuth(path`/api/chat/messages/${messageId}/note-proposal`, {
     method: 'POST',
     signal,
     headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
@@ -366,7 +590,7 @@ export async function streamMessageAnnotations(
   signal: AbortSignal,
 ) {
   const response = await fetchWithFreshAuth(
-    `/api/chat/messages/${messageId}/annotations?stream=1`,
+    path`/api/chat/messages/${messageId}/annotations?stream=1`,
     {
       method: 'POST',
       signal,
@@ -376,14 +600,14 @@ export async function streamMessageAnnotations(
   );
   if (!response.ok || !response.body)
     throw new ApiError(response.status, 'Highlights could not be added.');
-  await consumeEventStream(
+  await consumeEventStream<AnnotationEvent>(
     response,
-    onEvent,
+    (event) => {
+      onEvent(event);
+      if (event.type === 'error') throw new Error(event.message);
+    },
     (event) => event.type === 'done',
     signal,
     'Highlights were interrupted. Please try again.',
-    (event) => {
-      if (event.type === 'error') throw new Error(event.message);
-    },
   );
 }

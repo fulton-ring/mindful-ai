@@ -39,6 +39,10 @@
     background: var(--card);
     border: 1px solid var(--line);
   }
+  .settings-layout nav button[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
   .settings-layout main {
     min-height: 0;
     min-width: 0;
@@ -54,7 +58,6 @@
     line-height: 1.6;
   }
   .notice,
-  .empty-box,
   .connection {
     border: 1px solid var(--line);
     background: var(--card);
@@ -99,23 +102,5 @@
   .radio {
     display: block;
     margin: 0.65rem 0;
-  }
-  .auth-view {
-    min-height: 100vh;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    align-items: center;
-    gap: 4rem;
-    max-width: 980px;
-    margin: auto;
-    padding: 3rem;
-  }
-  .auth-copy h1 {
-    font: 500 clamp(2.5rem, 5vw, 4.2rem) / 1.04 "Source Serif 4";
-  }
-  .auth-copy p {
-    font: 1.2rem / 1.6 "Source Serif 4";
-    color: var(--muted);
-    max-width: 42ch;
   }
 }

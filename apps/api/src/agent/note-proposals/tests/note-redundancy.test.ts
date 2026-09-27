@@ -1,7 +1,7 @@
 import type { Note } from '@walden/contracts';
 import { isRedundantAddition } from '@walden/domain';
 import { describe, expect, it } from 'vitest';
-import { noteProposalFromCandidate } from '../../index';
+import { noteProposalFromCandidate } from '../../note-proposals/note-proposals';
 
 const note = (markdown: string): Note => ({
   id: 'note',

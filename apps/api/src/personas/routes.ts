@@ -1,28 +1,17 @@
-import { DEFAULT_PERSONAS, type Persona, personaSchema } from '@walden/contracts';
+import { DEFAULT_PERSONAS, personaSchema } from '@walden/contracts';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { all, first } from '../db/client';
-import { HttpError, jsonBody, newId, nowIso } from '../http';
+import { HttpError, newId, nowIso, parseBody } from '../http';
 import type { Bindings, Variables } from '../types';
+import { loadPersonaRow, PERSONA_COLUMNS, type PersonaRow, toPersona } from './repository';
 
-type PersonaRow = {
-  id: string;
-  name: string;
-  prompt: string;
-  brevity: Persona['brevity'];
-  challenge: Persona['challenge'];
-  tone: Persona['tone'];
-  revision: number;
-  icon?: Persona['icon'] | null;
-  replaces_persona_id?: string | null;
-};
-const map = ({ replaces_persona_id: replaces, icon, ...row }: PersonaRow): Persona => ({
-  ...row,
-  icon: icon ?? DEFAULT_PERSONAS.find((p) => p.id === replaces)?.icon ?? 'user',
+const personaFieldsSchema = personaSchema.omit({ id: true });
+const createSchema = personaFieldsSchema.extend({
+  replacesPersonaId: z.string().min(1).optional(),
 });
-const inputSchema = personaSchema
-  .omit({ id: true, revision: true })
-  .extend({ replacesPersonaId: z.string().min(1).optional() });
+// Which built-in a persona replaces is fixed at creation; a patch cannot move it.
+const updateSchema = personaFieldsSchema.partial();
 export const personaRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 personaRoutes.get('/', async (c) => {
@@ -33,7 +22,7 @@ personaRoutes.get('/', async (c) => {
     ),
     all<PersonaRow>(
       c.env.DB.prepare(
-        'SELECT id,name,prompt,brevity,challenge,tone,revision,icon,replaces_persona_id FROM personas WHERE owner_id=? ORDER BY updated_at DESC',
+        `SELECT ${PERSONA_COLUMNS} FROM personas WHERE owner_id=? ORDER BY updated_at DESC`,
       ).bind(ownerId),
     ),
   ]);
@@ -47,68 +36,72 @@ personaRoutes.get('/', async (c) => {
   );
   const slots = DEFAULT_PERSONAS.flatMap((persona) => {
     const override = overrides.get(persona.id);
-    if (override) return [map(override)];
+    if (override) return [toPersona(override)];
     return hidden.has(persona.id) ? [] : [persona];
   });
-  return c.json([...slots, ...customRows.filter((row) => !row.replaces_persona_id).map(map)]);
+  return c.json([...slots, ...customRows.filter((row) => !row.replaces_persona_id).map(toPersona)]);
 });
 personaRoutes.post('/', async (c) => {
-  const parsed = inputSchema.safeParse(await jsonBody<unknown>(c));
-  if (!parsed.success) throw new HttpError(400, 'Invalid persona', parsed.error.flatten());
-  const { replacesPersonaId, ...values } = parsed.data;
+  const { replacesPersonaId, ...values } = await parseBody(c, createSchema, 'Invalid persona');
   const replaces =
     replacesPersonaId && DEFAULT_PERSONAS.some((persona) => persona.id === replacesPersonaId)
       ? replacesPersonaId
       : null;
-  const persona: Persona = { id: newId(), revision: 0, ...values };
+  const row: PersonaRow = {
+    id: newId(),
+    ...values,
+    model: values.model ?? null,
+    icon: values.icon ?? null,
+    replaces_persona_id: replaces,
+  };
   const now = nowIso();
   await c.env.DB.prepare(
-    'INSERT INTO personas (id,owner_id,name,prompt,brevity,challenge,tone,revision,icon,created_at,updated_at,replaces_persona_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+    'INSERT INTO personas (id,owner_id,name,prompt,model,brevity,challenge,tone,icon,created_at,updated_at,replaces_persona_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
   )
     .bind(
-      persona.id,
+      row.id,
       c.get('userId'),
-      persona.name,
-      persona.prompt,
-      persona.brevity,
-      persona.challenge,
-      persona.tone,
-      0,
-      persona.icon ?? null,
+      row.name,
+      row.prompt,
+      row.model,
+      row.brevity,
+      row.challenge,
+      row.tone,
+      row.icon,
       now,
       now,
-      replaces,
+      row.replaces_persona_id,
     )
     .run();
-  return c.json(persona, 201);
+  return c.json(toPersona(row), 201);
 });
 personaRoutes.patch('/:id', async (c) => {
-  const parsed = inputSchema.partial().safeParse(await jsonBody<unknown>(c));
-  if (!parsed.success) throw new HttpError(400, 'Invalid persona', parsed.error.flatten());
-  const current = await first<PersonaRow>(
-    c.env.DB.prepare(
-      'SELECT id,name,prompt,brevity,challenge,tone,revision,icon FROM personas WHERE id=? AND owner_id=?',
-    ).bind(c.req.param('id'), c.get('userId')),
-  );
+  const changes = await parseBody(c, updateSchema, 'Invalid persona');
+  const current = await loadPersonaRow(c.env.DB, c.get('userId'), c.req.param('id'));
   if (!current) throw new HttpError(404, 'Persona not found');
-  const next = { ...current, ...parsed.data, revision: current.revision + 1 };
+  const next: PersonaRow = {
+    ...current,
+    ...changes,
+    model: changes.model ?? current.model,
+    icon: changes.icon ?? current.icon,
+  };
   await c.env.DB.prepare(
-    'UPDATE personas SET name=?,prompt=?,brevity=?,challenge=?,tone=?,revision=?,icon=?,updated_at=? WHERE id=? AND owner_id=?',
+    'UPDATE personas SET name=?,prompt=?,model=?,brevity=?,challenge=?,tone=?,icon=?,updated_at=? WHERE id=? AND owner_id=?',
   )
     .bind(
       next.name,
       next.prompt,
+      next.model,
       next.brevity,
       next.challenge,
       next.tone,
-      next.revision,
-      next.icon ?? null,
+      next.icon,
       nowIso(),
       current.id,
       c.get('userId'),
     )
     .run();
-  return c.json(map(next));
+  return c.json(toPersona(next));
 });
 // Check remaining choices in the mutation itself so concurrent deletes cannot
 // both succeed after observing the same list. Built-ins live outside the DB.

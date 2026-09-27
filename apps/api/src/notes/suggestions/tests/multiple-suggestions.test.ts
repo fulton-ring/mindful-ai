@@ -36,17 +36,17 @@ async function seedFixture(db: D1Database) {
     .run();
   await db
     .prepare(
-      "INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,status,last_user_activity_at,expires_at,created_at) VALUES ('branch:conversation','conversation','owner',1,'active','now','2999-01-01','now')",
+      "INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,status,created_at) VALUES ('branch:conversation','conversation','owner',1,'active','now')",
     )
     .run();
   await db
     .prepare(
-      "INSERT INTO messages (id,conversation_id,owner_id,role,content,sequence,created_at,origin_branch_id) VALUES ('source-a','conversation','owner','assistant','Source A',1,'now','branch:conversation'),('source-b','conversation','owner','assistant','Source B',2,'now','branch:conversation')",
+      "INSERT INTO messages (id,conversation_id,owner_id,role,content,created_at,origin_branch_id) VALUES ('source-a','conversation','owner','assistant','Source A','now','branch:conversation'),('source-b','conversation','owner','assistant','Source B','now','branch:conversation')",
     )
     .run();
   await db
     .prepare(
-      "INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,base_revision,old_text,new_text,reason,status,created_at,updated_at,branch_id) VALUES ('suggestion-a','note','owner','conversation','source-a',2,'Keep cash.','Keep cash. Save three months.','Source A','pending','1','1','branch:conversation'),('suggestion-b','note','owner','conversation','source-b',2,'Plan.','Plan. Review monthly.','Source B','pending','2','2','branch:conversation')",
+      "INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,base_revision,old_text,new_text,reason,status,created_at,updated_at,branch_id,generation_key) VALUES ('suggestion-a','note','owner','conversation','source-a',2,'Keep cash.','Keep cash. Save three months.','Source A','pending','1','1','branch:conversation','source-a'),('suggestion-b','note','owner','conversation','source-b',2,'Plan.','Plan. Review monthly.','Source B','pending','2','2','branch:conversation','source-b')",
     )
     .run();
 }

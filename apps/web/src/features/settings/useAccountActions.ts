@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from '../../lib/api';
+import { failureDetails, track } from '../../lib/telemetry';
 
 type PendingAction = 'export' | 'delete' | null;
 
@@ -26,11 +27,14 @@ export function useAccountActions() {
   const [pending, setPending] = useState<PendingAction>(null);
   const [error, setError] = useState('');
   const run = async (action: Exclude<PendingAction, null>, work: () => Promise<void>) => {
+    track('account_action_started', { action });
     setPending(action);
     setError('');
     try {
       await work();
+      if (action === 'export') track('account_action_completed', { action });
     } catch (cause) {
+      track('account_action_failed', { action, ...failureDetails(cause) });
       setError(
         cause instanceof Error
           ? cause.message
@@ -51,6 +55,7 @@ export function useAccountActions() {
     deleteAccount: () =>
       run('delete', async () => {
         await api.deleteAccount();
+        track('account_action_completed', { action: 'delete' });
         clearWaldenBrowserState();
         location.assign('/');
       }),

@@ -1,14 +1,15 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useQuery } from '@tanstack/react-query';
-import type { AppConfig, Persona } from '@walden/contracts';
-import { ArrowUpRight, Pencil, Plus, Trash2, X } from 'lucide-react';
+import type { Persona } from '@walden/contracts';
+import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '../../lib/api';
+import { failureDetails, track } from '../../lib/telemetry';
 import { AccountSettings } from './AccountSettings';
 
-type Tab = 'account' | 'billing' | 'usage' | 'personas';
+const TABS = ['account', 'usage', 'personas'] as const;
+type Tab = (typeof TABS)[number];
 export function SettingsPanel({
-  config,
   open = true,
   onClose,
   personas,
@@ -16,7 +17,6 @@ export function SettingsPanel({
   onDeletePersona,
   onCreatePersona,
 }: {
-  config: AppConfig;
   open?: boolean;
   personas: Persona[];
   onEditPersona(persona: Persona): void;
@@ -49,25 +49,19 @@ export function SettingsPanel({
           </header>
           <div className="settings-layout">
             <nav aria-label="Settings sections">
-              {(
-                [
-                  'account',
-                  ...(config.billingEnabled ? ['billing'] : []),
-                  'usage',
-                  'personas',
-                ] as Tab[]
-              ).map((item) => (
+              {TABS.map((item) => (
                 <button
                   key={item}
                   className={tab === item ? 'active' : ''}
-                  onClick={() => setTab(item)}
+                  onClick={() => {
+                    setTab(item);
+                    track('settings_section_opened', { action: item });
+                  }}
                 >
                   {item}
                 </button>
               ))}
-              <button type="button" disabled title="Coming soon">
-                Connectors
-              </button>
+              <UnavailableConnectorsTab />
             </nav>
             <main>
               {tab === 'personas' && (
@@ -110,6 +104,10 @@ export function SettingsPanel({
                               try {
                                 await onDeletePersona(persona);
                               } catch (error) {
+                                track('account_action_failed', {
+                                  action: 'delete_persona',
+                                  ...failureDetails(error),
+                                });
                                 setPersonaError(
                                   error instanceof Error
                                     ? error.message
@@ -130,10 +128,6 @@ export function SettingsPanel({
                 </section>
               )}
               {tab === 'account' && <AccountSettings />}
-              {tab === 'billing' && config.billingEnabled && <Billing config={config} />}
-              {tab === 'billing' && !config.billingEnabled && (
-                <p>Billing is disabled during testing.</p>
-              )}
               {tab === 'usage' && <Usage />}
             </main>
           </div>
@@ -143,37 +137,21 @@ export function SettingsPanel({
   );
 }
 
-function Billing({ config }: { config: AppConfig }) {
-  async function open(kind: 'checkout' | 'portal') {
-    try {
-      const { url } = await api.billing(kind);
-      location.assign(url);
-    } catch (error) {
-      alert(error instanceof Error ? error.message : 'Billing is unavailable.');
-    }
-  }
+function UnavailableConnectorsTab() {
   return (
-    <section>
-      <h2>Plan & billing</h2>
-      <p>Billing is currently disabled. Assistant usage is unlimited.</p>
-      {config.billingConfigured ? (
-        <div className="button-row">
-          <button className="primary" onClick={() => open('checkout')}>
-            Choose Personal
-          </button>
-          <button onClick={() => open('portal')}>
-            Manage billing <ArrowUpRight size={15} />
-          </button>
-        </div>
-      ) : (
-        <div className="notice">
-          <strong>Billing is not available yet</strong>
-          <p>Stripe has not been configured for this environment.</p>
-        </div>
-      )}
-    </section>
+    <button
+      type="button"
+      aria-disabled="true"
+      title="Coming soon"
+      onClick={() =>
+        track('action_blocked', { action: 'open_connectors', failure_code: 'coming_soon' })
+      }
+    >
+      Connectors
+    </button>
   );
 }
+
 function Usage() {
   const query = useQuery({ queryKey: ['usage'], queryFn: api.usage });
   if (query.isLoading)
@@ -194,10 +172,6 @@ function Usage() {
   return (
     <section>
       <h2>Usage</h2>
-      <p>
-        {value.used} assistant turns. No usage limit. Count resets{' '}
-        {new Date(value.resetsAt).toLocaleDateString()}.
-      </p>
       <dl>
         <div>
           <dt>Messages sent</dt>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadConversation } from '../conversations';
+import { loadConversation } from '../repository';
 import { database, testApp } from './conversations.fixtures';
 
 describe('conversation note attachment', () => {

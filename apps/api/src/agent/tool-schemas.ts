@@ -40,7 +40,7 @@ export const askInputSchema = z.object({
   question: z.string().min(1).max(400),
   options: z.array(z.string().min(1).max(240)).min(2).max(4),
 });
-export const learningCheckQuestionSchema = z
+const learningCheckQuestionSchema = z
   .string()
   .min(1)
   .max(500)
@@ -54,7 +54,7 @@ export const singleLearningCheckInputSchema = z.union([
     .strict(),
   z.object({ question: learningCheckQuestionSchema }).strict(),
 ]);
-export const learningCheckPromptSchema = z.union([
+const learningCheckPromptSchema = z.union([
   z
     .object({
       id: z.string().min(1).max(100).optional(),

@@ -3,12 +3,6 @@
   .save-state.conflict {
     color: var(--danger);
   }
-  .open-chat {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    margin-left: 0.4rem;
-  }
   .editor-wrap {
     position: relative;
     flex: 1 1 auto;
@@ -18,9 +12,6 @@
     margin: 0 auto;
     overflow-y: auto;
     padding: 1.25rem 1.5rem;
-  }
-  .menu-wrap {
-    position: relative;
   }
   .popover {
     position: absolute;

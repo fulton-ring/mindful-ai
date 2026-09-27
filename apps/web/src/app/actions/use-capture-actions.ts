@@ -1,6 +1,7 @@
-import type { Conversation, NoteState } from '@walden/contracts';
+import type { Conversation, Note, NoteState, ProvenanceSpan } from '@walden/contracts';
 import { api } from '../../lib/api';
 import { id } from '../../lib/ids';
+import { track } from '../../lib/telemetry';
 import type { ConversationContext } from '../data/conversation-context';
 import {
   mergeConversationAggregate,
@@ -21,11 +22,7 @@ type CaptureContext = ConversationContext & {
 
 export type CaptureDependencies = {
   ensureConversation: () => Promise<Conversation>;
-  updateDraft: (
-    markdown: string,
-    provenance: import('@walden/contracts').ProvenanceSpan[],
-    userChange?: boolean,
-  ) => void;
+  updateDraft: (markdown: string, provenance: ProvenanceSpan[]) => void;
   flushNoteDraft: () => Promise<number | null | false>;
 };
 
@@ -68,7 +65,7 @@ async function captureNewNote(
 function captureExistingNote(
   context: CaptureContext,
   dependencies: CaptureDependencies,
-  current: import('@walden/contracts').Note,
+  current: Note,
   text: string,
   _verbatim: boolean,
 ) {
@@ -82,7 +79,7 @@ function captureExistingNote(
     note: current,
     onAlreadyPresent: () => context.setNotice('Already in note.'),
     onApplied: (result) => {
-      dependencies.updateDraft(result.markdown, result.provenance, false);
+      dependencies.updateDraft(result.markdown, result.provenance);
       context.setCaptureRevealRange((previous) => ({
         from: result.from,
         to: result.to,
@@ -102,22 +99,27 @@ function captureExistingNote(
 
 function appendCapturedText(
   dependencies: CaptureDependencies,
-  current: import('@walden/contracts').Note,
+  current: Note,
   text: string,
   verbatim: boolean,
 ) {
   const separator = current.markdown.trim() ? '\n\n' : '';
   const from = current.markdown.length + separator.length;
-  dependencies.updateDraft(
-    `${current.markdown}${separator}${text}`,
-    [...current.provenance, captureSpan(text, verbatim, from, id('capture'))],
-    !verbatim,
-  );
+  dependencies.updateDraft(`${current.markdown}${separator}${text}`, [
+    ...current.provenance,
+    captureSpan(text, verbatim, from, id('capture')),
+  ]);
   return Promise.resolve(true);
 }
 
 export function useCaptureActions(context: CaptureContext) {
-  const captureError = (message: string) => context.setNotice(message);
+  const captureError = (message: string) => {
+    track('note_capture_failed', {
+      conversation_id: context.activeConversationId ?? undefined,
+      failure_code: 'capture_failed',
+    });
+    context.setNotice(message);
+  };
   const performCaptureText = async (
     dependencies: CaptureDependencies,
     text: string,
@@ -130,9 +132,22 @@ export function useCaptureActions(context: CaptureContext) {
   };
   const captureText = (dependencies: CaptureDependencies, text: string, verbatim: boolean) => {
     if (context.capturePromise.current) return context.capturePromise.current;
-    const running = performCaptureText(dependencies, text, verbatim).finally(() => {
-      if (context.capturePromise.current === running) context.capturePromise.current = null;
+    track('note_capture_started', {
+      conversation_id: context.activeConversationId ?? undefined,
+      action: verbatim ? 'verbatim' : 'summary',
     });
+    const running = performCaptureText(dependencies, text, verbatim)
+      .then((result) => {
+        if (result)
+          track('note_capture_completed', {
+            conversation_id: context.activeConversationId ?? undefined,
+            action: verbatim ? 'verbatim' : 'summary',
+          });
+        return result;
+      })
+      .finally(() => {
+        if (context.capturePromise.current === running) context.capturePromise.current = null;
+      });
     context.capturePromise.current = running;
     return running;
   };

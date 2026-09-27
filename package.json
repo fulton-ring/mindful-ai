@@ -11,7 +11,6 @@
     "format": "biome format --write .",
     "check:ci": "biome ci --reporter=summary .",
     "test": "turbo run test",
-    "test:unit": "turbo run test",
     "test:e2e": "playwright test",
     "db:migrate": "pnpm --filter @walden/api db:migrate",
     "verify": "pnpm typecheck && pnpm exec turbo run test --concurrency=1 && pnpm build",

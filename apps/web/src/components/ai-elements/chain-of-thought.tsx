@@ -100,24 +100,6 @@ export const ChainOfThoughtStep = memo(function ChainOfThoughtStep({
   );
 });
 
-export const ChainOfThoughtSearchResults = memo(function ChainOfThoughtSearchResults({
-  className = '',
-  ...props
-}: ComponentProps<'div'>) {
-  return <div {...props} className={`flex flex-wrap items-center gap-2 ${className}`} />;
-});
-export const ChainOfThoughtSearchResult = memo(function ChainOfThoughtSearchResult({
-  className = '',
-  ...props
-}: ComponentProps<'span'>) {
-  return (
-    <span
-      {...props}
-      className={`inline-flex max-w-full rounded-full bg-[var(--line)] px-2 py-0.5 text-xs font-normal ${className}`}
-    />
-  );
-});
-
 export const ChainOfThoughtContent = memo(function ChainOfThoughtContent({
   className = '',
   children,
@@ -133,21 +115,5 @@ export const ChainOfThoughtContent = memo(function ChainOfThoughtContent({
         {children}
       </Collapsible.Content>
     </Collapsible.Root>
-  );
-});
-
-export const ChainOfThoughtImage = memo(function ChainOfThoughtImage({
-  className = '',
-  children,
-  caption,
-  ...props
-}: ComponentProps<'div'> & { caption?: string }) {
-  return (
-    <div {...props} className={`mt-2 space-y-2 ${className}`}>
-      <div className="relative flex max-h-[22rem] items-center justify-center overflow-hidden rounded-lg bg-[var(--line)] p-3">
-        {children}
-      </div>
-      {caption && <p className="text-xs text-[var(--muted)]">{caption}</p>}
-    </div>
   );
 });

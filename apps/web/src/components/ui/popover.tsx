@@ -4,7 +4,6 @@ import { type ComponentPropsWithoutRef, type ElementRef, forwardRef } from 'reac
 export const Popover = PopoverPrimitive.Root;
 export const PopoverAnchor = PopoverPrimitive.Anchor;
 export const PopoverTrigger = PopoverPrimitive.Trigger;
-export const PopoverClose = PopoverPrimitive.Close;
 
 export const PopoverContent = forwardRef<
   ElementRef<typeof PopoverPrimitive.Content>,

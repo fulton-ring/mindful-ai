@@ -3,7 +3,12 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ChatEvent, Conversation, NoteProposalEvent } from '@walden/contracts';
 import { expect, it, vi } from 'vitest';
-import { conversation, getTransport, props } from '../../tests/_ChatPanel.test-helpers';
+import {
+  conversation,
+  getTransport,
+  props,
+  setComposerValue,
+} from '../../tests/_ChatPanel.test-helpers';
 
 const { ChatPanel } = await import('../../ChatPanel');
 
@@ -12,7 +17,7 @@ const transport = getTransport();
 function configureProposalAbort() {
   let emitProposal: ((event: unknown) => void) | undefined;
   let proposalSignal: AbortSignal | undefined;
-  transport.messageAnnotations.mockResolvedValue([]);
+  transport.annotationResults.mockResolvedValue([]);
   transport.streamNoteProposal.mockImplementation(
     async (_messageId, _input, onEvent: (event: unknown) => void, signal: AbortSignal) => {
       emitProposal = onEvent;
@@ -49,7 +54,7 @@ it('aborts a streaming note proposal and ignores a late terminal event', async (
   values.onConversation.mockImplementation((next: Conversation) => {
     rendered.rerender(<ChatPanel {...values} conversation={next} />);
   });
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Question');
   fireEvent.click(screen.getByLabelText('Send message'));
   // Note suggestions are asked for, never automatic.
   await screen.findByRole('button', { name: 'Add selection to note' });
@@ -165,7 +170,7 @@ it('retries a failed note proposal from the response that owns the error', async
 });
 
 it('never proposes a note on its own when a response completes', async () => {
-  transport.messageAnnotations.mockReturnValue(new Promise(() => undefined));
+  transport.annotationResults.mockReturnValue(new Promise(() => undefined));
   transport.streamNoteProposal.mockImplementation(
     async (_messageId, _input, onEvent: (event: NoteProposalEvent) => void) => {
       onEvent({ type: 'done', proposal: null });
@@ -192,7 +197,7 @@ it('never proposes a note on its own when a response completes', async () => {
     rendered.rerender(<ChatPanel {...values} conversation={next} />);
   });
 
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Help me think' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Help me think');
   fireEvent.click(screen.getByLabelText('Send message'));
 
   // Highlights still run on their own; note suggestions are only ever asked
@@ -236,18 +241,18 @@ it('keeps a visible note suggestion alive while the next message starts', async 
   values.onConversation.mockImplementation((next: Conversation) => {
     rendered.rerender(<ChatPanel {...values} conversation={next} />);
   });
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'First' } });
+  setComposerValue(screen.getByLabelText('Message'), 'First');
   fireEvent.click(screen.getByLabelText('Send message'));
   await screen.findByRole('button', { name: 'Add selection to note' });
   fireEvent.click(screen.getByRole('button', { name: 'Add selection to note' }));
   await waitFor(() => expect(proposalSignal).toBeDefined());
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Second' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Second');
   fireEvent.click(screen.getByLabelText('Send message'));
   expect(proposalSignal?.aborted).toBe(false);
 });
 
 it('offers a selection capture on any completed response while keeping other response actions', async () => {
-  transport.messageAnnotations.mockResolvedValue([]);
+  transport.annotationResults.mockResolvedValue([]);
   transport.streamNoteProposal.mockReturnValue(new Promise(() => undefined));
   const history = {
     ...conversation('conversation-1'),
@@ -542,7 +547,7 @@ it('routes intervention capture through the same streamed proposal pipeline', as
   };
   const values = props(history);
   render(<ChatPanel {...values} />);
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Continue' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Continue');
   fireEvent.click(screen.getByLabelText('Send message'));
   await waitFor(() =>
     expect(screen.getByRole('button', { name: 'Capture intervention' })).toBeTruthy(),

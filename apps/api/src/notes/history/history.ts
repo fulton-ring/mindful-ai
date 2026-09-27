@@ -3,11 +3,7 @@ import { applyProposal } from '@walden/domain';
 import { all, first } from '../../db/client';
 import { HttpError } from '../../http';
 import { selectNote, toNote } from '../repository';
-import {
-  SELECT_SUGGESTION,
-  type SuggestionRow,
-  toNoteSuggestion,
-} from '../suggestions/suggestions';
+import { SELECT_SUGGESTION, type SuggestionRow, toNoteSuggestion } from '../suggestions/queries';
 
 export async function loadNoteState(
   db: D1Database,

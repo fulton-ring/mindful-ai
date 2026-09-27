@@ -1,6 +1,10 @@
 import type { NoteProposalEvent } from '@walden/contracts';
 import { expect, it } from 'vitest';
+import type { AgentCheckpoints } from '../../../agent/checkpoints';
 import { createAgentService, OPENROUTER_DEFAULT_MODEL } from '../agent';
+
+/** Live smoke tests run outside a Workflow, so each checkpoint just runs inline. */
+const inlineCheckpoints: AgentCheckpoints = { do: (_name, callback) => callback() };
 
 const key = process.env.OPENROUTER_API_KEY;
 const model = process.env.OPENROUTER_TEST_MODEL ?? OPENROUTER_DEFAULT_MODEL;
@@ -13,31 +17,33 @@ it.skipIf(!key)(
       AI_MODEL: model,
       OPENROUTER_API_KEY: key,
     });
-    const stream = await service.streamTurn({
-      turnId: 'openrouter-smoke-turn',
-      requestId: 'openrouter-smoke-request',
-      conversation: {
-        id: 'openrouter-smoke-conversation',
-        title: 'Test thread',
-        noteId: null,
-        messages: [],
-        expiresAt: new Date(Date.now() + 60_000).toISOString(),
-        learningChecksEnabled: false,
-        branchId: 'openrouter-smoke-branch',
-        branches: [],
+    const stream = await service.streamTurn(
+      {
+        turnId: 'openrouter-smoke-turn',
+        requestId: 'openrouter-smoke-request',
+        conversation: {
+          id: 'openrouter-smoke-conversation',
+          title: 'Test thread',
+          noteId: null,
+          messages: [],
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          learningChecksEnabled: false,
+          branchId: 'openrouter-smoke-branch',
+          branches: [],
+        },
+        note: null,
+        persona: {
+          id: 'mentor',
+          name: 'Mentor',
+          prompt: 'Reply directly and briefly.',
+          tone: 'neutral',
+          brevity: 'brief',
+          challenge: 'gentle',
+        },
+        message: 'Reply with exactly: openrouter is connected',
       },
-      note: null,
-      persona: {
-        id: 'mentor',
-        name: 'Mentor',
-        prompt: 'Reply directly and briefly.',
-        tone: 'neutral',
-        brevity: 'brief',
-        challenge: 'gentle',
-        revision: 0,
-      },
-      message: 'Reply with exactly: openrouter is connected',
-    });
+      inlineCheckpoints,
+    );
     let text = '';
     for await (const event of stream) if (event.type === 'text') text += event.text;
     expect(text.toLowerCase()).toContain('openrouter is connected');
@@ -75,7 +81,6 @@ it.skipIf(!key)(
           tone: 'neutral',
           brevity: 'brief',
           challenge: 'gentle',
-          revision: 0,
         },
         message: 'Remember that the fictional blue kite festival starts at noon.',
         noteProposalRequested: true,

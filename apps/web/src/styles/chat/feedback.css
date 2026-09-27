@@ -105,4 +105,7 @@
   .composer:focus-within {
     border-color: var(--line);
   }
+  .composer.composer-dragging {
+    border-color: var(--ink);
+  }
 }

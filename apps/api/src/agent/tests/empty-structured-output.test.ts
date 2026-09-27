@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { annotationOutputSchema, noteProposalBatchOutputSchema } from '../index';
+import { annotationOutputSchema, noteProposalBatchOutputSchema } from '../tool-schemas';
 
 // Gemma expresses "nothing to report" by omitting the array rather than
 // returning an empty one. Both generators are allowed to decline, so an omitted

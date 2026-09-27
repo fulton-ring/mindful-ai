@@ -15,7 +15,8 @@ vi.mock('@mastra/core/agent', () => ({
   },
 }));
 
-import { noteProposalBatchOutputSchema, streamNoteProposal } from '../../index';
+import { streamNoteProposal } from '../../note-proposals/note-proposal-stream';
+import { noteProposalBatchOutputSchema } from '../../tool-schemas';
 import { assistantMessage, input, model, objectStream } from './note-proposal-generation-fixtures';
 
 beforeEach(() => {

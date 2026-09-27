@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { GemmaToolLeakDecoder, recoveredFrontendIntervention } from '../../index';
+import { GemmaToolLeakDecoder, recoveredFrontendIntervention } from '../../learning-checks';
 
 const leaked =
   'proposeAsk{options:[<|"|>Focus on the \'common driver\' mechanism<|"|>,<|"|>Focus on the conditions for decoupling<|"|>,<|"|>Focus on the lag between instruments<|"|>,<|"|>Other<|"|>],question:<|"|>Which aspect of the challenge best serves your current thinking?<|"|>}';

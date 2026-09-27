@@ -30,17 +30,17 @@ async function fixture() {
     .run();
   await db
     .prepare(
-      "INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,status,last_user_activity_at,expires_at,created_at) VALUES ('branch','conversation','owner',1,'active','now','2999-01-01','now')",
+      "INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,status,created_at) VALUES ('branch','conversation','owner',1,'active','now')",
     )
     .run();
   await db
     .prepare(
-      "INSERT INTO messages (id,conversation_id,owner_id,role,content,sequence,created_at,origin_branch_id) VALUES ('source','conversation','owner','assistant','Source',1,'now','branch')",
+      "INSERT INTO messages (id,conversation_id,owner_id,role,content,created_at,origin_branch_id) VALUES ('source','conversation','owner','assistant','Source','now','branch')",
     )
     .run();
   await db
     .prepare(
-      "INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,base_revision,old_text,new_text,reason,status,created_at,updated_at,branch_id) VALUES ('suggestion','note','owner','conversation','source',1,'Keep cash.','Keep cash. Save three months.','Source','pending','1','1','branch')",
+      "INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,base_revision,old_text,new_text,reason,status,created_at,updated_at,branch_id,generation_key) VALUES ('suggestion','note','owner','conversation','source',1,'Keep cash.','Keep cash. Save three months.','Source','pending','1','1','branch','source')",
     )
     .run();
   return db;

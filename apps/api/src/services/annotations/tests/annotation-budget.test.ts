@@ -1,6 +1,6 @@
 import type { Annotation } from '@walden/contracts';
 import { describe, expect, it } from 'vitest';
-import { annotationBudget, mergeAnnotationsPreservingExisting } from '../early-annotations';
+import { annotationBudget, mergeAnnotationsPreservingExisting } from '../annotations';
 
 const mark = (quote: string): Annotation => ({
   id: quote,

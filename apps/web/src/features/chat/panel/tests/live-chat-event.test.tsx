@@ -49,3 +49,22 @@ it('accumulates live response text, activity, context, and annotations', () => {
     expect.objectContaining({ id: 'fact-1' }),
   ]);
 });
+
+it('replaces provisional text after a Workflow attempt resets', () => {
+  const { result } = renderHook(() => {
+    const display = useChatDisplayState();
+    return { display, turn: useChatTurn(display.setStreamed) };
+  });
+  act(() => {
+    handleLiveChatEvent(result.current, {
+      type: 'text-snapshot',
+      text: 'First attempt',
+      reasoning: '',
+    });
+    result.current.turn.flushStream();
+    handleLiveChatEvent(result.current, { type: 'reset' });
+    handleLiveChatEvent(result.current, { type: 'text-snapshot', text: 'Second', reasoning: '' });
+    result.current.turn.flushStream();
+  });
+  expect(result.current.display.streamed).toBe('Second');
+});

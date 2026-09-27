@@ -1,7 +1,7 @@
 import type { Message } from '@walden/contracts';
 import type { AgentTurnInput } from '../../../services/types';
 
-type NoteProposalStream = typeof import('../../index')['streamNoteProposal'];
+type NoteProposalStream = typeof import('../note-proposal-stream')['streamNoteProposal'];
 
 export const model = {} as Parameters<NoteProposalStream>[2];
 
@@ -38,7 +38,6 @@ export const input = (
     brevity: 'brief',
     challenge: 'balanced',
     tone: 'neutral',
-    revision: 0,
   },
   message,
   noteProposalRequested,

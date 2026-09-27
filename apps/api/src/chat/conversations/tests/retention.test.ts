@@ -5,7 +5,8 @@ import { join } from 'node:path';
 import { expect, it, vi } from 'vitest';
 import { deleteAgentMemoryThread } from '../../../agent/memory/memory';
 import { sqliteD1Binding } from '../../../agent/memory/tests/d1-test-binding';
-import { loadConversation, purgeExpiredConversations } from '../conversations';
+import { purgeExpiredConversations } from '../deletion';
+import { loadConversation } from '../repository';
 
 vi.mock('../../../agent/memory/memory', () => ({ deleteAgentMemoryThread: vi.fn() }));
 
@@ -40,19 +41,19 @@ async function createRetentionFixture() {
       .run();
     await db
       .prepare(
-        "INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,status,last_user_activity_at,expires_at,created_at) VALUES (?,?,'owner',1,'active','now',?,'now')",
+        "INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,status,created_at) VALUES (?,?,'owner',1,'active','now')",
       )
-      .bind(id, id, expiresAt)
+      .bind(id, id)
       .run();
     await db
       .prepare(
-        "INSERT INTO turns (id,request_id,conversation_id,owner_id,status,created_at,branch_id) VALUES (?,?,?,'owner','completed','now',?)",
+        "INSERT INTO turns (id,request_id,conversation_id,owner_id,status,created_at,branch_id,source_branch_id) VALUES (?,?,?,'owner','completed','now',?,?)",
       )
-      .bind(id, id, id, id)
+      .bind(id, id, id, id, id)
       .run();
     await db
       .prepare(
-        "INSERT INTO messages (id,conversation_id,turn_id,owner_id,role,content,sequence,created_at,origin_branch_id) VALUES (?,?,?,'owner','assistant','Response',1,'now',?)",
+        "INSERT INTO messages (id,conversation_id,turn_id,owner_id,role,content,created_at,origin_branch_id) VALUES (?,?,?,'owner','assistant','Response','now',?)",
       )
       .bind(id, id, id, id)
       .run();
@@ -73,7 +74,7 @@ async function createRetentionFixture() {
 async function addExpiredBranch(db: D1Database) {
   await db
     .prepare(
-      "INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,status,last_user_activity_at,expires_at,created_at) VALUES ('old-branch','active','owner',0,'expired','now','2000-01-01','now')",
+      "INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,status,created_at) VALUES ('old-branch','active','owner',0,'expired','now')",
     )
     .run();
 }
@@ -132,13 +133,13 @@ async function resumeArchivedNote(db: D1Database) {
   expect(Date.parse(resumed.expiresAt)).toBeGreaterThan(Date.now());
   await db
     .prepare(
-      "INSERT INTO turns (id,request_id,conversation_id,owner_id,status,created_at,branch_id) VALUES ('resumed','resumed','expired-note','owner','completed','now',?)",
+      "INSERT INTO turns (id,request_id,conversation_id,owner_id,status,created_at,branch_id,source_branch_id) VALUES ('resumed','resumed','expired-note','owner','completed','now',?,?)",
     )
-    .bind(resumed.branchId)
+    .bind(resumed.branchId, resumed.branchId)
     .run();
   await db
     .prepare(
-      "INSERT INTO messages (id,conversation_id,turn_id,owner_id,role,content,sequence,created_at,origin_branch_id) VALUES ('resumed','expired-note','resumed','owner','user','Continue from my note',1,'now',?)",
+      "INSERT INTO messages (id,conversation_id,turn_id,owner_id,role,content,created_at,origin_branch_id) VALUES ('resumed','expired-note','resumed','owner','user','Continue from my note','now',?)",
     )
     .bind(resumed.branchId)
     .run();

@@ -16,9 +16,9 @@ export type MemoryLifecycleEvent = {
 };
 
 const stores = new WeakMap<D1Database, Promise<D1Store>>();
-export const OBSERVATION_TOKEN_THRESHOLD = 12_000;
-export const REFLECTION_TOKEN_THRESHOLD = 4_000;
-export const RECENT_MESSAGE_TOKEN_RETENTION = 6_000;
+const OBSERVATION_TOKEN_THRESHOLD = 12_000;
+const REFLECTION_TOKEN_THRESHOLD = 4_000;
+const RECENT_MESSAGE_TOKEN_RETENTION = 6_000;
 
 const identity = (ownerId: string, conversationId: string, branchId: string) => ({
   threadId: `conversation:${ownerId}:${conversationId}:branch:${branchId}`,
@@ -44,11 +44,7 @@ function storeFor(db: D1Database): Promise<D1Store> {
   return initialized;
 }
 
-export function createObservationalMemory(
-  storage: D1Store,
-  model: LanguageModelV3,
-  signal: AbortSignal,
-) {
+function createObservationalMemory(storage: D1Store, model: LanguageModelV3, signal: AbortSignal) {
   return new Memory({
     storage,
     options: {

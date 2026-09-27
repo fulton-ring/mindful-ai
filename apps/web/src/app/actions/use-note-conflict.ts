@@ -1,9 +1,10 @@
 import type { Note } from '@walden/contracts';
 import type { ConversationContext } from '../data/conversation-context';
 import {
-  type CachedNoteDraft,
+  clearCachedDraft,
   type NoteMutationScope,
   noteMutationBelongsToRoute,
+  writeCachedDraft,
 } from '../lifecycle/workspace-helpers';
 
 type ConflictContext = ConversationContext & { doSave: () => Promise<boolean> };
@@ -30,7 +31,7 @@ async function loadLatestNote(context: ConflictContext) {
     const result = await context.noteStateQuery.refetch({ throwOnError: true });
     const remote = result.data?.note;
     if (!remote || remote.id !== current.id || !scopeIsCurrent(context, scope)) return;
-    sessionStorage.removeItem(`walden:draft:${current.id}`);
+    clearCachedDraft(current.id);
     context.dismissSuggestionsOnSave.current.clear();
     context.draftRef.current = remote;
     context.setDraft(remote);
@@ -59,16 +60,7 @@ async function keepLocalDraft(context: ConflictContext) {
     context.draftRef.current = rebased;
     context.setDraft(rebased);
     context.setSaveState('dirty');
-    sessionStorage.setItem(
-      `walden:draft:${rebased.id}`,
-      JSON.stringify({
-        version: 1,
-        baseRevision: rebased.revision,
-        markdown: rebased.markdown,
-        provenance: rebased.provenance,
-        dismissedSuggestionIds: [...context.dismissSuggestionsOnSave.current],
-      } satisfies CachedNoteDraft),
-    );
+    writeCachedDraft(rebased, context.dismissSuggestionsOnSave.current);
     await context.doSave();
   } catch (error) {
     if (!scopeIsCurrent(context, scope)) return;

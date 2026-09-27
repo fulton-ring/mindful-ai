@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isLengthLimitedFinalChunk, visibleStreamEvent } from '../../index';
+import { isLengthLimitedFinalChunk, visibleStreamEvent } from '../../stream-events';
 
 describe('stream finish classification', () => {
   it('classifies a final length finish as incomplete', () => {

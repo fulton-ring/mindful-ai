@@ -42,7 +42,17 @@ async function setupTest() {
     .run();
   await db
     .prepare(
-      "INSERT INTO note_suggestions (id,note_id,owner_id,base_revision,old_text,new_text,reason,status,created_at,updated_at) VALUES ('a','note','owner',0,'Base','Base A','A','pending','1','1'),('b','note','owner',0,'Base','Base B','B','pending','2','2')",
+      "INSERT INTO conversations (id,owner_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('conversation','owner','Title','now','2999-01-01','active','now')",
+    )
+    .run();
+  await db
+    .prepare(
+      "INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,created_at) VALUES ('branch','conversation','owner',1,'now')",
+    )
+    .run();
+  await db
+    .prepare(
+      "INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,branch_id,generation_key,base_revision,old_text,new_text,reason,status,created_at,updated_at) VALUES ('a','note','owner','conversation','source-a','branch','source-a',0,'Base','Base A','A','pending','1','1'),('b','note','owner','conversation','source-b','branch','source-b',0,'Base','Base B','B','pending','2','2')",
     )
     .run();
   app = new Hono<{ Bindings: Bindings; Variables: Variables }>();

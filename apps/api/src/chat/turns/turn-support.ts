@@ -1,19 +1,6 @@
-import {
-  type ChatEvent,
-  type Conversation,
-  DEFAULT_PERSONAS,
-  type Persona,
-} from '@walden/contracts';
-import { first } from '../../db/client';
+import { type Conversation, DEFAULT_PERSONAS, type Persona } from '@walden/contracts';
 import { HttpError } from '../../http';
-
-// Five-minute generation budget plus 15 seconds for terminal cleanup.
-const ORPHANED_TURN_AFTER_MS = 315_000;
-const encoder = new TextEncoder();
-
-export function sse(event: ChatEvent) {
-  return encoder.encode(`data: ${JSON.stringify(event)}\n\n`);
-}
+import { loadPersona } from '../../personas/repository';
 
 export function regenerationContext(messages: Conversation['messages'], assistantId: string) {
   const assistantIndex = messages.findIndex(({ id }) => id === assistantId);
@@ -43,25 +30,10 @@ export function editContext(messages: Conversation['messages'], userId: string) 
   };
 }
 
-export function turnReplayDisposition(
-  status: string,
-  createdAt: string,
-  now = Date.now(),
-): 'active' | 'recover' | 'replay' | 'blocked' {
-  if (status === 'streaming') {
-    const age = now - Date.parse(createdAt);
-    return Number.isFinite(age) && age > ORPHANED_TURN_AFTER_MS ? 'recover' : 'active';
-  }
+export function turnReplayDisposition(status: string): 'active' | 'replay' | 'blocked' {
+  if (status === 'streaming') return 'active';
   if (status === 'completed' || status === 'cancelled') return 'replay';
   return 'blocked';
-}
-
-export function conversationStreamingDisposition(
-  createdAt: string,
-  now = Date.now(),
-): 'active' | 'recover' {
-  const disposition = turnReplayDisposition('streaming', createdAt, now);
-  return disposition === 'recover' ? 'recover' : 'active';
 }
 
 export async function personaFor(db: D1Database, ownerId: string, id: string): Promise<Persona> {
@@ -69,43 +41,14 @@ export async function personaFor(db: D1Database, ownerId: string, id: string): P
     ? DEFAULT_PERSONAS.find((persona) => persona.id === id)
     : DEFAULT_PERSONAS.find((persona) => persona.id === 'thinking-partner');
   if (builtin) return builtin;
-  const row = await first<Persona>(
-    db
-      .prepare(
-        'SELECT id,name,prompt,brevity,challenge,tone,revision FROM personas WHERE id=? AND owner_id=?',
-      )
-      .bind(id, ownerId),
-  );
-  if (!row) throw new HttpError(404, 'Persona not found');
-  return row;
-}
-
-export function createDurableStream(
-  run: (output: ReadableStreamDefaultController<Uint8Array>) => Promise<void>,
-  cancel: () => void,
-  waitUntil: (task: Promise<void>) => void,
-) {
-  return new ReadableStream<Uint8Array>({
-    start(output) {
-      const lifecycle = run(output);
-      waitUntil(lifecycle);
-    },
-    cancel,
-  });
+  const persona = await loadPersona(db, ownerId, id);
+  if (!persona) throw new HttpError(404, 'Persona not found');
+  return persona;
 }
 
 export async function batchIfAny(db: D1Database, statements: D1PreparedStatement[]) {
   if (statements.length > 0) await db.batch(statements);
 }
-
-export type ReplayMessage = {
-  id: string;
-  content: string;
-  reasoning: string | null;
-  created_at: string;
-  incomplete: number;
-  activity_json: string;
-};
 
 export type PreviousTurn = {
   id: string;

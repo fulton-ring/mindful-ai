@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { loadConversation, purgeExpiredConversations } from '../conversations';
+import { purgeExpiredConversations } from '../deletion';
+import { loadConversation } from '../repository';
 import { database } from './conversations.fixtures';
 
 describe('expired conversation cleanup', () => {

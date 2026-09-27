@@ -53,12 +53,16 @@ type ProposalPolicy = {
   pendingProposalIds: string[];
 };
 type ProposalRun = {
+  input: AgentTurnInput;
+  signal: AbortSignal;
   noteAgent: Agent;
   noteMaterial: string;
   response: ProposalResponse;
   proposalPolicy: ProposalPolicy;
+  previousPreviews: Map<number, string>;
   explainDecline: () => Promise<string | undefined>;
 };
+type ProposalOutput = NoteProposalCandidate & z.infer<typeof noteProposalBatchOutputSchema>;
 
 function noteMaterialFor(input: AgentTurnInput) {
   const largeNote = Boolean(input.note && input.note.markdown.length > 48_000);
@@ -204,10 +208,13 @@ async function prepareProposalRun(
     pendingProposalIds: (input.pendingProposals ?? []).map((pending) => pending.id),
   };
   return {
+    input,
+    signal,
     noteAgent,
     noteMaterial,
     response,
     proposalPolicy,
+    previousPreviews: new Map(),
     explainDecline: () => explainDecline(noteAgent, input, assistantMessage, noteMaterial, signal),
   };
 }
@@ -278,13 +285,9 @@ async function* partialPreviewEvents(
   }
 }
 
-async function* streamProposalPreviews(
-  response: ProposalResponse,
-  input: AgentTurnInput,
-  proposalPolicy: ProposalPolicy,
-  previousPreviews: Map<number, string>,
-): AsyncGenerator<NoteProposalEvent> {
-  for await (const partial of response.objectStream)
+async function* streamProposalPreviews(run: ProposalRun): AsyncGenerator<NoteProposalEvent> {
+  const { input, proposalPolicy, previousPreviews } = run;
+  for await (const partial of run.response.objectStream)
     yield* partialPreviewEvents(partial, input, proposalPolicy, previousPreviews);
 }
 
@@ -296,7 +299,7 @@ type BatchState = {
 };
 
 function batchState(
-  finalOutput: NoteProposalCandidate & z.infer<typeof noteProposalBatchOutputSchema>,
+  finalOutput: ProposalOutput,
   input: AgentTurnInput,
   proposalPolicy: ProposalPolicy,
 ): BatchState {
@@ -353,7 +356,7 @@ function batchDone(proposals: Array<EditProposal | null>, reason?: string): Note
 }
 
 function batchRepairPrompt(
-  finalOutput: NoteProposalCandidate & z.infer<typeof noteProposalBatchOutputSchema>,
+  finalOutput: ProposalOutput,
   invalidIndexes: number[],
   noteMaterial: string,
 ): string {
@@ -390,12 +393,11 @@ function repairOptions<
 }
 
 async function* batchRepairPreviews(
+  run: ProposalRun,
   repair: ProposalResponse,
   invalidIndexes: number[],
-  input: AgentTurnInput,
-  proposalPolicy: ProposalPolicy,
-  previousPreviews: Map<number, string>,
 ): AsyncGenerator<NoteProposalEvent> {
+  const { input, proposalPolicy, previousPreviews } = run;
   for await (const partial of repair.objectStream) {
     const partialOperations = (partial as Partial<z.infer<typeof noteProposalBatchOutputSchema>>)
       .operations;
@@ -464,22 +466,18 @@ function applyBatchRepair(
 }
 
 async function* repairBatchProposal(
-  finalOutput: NoteProposalCandidate & z.infer<typeof noteProposalBatchOutputSchema>,
+  run: ProposalRun,
+  finalOutput: ProposalOutput,
   state: BatchState,
-  input: AgentTurnInput,
-  noteAgent: Agent,
-  noteMaterial: string,
-  signal: AbortSignal,
-  proposalPolicy: ProposalPolicy,
-  previousPreviews: Map<number, string>,
 ): AsyncGenerator<NoteProposalEvent, { declineReason: string | undefined }> {
+  const { input, noteAgent, noteMaterial, signal, proposalPolicy } = run;
   const { invalidIndexes } = state;
   try {
     const repair = await noteAgent.stream(
       batchRepairPrompt(finalOutput, invalidIndexes, noteMaterial),
       repairOptions(signal, noteProposalBatchOutputSchema),
     );
-    yield* batchRepairPreviews(repair, invalidIndexes, input, proposalPolicy, previousPreviews);
+    yield* batchRepairPreviews(run, repair, invalidIndexes);
     return {
       declineReason: applyBatchRepair(
         (await repair.object) as z.infer<typeof noteProposalBatchOutputSchema>,
@@ -500,15 +498,10 @@ async function* repairBatchProposal(
 }
 
 async function* streamBatchProposal(
-  finalOutput: NoteProposalCandidate & z.infer<typeof noteProposalBatchOutputSchema>,
-  input: AgentTurnInput,
-  noteAgent: Agent,
-  noteMaterial: string,
-  signal: AbortSignal,
-  proposalPolicy: ProposalPolicy,
-  previousPreviews: Map<number, string>,
-  explainDecline: () => Promise<string | undefined>,
+  run: ProposalRun,
+  finalOutput: ProposalOutput,
 ): AsyncGenerator<NoteProposalEvent> {
+  const { input, proposalPolicy, explainDecline } = run;
   if (proposalPolicy.explicitCapture || !Array.isArray(finalOutput.operations)) return;
   if (finalOutput.operations.length === 0) {
     const reason = noteProposalNoopReason(finalOutput.reason) ?? (await explainDecline());
@@ -549,16 +542,7 @@ async function* streamBatchProposal(
         ),
       ),
     });
-    const { declineReason } = yield* repairBatchProposal(
-      finalOutput,
-      state,
-      input,
-      noteAgent,
-      noteMaterial,
-      signal,
-      proposalPolicy,
-      previousPreviews,
-    );
+    const { declineReason } = yield* repairBatchProposal(run, finalOutput, state);
     repairDeclineReason = declineReason;
   }
   if (state.invalidIndexes.some((index) => !state.proposals[index])) {
@@ -603,11 +587,10 @@ function singleRepairPrompt(
 }
 
 async function* singleRepairPreviews(
+  run: ProposalRun,
   repair: ProposalResponse,
-  input: AgentTurnInput,
-  proposalPolicy: ProposalPolicy,
-  previousPreviews: Map<number, string>,
 ): AsyncGenerator<NoteProposalEvent> {
+  const { input, proposalPolicy, previousPreviews } = run;
   for await (const partial of repair.objectStream) {
     const preview = noteProposalFromCandidate(
       input.note,
@@ -622,23 +605,19 @@ async function* singleRepairPreviews(
 }
 
 async function* repairSingleProposal(
+  run: ProposalRun,
   finalCandidateInput: NoteProposalCandidate,
-  input: AgentTurnInput,
-  noteAgent: Agent,
-  noteMaterial: string,
-  signal: AbortSignal,
-  proposalPolicy: ProposalPolicy,
-  previousPreviews: Map<number, string>,
 ): AsyncGenerator<
   NoteProposalEvent,
   { finalCandidate: NoteProposalCandidate; proposal: EditProposal | null }
 > {
+  const { input, noteAgent, noteMaterial, signal, proposalPolicy } = run;
   try {
     const repair = await noteAgent.stream(
       singleRepairPrompt(finalCandidateInput, input, noteMaterial),
       repairOptions(signal, noteProposalOutputSchema),
     );
-    yield* singleRepairPreviews(repair, input, proposalPolicy, previousPreviews);
+    yield* singleRepairPreviews(run, repair);
     const repairedCandidate = (await repair.object) as Partial<NoteProposalCandidate>;
     const finalCandidate = { replaces: null, ...repairedCandidate } as NoteProposalCandidate;
     const proposal = noteProposalFromCandidate(
@@ -665,14 +644,10 @@ async function* repairSingleProposal(
 }
 
 async function* streamSingleProposal(
+  run: ProposalRun,
   finalCandidateInput: NoteProposalCandidate,
-  input: AgentTurnInput,
-  noteAgent: Agent,
-  noteMaterial: string,
-  signal: AbortSignal,
-  proposalPolicy: ProposalPolicy,
-  previousPreviews: Map<number, string>,
 ): AsyncGenerator<NoteProposalEvent> {
+  const { input, proposalPolicy } = run;
   let finalCandidate = finalCandidateInput;
   let proposal = noteProposalFromCandidate(
     input.note,
@@ -691,15 +666,7 @@ async function* streamSingleProposal(
     finalCandidate.shouldPropose === true &&
     Boolean(finalCandidate.captureBasis && finalCandidate.captureBasis !== 'none');
   if (!proposal && warrantsRepair) {
-    ({ finalCandidate, proposal } = yield* repairSingleProposal(
-      finalCandidate,
-      input,
-      noteAgent,
-      noteMaterial,
-      signal,
-      proposalPolicy,
-      previousPreviews,
-    ));
+    ({ finalCandidate, proposal } = yield* repairSingleProposal(run, finalCandidate));
   }
   if (!proposal) {
     if (finalCandidate.shouldPropose !== true || finalCandidate.captureBasis === 'none') {
@@ -717,45 +684,17 @@ async function* streamSingleProposal(
     };
     return;
   }
-  yield {
-    type: 'done',
-    proposal,
-    ...(proposal ? {} : { reason: noteProposalNoopReason(finalCandidate.reason) }),
-  };
+  yield { type: 'done', proposal };
 }
 
-async function* streamProposalBody(
-  run: ProposalRun,
-  input: AgentTurnInput,
-  signal: AbortSignal,
-): AsyncGenerator<NoteProposalEvent> {
-  const { noteAgent, noteMaterial, response, proposalPolicy, explainDecline } = run;
-  const previousPreviews = new Map<number, string>();
-  yield* streamProposalPreviews(response, input, proposalPolicy, previousPreviews);
-  const finalOutput = ((await response.object) ?? {}) as unknown as NoteProposalCandidate &
-    z.infer<typeof noteProposalBatchOutputSchema>;
-  if (!proposalPolicy.explicitCapture && Array.isArray(finalOutput.operations)) {
-    yield* streamBatchProposal(
-      finalOutput,
-      input,
-      noteAgent,
-      noteMaterial,
-      signal,
-      proposalPolicy,
-      previousPreviews,
-      explainDecline,
-    );
+async function* streamProposalBody(run: ProposalRun): AsyncGenerator<NoteProposalEvent> {
+  yield* streamProposalPreviews(run);
+  const finalOutput = ((await run.response.object) ?? {}) as unknown as ProposalOutput;
+  if (!run.proposalPolicy.explicitCapture && Array.isArray(finalOutput.operations)) {
+    yield* streamBatchProposal(run, finalOutput);
     return;
   }
-  yield* streamSingleProposal(
-    finalOutput,
-    input,
-    noteAgent,
-    noteMaterial,
-    signal,
-    proposalPolicy,
-    previousPreviews,
-  );
+  yield* streamSingleProposal(run, finalOutput);
 }
 
 export async function* streamNoteProposal(
@@ -767,7 +706,7 @@ export async function* streamNoteProposal(
 ): AsyncIterable<NoteProposalEvent> {
   try {
     const run = await prepareProposalRun(input, assistantMessage, model, signal, trace);
-    yield* streamProposalBody(run, input, signal);
+    yield* streamProposalBody(run);
   } catch (error) {
     yield noteProposalStreamError(error);
   }

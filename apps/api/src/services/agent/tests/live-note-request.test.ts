@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { streamMastraTurn } from '../../../agent';
+import { streamMastraTurn } from '../../../agent/mastra-turn';
 import { createCloudflareModel, DEFAULT_AI_MODEL } from '../agent';
 
 const token = process.env.CLOUDFLARE_API_TOKEN;
@@ -21,8 +21,8 @@ describe.skipIf(!token || !accountId)('Cloudflare explicit note requests', () =>
   ])(
     'acknowledges $name without asking permission or claiming it was saved',
     async ({ message, expected }) => {
-      const events = streamMastraTurn(
-        {
+      const events = streamMastraTurn({
+        input: {
           turnId: 'live-note-request',
           requestId: 'live-note-request',
           conversation: {
@@ -44,16 +44,15 @@ describe.skipIf(!token || !accountId)('Cloudflare explicit note requests', () =>
             tone: 'neutral',
             brevity: 'brief',
             challenge: 'gentle',
-            revision: 0,
           },
           message,
         },
-        createCloudflareModel(
+        model: createCloudflareModel(
           { CLOUDFLARE_ACCOUNT_ID: accountId, CLOUDFLARE_API_TOKEN: token },
           DEFAULT_AI_MODEL,
         ),
-        AbortSignal.timeout(75_000),
-      );
+        signal: AbortSignal.timeout(75_000),
+      });
       let text = '';
       for await (const event of events) if (event.type === 'text') text += event.text;
       for (const detail of expected) expect(text.toLowerCase()).toContain(detail);

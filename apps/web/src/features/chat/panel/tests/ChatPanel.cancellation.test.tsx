@@ -1,32 +1,81 @@
 // @vitest-environment jsdom
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { AnnotationEvent, ChatEvent, Conversation } from '@walden/contracts';
 import { expect, it, vi } from 'vitest';
-import { conversation, getTransport, props } from '../../tests/_ChatPanel.test-helpers';
+import {
+  composerValue,
+  conversation,
+  getTransport,
+  props,
+  setComposerValue,
+} from '../../tests/_ChatPanel.test-helpers';
 
+const { track } = await import('../../../../lib/telemetry');
 const { ChatPanel } = await import('../../ChatPanel');
 
 const transport = getTransport();
 
-it('clears the response deadline on unmount even when the transport does not settle', async () => {
+it('detaches on unmount without cancelling a running turn', async () => {
   const schedule = vi.spyOn(window, 'setTimeout');
   const clear = vi.spyOn(window, 'clearTimeout');
   transport.streamChat.mockImplementation(() => new Promise(() => {}));
   try {
     const rendered = render(<ChatPanel {...props()} />);
-    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+    setComposerValue(screen.getByLabelText('Message'), 'Question');
     fireEvent.click(screen.getByLabelText('Send message'));
     await waitFor(() => expect(transport.streamChat).toHaveBeenCalled());
-    const index = schedule.mock.calls.findIndex((call) => call[1] === 315_000);
-    expect(index).toBeGreaterThanOrEqual(0);
-    const deadline = schedule.mock.results[index]?.value;
     rendered.unmount();
-    expect(clear).toHaveBeenCalledWith(deadline);
+    expect(schedule.mock.calls.some((call) => call[1] === 315_000)).toBe(false);
+    expect(transport.cancelTurn).not.toHaveBeenCalled();
   } finally {
     schedule.mockRestore();
     clear.mockRestore();
   }
+});
+
+it('replaces replayed live text with the saved answer after reconnecting', async () => {
+  const initial = conversation('conversation-1');
+  const user = {
+    id: 'user-1',
+    role: 'user' as const,
+    content: 'Question',
+    createdAt: new Date().toISOString(),
+  };
+  const answer = {
+    id: 'turn-1',
+    role: 'assistant' as const,
+    content: 'A saved answer',
+    createdAt: new Date().toISOString(),
+  };
+  const values = props({ ...initial, messages: [user] });
+  transport.activeTurn.mockResolvedValue({
+    turn: { id: 'turn-1', requestId: 'request-1' },
+  });
+  transport.conversation.mockResolvedValue({ ...initial, messages: [user, answer] });
+  let deliver: ((event: ChatEvent) => void) | undefined;
+  transport.attachChatTurn.mockImplementation((_id, onEvent) => {
+    deliver = onEvent;
+    return new Promise<void>(() => undefined);
+  });
+  const view = render(<ChatPanel {...values} />);
+  values.onConversation.mockImplementation((next: Conversation) => {
+    view.rerender(<ChatPanel {...values} conversation={next} />);
+  });
+  await waitFor(() => expect(deliver).toBeDefined());
+  await act(async () => {
+    deliver?.({ type: 'text-snapshot', text: answer.content, reasoning: '' });
+    deliver?.({
+      type: 'done',
+      message: answer,
+      conversationId: initial.id,
+      branchId: 'branch-1',
+      title: initial.title,
+      expiresAt: initial.expiresAt,
+    });
+  });
+  await waitFor(() => expect(values.onConversation).toHaveBeenCalled());
+  await waitFor(() => expect(screen.getAllByText(answer.content)).toHaveLength(1));
 });
 
 it('preserves a saved removal when a late classifier result updates the message', async () => {
@@ -72,7 +121,7 @@ it('stops following when the reader scrolls slightly up and resumes only at the 
     return new Promise<void>(() => undefined);
   });
   const view = render(<ChatPanel {...props()} />);
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Question');
   fireEvent.click(screen.getByLabelText('Send message'));
   await waitFor(() => expect(emit).toBeTypeOf('function'));
   const scroll = view.container.querySelector('.chat-scroll')!;
@@ -97,7 +146,10 @@ it('stops following when the reader scrolls slightly up and resumes only at the 
 
 it('catches up a long streamed response without waiting on the old speed cap', async () => {
   const frames: FrameRequestCallback[] = [];
-  vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false }));
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn().mockReturnValue({ matches: false, addListener: vi.fn(), removeListener: vi.fn() }),
+  );
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
     frames.push(callback);
     return frames.length;
@@ -110,9 +162,10 @@ it('catches up a long streamed response without waiting on the old speed cap', a
     return new Promise<void>(() => undefined);
   });
   const view = render(<ChatPanel {...props()} />);
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Question');
   fireEvent.click(screen.getByLabelText('Send message'));
   await waitFor(() => expect(emit).toBeTypeOf('function'));
+  frames.length = 0;
   act(() => emit?.({ type: 'text', text }));
   expect(frames).toHaveLength(1);
   act(() => frames.shift()?.(0));
@@ -133,7 +186,10 @@ it('catches up a long streamed response without waiting on the old speed cap', a
 });
 
 it('finalizes buffered response text before allowing the next message', async () => {
-  vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false }));
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn().mockReturnValue({ matches: false, addListener: vi.fn(), removeListener: vi.fn() }),
+  );
   vi.stubGlobal('requestAnimationFrame', vi.fn().mockReturnValue(1));
   vi.stubGlobal('cancelAnimationFrame', vi.fn());
   const text = 'A completed answer. '.repeat(100);
@@ -156,7 +212,7 @@ it('finalizes buffered response text before allowing the next message', async ()
   });
   const values = props();
   render(<ChatPanel {...values} />);
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Question');
   fireEvent.click(screen.getByLabelText('Send message'));
   await waitFor(() => expect(screen.queryByLabelText('Stop response')).toBeNull());
   expect(values.onConversation).toHaveBeenCalledWith(
@@ -169,7 +225,10 @@ it('finalizes buffered response text before allowing the next message', async ()
 });
 
 it('does not persist a buffered completion when stop wins before drain', async () => {
-  vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false }));
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn().mockReturnValue({ matches: false, addListener: vi.fn(), removeListener: vi.fn() }),
+  );
   vi.stubGlobal('requestAnimationFrame', vi.fn().mockReturnValue(1));
   vi.stubGlobal('cancelAnimationFrame', vi.fn());
   transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
@@ -195,7 +254,7 @@ it('does not persist a buffered completion when stop wins before drain', async (
     rendered.rerender(<ChatPanel {...values} conversation={next} />);
   });
 
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Question');
   fireEvent.click(screen.getByLabelText('Send message'));
   await waitFor(() => expect(screen.getByLabelText('Stop response')).toBeTruthy());
   fireEvent.click(screen.getByLabelText('Stop response'));
@@ -220,7 +279,7 @@ it('uses the first available persona when the built-in default is unavailable', 
   };
   render(<ChatPanel {...values} personas={[custom]} />);
 
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Question');
   fireEvent.click(screen.getByLabelText('Send message'));
 
   await waitFor(() => expect(transport.streamChat).toHaveBeenCalledTimes(1));
@@ -244,7 +303,7 @@ it('keeps the first turn alive when its newly created conversation route is adop
   );
   const rendered = render(<ChatPanel {...values} conversation={null} scopeId={null} />);
 
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'First question' } });
+  setComposerValue(screen.getByLabelText('Message'), 'First question');
   fireEvent.click(screen.getByLabelText('Send message'));
   await waitFor(() => expect(values.onEnsureConversation).toHaveBeenCalledTimes(1));
   rendered.rerender(<ChatPanel {...values} conversation={created} scopeId={created.id} />);
@@ -260,7 +319,7 @@ it('switches to the full-height conversation layout as soon as submit begins', a
   render(<ChatPanel {...values} />);
 
   expect(screen.getByLabelText('Thread').classList).toContain('empty-conversation');
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Question');
   fireEvent.click(screen.getByLabelText('Send message'));
 
   expect(screen.getByLabelText('Thread').classList).not.toContain('empty-conversation');
@@ -288,7 +347,7 @@ it('keeps interrupted text visible, unlocks the composer, and ignores late compl
     rendered.rerender(<ChatPanel {...values} conversation={next} />);
   });
 
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Question');
   fireEvent.click(screen.getByLabelText('Send message'));
   await screen.findByText('Partial answer');
   fireEvent.click(screen.getByLabelText('Stop response'));
@@ -309,10 +368,10 @@ it('keeps interrupted text visible, unlocks the composer, and ignores late compl
     expiresAt: '2026-09-25T00:00:00.000Z',
   });
   expect(values.onConversation).toHaveBeenCalledTimes(1);
-  expect(transport.messageAnnotations).not.toHaveBeenCalled();
+  expect(transport.streamMessageAnnotations).not.toHaveBeenCalled();
   expect(transport.streamNoteProposal).not.toHaveBeenCalled();
 
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Next question' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Next question');
   fireEvent.click(screen.getByLabelText('Send message'));
   await waitFor(() => expect(transport.streamChat).toHaveBeenCalledTimes(2));
   expect(screen.getByText('Question')).toBeTruthy();
@@ -332,11 +391,11 @@ it('waits for stop acknowledgement before starting another turn', async () => {
   );
   transport.streamChat.mockImplementation(() => new Promise(() => {}));
   render(<ChatPanel {...props()} />);
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'First' } });
+  setComposerValue(screen.getByLabelText('Message'), 'First');
   fireEvent.click(screen.getByLabelText('Send message'));
   await waitFor(() => expect(transport.streamChat).toHaveBeenCalledTimes(1));
   fireEvent.click(screen.getByLabelText('Stop response'));
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Second' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Second');
   await act(async () => fireEvent.click(screen.getByLabelText('Send message')));
   expect(transport.streamChat).toHaveBeenCalledTimes(1);
   await act(async () => acknowledge?.());
@@ -350,7 +409,7 @@ it('offers recovery immediately when stopped before the first token', async () =
   values.onConversation.mockImplementation((next: Conversation) => {
     rendered.rerender(<ChatPanel {...values} conversation={next} />);
   });
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Keep this question' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Keep this question');
   fireEvent.click(screen.getByLabelText('Send message'));
   await waitFor(() => expect(transport.streamChat).toHaveBeenCalledTimes(1));
   fireEvent.click(screen.getByLabelText('Stop response'));
@@ -372,12 +431,12 @@ it('restores the latest failed question without sending or overwriting a draft',
   render(<ChatPanel {...values} />);
   expect(screen.getByText('No response received')).toBeTruthy();
   const composer = screen.getByLabelText('Message') as HTMLTextAreaElement;
-  fireEvent.change(composer, { target: { value: 'Unsent draft' } });
+  setComposerValue(composer, 'Unsent draft');
   const retry = screen.getByRole('button', { name: 'Edit message' }) as HTMLButtonElement;
   expect(retry.disabled).toBe(true);
   fireEvent.click(retry);
-  expect(composer.value).toBe('Unsent draft');
-  fireEvent.change(composer, { target: { value: '' } });
+  expect(composerValue(composer)).toBe('Unsent draft');
+  setComposerValue(composer, '');
   fireEvent.click(retry);
   expect((screen.getByRole('textbox', { name: 'Edit message' }) as HTMLTextAreaElement).value).toBe(
     'Original question',
@@ -425,7 +484,7 @@ it('adopts a partial response as incomplete when the stream reports an error', a
   values.onConversation.mockImplementation((next: Conversation) => {
     rendered.rerender(<ChatPanel {...values} conversation={next} />);
   });
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Question');
   fireEvent.click(screen.getByLabelText('Send message'));
   await waitFor(() => expect(values.onConversation).toHaveBeenCalledTimes(1));
   const adopted = values.onConversation.mock.calls[0]?.[0] as Conversation;
@@ -454,7 +513,7 @@ it('does not start a turn when navigation happens during preflight', async () =>
     }),
   );
   const rendered = render(<ChatPanel {...first} />);
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Question');
   fireEvent.click(screen.getByLabelText('Send message'));
 
   const second = props(conversation('conversation-2'));
@@ -483,7 +542,7 @@ it('keeps the streamed response visible until saved message adoption', async () 
   });
   const values = props();
   const rendered = render(<ChatPanel {...values} />);
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Question');
   fireEvent.click(screen.getByLabelText('Send message'));
 
   const liveArticle = await waitFor(() => screen.getByText('Completed answer').closest('article'));
@@ -495,4 +554,78 @@ it('keeps the streamed response visible until saved message adoption', async () 
   expect(screen.getByText('Completed answer').closest('article')).toBe(liveArticle);
   rendered.unmount();
   expect(transport.cancelTurn).not.toHaveBeenCalled();
+});
+
+it('clears an attached file when sending starts, before the response finishes', async () => {
+  transport.streamChat.mockImplementation(() => new Promise(() => {}));
+  const view = render(<ChatPanel {...props()} />);
+  const composer = view.container.querySelector<HTMLElement>('.composer');
+  if (!composer) throw new Error('Composer missing');
+  const file = new File(['docx'], 'paper.docx', {
+    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  });
+  fireEvent.change(screen.getByLabelText('Choose files'), { target: { files: [file] } });
+  expect(within(composer).getByRole('button', { name: 'Download paper.docx' })).toBeTruthy();
+  await waitFor(() => expect(transport.uploadAttachment).toHaveBeenCalledOnce());
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Send message' }).hasAttribute('disabled')).toBe(
+      false,
+    ),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  await waitFor(() => expect(transport.streamChat).toHaveBeenCalledOnce());
+  expect(within(composer).queryByRole('button', { name: 'Download paper.docx' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Stop response' })).toBeTruthy();
+});
+
+it('removes a failed attachment, shows an error, and does not send it', async () => {
+  transport.uploadAttachment.mockRejectedValueOnce(new Error('Upload failed'));
+  const view = render(<ChatPanel {...props()} />);
+  const composer = view.container.querySelector<HTMLElement>('.composer');
+  if (!composer) throw new Error('Composer missing');
+  const file = new File(['docx'], 'paper.docx', {
+    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  });
+  fireEvent.change(screen.getByLabelText('Choose files'), { target: { files: [file] } });
+  await waitFor(() =>
+    expect(within(composer).queryByRole('button', { name: 'Download paper.docx' })).toBeNull(),
+  );
+  expect(transport.streamChat).not.toHaveBeenCalled();
+  expect(screen.getByText(/Could not upload paper\.docx: Upload failed/)).toBeTruthy();
+});
+
+it('shows upload progress and blocks sending until the attachment is ready', async () => {
+  let finish:
+    | ((value: { id: string; name: string; mimeType: string; size: number }) => void)
+    | undefined;
+  transport.uploadAttachment.mockImplementation((_id, _file, _signal, onProgress) => {
+    onProgress?.(47);
+    return new Promise((resolve) => {
+      finish = resolve;
+    });
+  });
+  const view = render(<ChatPanel {...props()} />);
+  const file = new File(['text'], 'notes.md', { type: 'text/markdown' });
+  fireEvent.change(screen.getByLabelText('Choose files'), { target: { files: [file] } });
+  await waitFor(() =>
+    expect(
+      screen.getByRole('progressbar', { name: 'Uploading notes.md' }).getAttribute('value'),
+    ).toBe('47'),
+  );
+  expect(screen.getByRole('button', { name: 'Send message' }).getAttribute('aria-disabled')).toBe(
+    'true',
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  expect(transport.streamChat).not.toHaveBeenCalled();
+  expect(track).toHaveBeenCalledWith('action_blocked', {
+    action: 'send_message',
+    failure_code: 'upload_in_progress',
+  });
+  finish?.({ id: 'uploaded', name: file.name, mimeType: file.type, size: file.size });
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Send message' }).hasAttribute('disabled')).toBe(
+      false,
+    ),
+  );
+  view.unmount();
 });

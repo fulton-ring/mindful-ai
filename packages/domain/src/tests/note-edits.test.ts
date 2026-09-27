@@ -1,13 +1,6 @@
 import type { Note } from '@walden/contracts';
 import { describe, expect, it } from 'vitest';
-import {
-  applyProposal,
-  EditError,
-  expiryFrom,
-  isExpired,
-  resolveEdit,
-  updateProvenance,
-} from '../note-edits';
+import { applyProposal, EditError, resolveEdit, updateProvenance } from '../note-edits';
 
 const note = (markdown: string, revision = 4): Note => ({
   id: 'n1',
@@ -85,14 +78,5 @@ describe('proposals and provenance', () => {
       { from: 2, to: 3, origin: 'user', verbatim: false },
       { from: 3, to: 5, origin: 'agent', verbatim: false },
     ]);
-  });
-});
-
-describe('expiry', () => {
-  it('expires at the deadline and creates a seven day ISO deadline', () => {
-    const now = Date.parse('2026-01-01T00:00:00.000Z');
-    expect(expiryFrom(now)).toBe('2026-01-08T00:00:00.000Z');
-    expect(isExpired(expiryFrom(now), now)).toBe(false);
-    expect(isExpired(expiryFrom(now), now + 7 * 24 * 60 * 60 * 1000)).toBe(true);
   });
 });

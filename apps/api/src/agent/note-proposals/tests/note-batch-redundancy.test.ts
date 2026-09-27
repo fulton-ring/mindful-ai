@@ -17,7 +17,7 @@ vi.mock('@mastra/core/agent', () => ({
 
 import type { Message } from '@walden/contracts';
 import type { AgentTurnInput } from '../../../services/types';
-import { streamNoteProposal } from '../../index';
+import { streamNoteProposal } from '../../note-proposals/note-proposal-stream';
 
 const model = {} as Parameters<typeof streamNoteProposal>[2];
 const assistantMessage: Message = {
@@ -64,7 +64,6 @@ const input = (markdown: string): AgentTurnInput => ({
     brevity: 'brief',
     challenge: 'balanced',
     tone: 'neutral',
-    revision: 0,
   },
   message: 'Actually we moved it to March 21. Also Priya is running the pilot.',
   noteProposalRequested: false,

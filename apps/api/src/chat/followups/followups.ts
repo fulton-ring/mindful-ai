@@ -1,9 +1,11 @@
-import type {
-  Annotation,
-  AnnotationEvent,
-  Conversation,
-  Message,
-  NoteProposalEvent,
+import {
+  type Annotation,
+  type AnnotationEvent,
+  type Conversation,
+  type Message,
+  type MessageFollowupRequest,
+  messageFollowupRequestSchema,
+  type NoteProposalEvent,
 } from '@walden/contracts';
 import { type Context, Hono } from 'hono';
 import { z } from 'zod';
@@ -17,11 +19,12 @@ import {
   loadPendingNoteSuggestions,
 } from '../../notes/suggestions/suggestions';
 import { createAgentService } from '../../services/agent/agent';
-import { annotationBudget } from '../../services/annotations/early-annotations';
+import { annotationBudget } from '../../services/annotations/annotations';
 import type { AgentTurnInput } from '../../services/types';
 import type { Bindings, Variables } from '../../types';
-import { loadConversation } from '../conversations/conversations';
-import { personaFor } from '../turns/routes';
+import { loadConversation } from '../conversations/repository';
+import { encodeSse, sseResponse } from '../sse';
+import { personaFor } from '../turns/turn-support';
 import {
   AnnotationGenerationError,
   createAnnotationStream,
@@ -33,26 +36,6 @@ type FollowupEnv = { Bindings: Bindings; Variables: Variables };
 type FollowupContext = Context<FollowupEnv>;
 type FollowupOperation = 'annotations' | 'note-proposal';
 
-const requestSchema = z
-  .object({
-    conversationId: z.string().min(1),
-    branchId: z.string().min(1),
-    personaId: z.string(),
-    noteRevision: z.number().int().nonnegative().nullable(),
-    noteProposalRequested: z.boolean().optional(),
-    action: z.literal('capture').optional(),
-    captureText: z.string().min(1).max(20_000).optional(),
-  })
-  .superRefine((value, context) => {
-    if ((value.action === 'capture') !== (typeof value.captureText === 'string'))
-      context.addIssue({
-        code: 'custom',
-        message: 'Capture action and text must be supplied together',
-      });
-  });
-
-type FollowupRequest = z.infer<typeof requestSchema>;
-
 type FollowupTarget = {
   ownerId: string;
   conversation: Conversation;
@@ -60,18 +43,6 @@ type FollowupTarget = {
   assistantMessage: Message;
   generationKey: string;
 };
-
-const sseHeaders = {
-  'content-type': 'text/event-stream; charset=utf-8',
-  'cache-control': 'no-cache, no-transform',
-  'x-accel-buffering': 'no',
-};
-
-export { loadNote };
-
-function sseResponse(body: BodyInit) {
-  return new Response(body, { headers: sseHeaders });
-}
 
 function parseOperation(value: string): FollowupOperation {
   if (value !== 'annotations' && value !== 'note-proposal') throw new HttpError(404, 'Not found');
@@ -84,8 +55,8 @@ function requestParam(c: FollowupContext, name: string) {
   return value;
 }
 
-async function parseRequest(c: FollowupContext): Promise<FollowupRequest> {
-  const parsed = requestSchema.safeParse(await jsonBody(c));
+async function parseRequest(c: FollowupContext): Promise<MessageFollowupRequest> {
+  const parsed = messageFollowupRequestSchema.safeParse(await jsonBody(c));
   if (!parsed.success) throw new HttpError(400, 'Invalid follow-up request');
   return parsed.data;
 }
@@ -98,13 +69,16 @@ async function captureGenerationKey(messageId: string, captureText: string) {
   return `${messageId}:capture:${hash}`;
 }
 
-async function generationKeyFor(messageId: string, request: FollowupRequest) {
+async function generationKeyFor(messageId: string, request: MessageFollowupRequest) {
   return request.action === 'capture'
     ? captureGenerationKey(messageId, request.captureText ?? '')
     : messageId;
 }
 
-async function loadTarget(c: FollowupContext, request: FollowupRequest): Promise<FollowupTarget> {
+async function loadTarget(
+  c: FollowupContext,
+  request: MessageFollowupRequest,
+): Promise<FollowupTarget> {
   const ownerId = c.get('userId');
   const conversation = await loadConversation(c.env.DB, ownerId, request.conversationId, {
     branchId: request.branchId,
@@ -138,14 +112,14 @@ function cachedAnnotationResponse(
   const annotations = assistantMessage.annotations ?? [];
   if (c.req.query('stream') === '1') {
     const event = { type: 'done', annotations } satisfies AnnotationEvent;
-    return sseResponse(`data: ${JSON.stringify(event)}\n\n`);
+    return sseResponse(encodeSse(event));
   }
   return c.json({ annotations });
 }
 
 async function storedProposalResponse(
   c: FollowupContext,
-  request: FollowupRequest,
+  request: MessageFollowupRequest,
   target: FollowupTarget,
 ) {
   const lookup = {
@@ -168,13 +142,13 @@ async function storedProposalResponse(
     proposal: pending.at(-1) ?? null,
     ...(request.action === 'capture' ? {} : { proposals: pending }),
   };
-  return sseResponse(`data: ${JSON.stringify(event)}\n\n`);
+  return sseResponse(encodeSse(event));
 }
 
 async function buildAgentInput(
   c: FollowupContext,
   operation: FollowupOperation,
-  request: FollowupRequest,
+  request: MessageFollowupRequest,
   target: FollowupTarget,
 ): Promise<AgentTurnInput> {
   const { ownerId, conversation, assistantMessage, index } = target;
@@ -244,7 +218,7 @@ async function annotationResponse(
 
 function proposalResponse(
   c: FollowupContext,
-  request: FollowupRequest,
+  request: MessageFollowupRequest,
   target: FollowupTarget,
   input: AgentTurnInput,
 ) {

@@ -8,10 +8,6 @@ Create separate development and production Clerk applications. Enable email veri
 
 Test email login followed by Google linking, sign-out, expired tokens, and deletion against the same notes account before launch. Do not merge accounts based on an unverified email string. D1 stores an external identity reference and application records, not login credentials.
 
-## Stripe
-
-Create a recurring personal subscription price in Stripe test mode first. Set `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`, and `APP_URL` for the frontend's trusted origin. Register the API billing webhook URL shown in the API routes. Configure subscription lifecycle notifications. Test checkout, cancellation, failed payment, duplicate and out-of-order webhook delivery before enabling production billing. Credentials are intentionally not included in the repository.
-
 ## Model provider
 
 The default inference provider is **Cloudflare Workers AI**, using `@cf/google/gemma-4-26b-a4b-it`, as requested by Jeremy. Use the Worker AI binding for deployed inference. Local inference requires Cloudflare authentication and consumes Workers AI usage.
@@ -24,9 +20,9 @@ The `walden` D1 database is configured in `apps/api/wrangler.jsonc`. Its fresh s
 
 Build the web app and API. Verify SPA routing, `/api/*` routing, streaming, auth origins, and scheduled expiration on a staging deployment before releasing it. No remote resources are created by the local setup steps.
 
-### R2 agent files
+### R2 chat attachments
 
-Mastra accesses Cloudflare R2 through its native S3-compatible filesystem provider. Create a private R2 bucket and an R2 API token restricted to object reads and bucket listing for that bucket. Supply these four values to the API runtime; an R2 Worker binding is not used by this provider:
+Create a private `walden-attachments` bucket and bind it as `FILES` in the Worker. Create R2 S3 API credentials restricted to this bucket, with object read/write access. The Worker uses them only to sign two-minute browser PUT URLs for staging objects; after upload, the `FILES` binding validates and moves files into the owner's thread prefix. Set the credentials as Worker secrets:
 
 ```dotenv
 R2_ACCOUNT_ID=<Cloudflare account ID>
@@ -35,7 +31,9 @@ R2_ACCESS_KEY_ID=<R2 API token access key ID>
 R2_SECRET_ACCESS_KEY=<R2 API token secret access key>
 ```
 
-All four settings must be present to enable files. A partial configuration fails at runtime instead of silently disabling file access. The application creates a read-only filesystem for each authenticated owner and conversation under `owners/<owner-id>/threads/<thread-id>`, so the model cannot use file tools to write around the note proposal and acceptance flow. Upload files through a separately authorized application path and keep the bucket private.
+`R2_ACCOUNT_ID` and `R2_BUCKET` are in `apps/api/wrangler.jsonc`. Apply `apps/api/r2-cors.json` to the bucket so the production origin can PUT with `Content-Type`. Add an R2 lifecycle rule to remove objects under `staging/` after one day; abandoned uploads otherwise remain until their thread is removed. Keep the bucket private. Local development sets `UPLOAD_LOCAL_FALLBACK=true` and uses the same authenticated Worker endpoint for multipart upload because local R2 does not support a browser-accessible presigned URL.
+
+Mastra's native list, stat, read, and grep tools see a read-only, owner/thread-scoped view of the `FILES` binding. PDF, DOCX, and XLSX files require `extractDocument`, which uses Workers AI `toMarkdown` and stores a Markdown sidecar in that view. Image files remain available to the model as image content. Both file and sidecar objects are deleted with the thread or account.
 
 ## Retention
 
@@ -64,7 +62,7 @@ Mastra registers both the main chat agent and the semantic annotator with PostHo
 
 The token in the root `.env` (`CLOUDFLARE_API_TOKEN`) is reserved for application access. Do not use it for provisioning, migrations, or deployment, and do not broaden its permissions for those operations. The deployed Mastra integration uses the native `AI` binding and does not need this token injected into the Worker.
 
-Use the connected Cloudflare MCP for provisioning where supported, or a separate deployment token supplied explicitly to the deployment process. Never load the application's root `.env` into a deployment command. Clerk and Stripe secrets remain separate.
+Use the connected Cloudflare MCP for provisioning where supported, or a separate deployment token supplied explicitly to the deployment process. Never load the application's root `.env` into a deployment command. Clerk secrets remain separate.
 
 ## Wrangler deployment token
 
@@ -91,7 +89,7 @@ Deployed through the Cloudflare MCP on September 17, 2026:
 - Model: `@cf/google/gemma-4-26b-a4b-it` through Mastra and the native binding.
 - Scheduled transcript cleanup: `17 * * * *` (UTC).
 - Preview URLs are disabled.
-- Clerk development authentication is configured and required. Stripe is not configured and billing is disabled by `BILLING_ENABLED=false`.
+- Clerk development authentication is configured and required.
 
 Verification: public config returned 200; protected notes returned 401; Chromium loaded the setup screen without page errors. Cloudflare rejected the default Python urllib user agent with error 1010, while Chromium and a browser user agent succeeded.
 
@@ -103,8 +101,7 @@ MCP deployment used a Cloudflare-issued, short-lived assets upload session for l
 - Clerk CLI 3.3.0 links to application `app_3JU6USCGeA1w4xSM8iiUuMvu96C` (Walden), development instance `ins_3JU6ULlzUU1s7RXDlOQOdTDMs7l`.
 - Frontend uses `@clerk/react`; the Hono API validates Clerk Bearer tokens using `@clerk/backend` and checks authorized frontend origins.
 - Email verification-code and Google sign-in are enabled; passwords are disabled. The Clerk secret is a Cloudflare Worker secret, never a frontend variable. Fresh credentials were retrieved through Clerk's authenticated Platform API without reading existing environment files.
-- `BILLING_ENABLED=false` hides billing navigation and rejects checkout, portal, and webhook requests. No Stripe setup was performed.
-- Clerk doctor passed. Local and deployed browser checks covered sign-up controls, Google availability, password absence, and billing disabled. Application data requires a valid signed-in session.
+- Clerk doctor passed. Local and deployed browser checks covered sign-up controls, Google availability, and password absence. Application data requires a valid signed-in session.
 - This is Clerk's development instance; production domain/OAuth setup is a separate launch task.
 
 ## Search and PostHog configuration — September 20, 2026

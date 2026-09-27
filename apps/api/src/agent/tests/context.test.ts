@@ -4,6 +4,67 @@ import type { Message, Note } from '@walden/contracts';
 import { expect, it } from 'vitest';
 import { buildTurnContext, contextBudgetProcessor } from '../context';
 
+it('puts attached images into the current model message and names readable text files', () => {
+  const result = buildTurnContext({
+    note: null,
+    messages: [],
+    currentMessage: 'Explain this',
+    requestId: 'current',
+    dynamicContext: '',
+    attachments: [
+      { id: 'text', name: 'details.md', mimeType: 'text/markdown', size: 5 },
+      {
+        id: 'image',
+        name: 'plot.png',
+        mimeType: 'image/png',
+        size: 3,
+        bytes: new Uint8Array([1, 2, 3]),
+      },
+    ],
+  });
+  expect(JSON.stringify(result.messages.at(-1)?.content)).toContain('details.md');
+  expect(JSON.stringify(result.messages.at(-1)?.content)).toContain('/attachments/text.md');
+  expect(JSON.stringify(result.messages.at(-1)?.content)).toContain('"type":"image"');
+});
+
+it('lists a long attachment by path without copying its contents into the current turn', () => {
+  const result = buildTurnContext({
+    note: null,
+    messages: [],
+    currentMessage: 'What is the final word?',
+    requestId: 'current',
+    dynamicContext: '',
+    attachments: [
+      {
+        id: 'long',
+        name: 'long.md',
+        mimeType: 'text/markdown',
+        size: 20_005,
+      },
+    ],
+  });
+  expect(JSON.stringify(result.messages.at(-1)?.content)).toContain('long.md');
+  expect(JSON.stringify(result.messages.at(-1)?.content)).toContain('/attachments/long.md');
+});
+
+it('keeps attachment IDs available when Mastra memory supplies the transcript', () => {
+  const image = {
+    id: '00112233-4455-6677-8899-aabbccddeeff',
+    name: 'plot.png',
+    mimeType: 'image/png',
+    size: 500,
+  };
+  const result = buildTurnContext({
+    note: null,
+    messages: [{ ...message('u1', 'user', 'Look at my image'), attachments: [image] }],
+    currentMessage: 'Does it contain text?',
+    requestId: 'r2',
+    dynamicContext: '',
+    memoryManaged: true,
+  });
+  expect(result.context.map(({ content }) => content).join('\n')).toContain(image.id);
+});
+
 const message = (id: string, role: Message['role'], content: string): Message => ({
   id,
   role,

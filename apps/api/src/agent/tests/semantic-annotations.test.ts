@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
-import { annotationKindSchema, semanticAnnotations } from '../index';
+import { semanticAnnotations } from '../stream-events';
+import { annotationKindSchema } from '../tool-schemas';
 
 it('only generates the six supported semantic kinds', () => {
   for (const activeKind of ['fact', 'claim', 'assumption', 'question', 'decision', 'explanation']) {

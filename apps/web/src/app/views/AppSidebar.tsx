@@ -2,76 +2,63 @@ import { ChevronLeft, Moon, Settings, Sun } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import { ResizablePanel } from '../../components/ui/resizable';
 import { ThreadHistory } from '../../features/chat/ThreadHistory';
-import type { WorkspaceData } from '../data/app-types';
+import { storageKeys } from '../../lib/storage-keys';
+import { useWorkspaceShell, type WorkspaceShell } from '../data/workspace-context';
 
-const SIDEBAR_WIDTH = 'walden:sidebar-width';
-const LAST_NOTE = 'walden:last-note';
-
-export function AppSidebar({
-  data,
-  authControls,
-}: {
-  data: WorkspaceData;
-  authControls?: ReactNode;
-}) {
-  const { desktop } = data;
+export function AppSidebar({ authControls }: { authControls?: ReactNode }) {
+  const { desktop } = useWorkspaceShell();
   return (
     <ResizablePanel
       className="sidebar-panel"
-      defaultSize={`${Number(localStorage.getItem(SIDEBAR_WIDTH)) || 250}px`}
+      defaultSize={`${Number(localStorage.getItem(storageKeys.sidebarWidth)) || 250}px`}
       minSize="220px"
       maxSize="360px"
       onResize={({ inPixels }) => {
-        if (desktop) localStorage.setItem(SIDEBAR_WIDTH, String(Math.round(inPixels)));
+        if (desktop) localStorage.setItem(storageKeys.sidebarWidth, String(Math.round(inPixels)));
       }}
     >
-      <SidebarContent data={data} authControls={authControls} />
+      <SidebarContent authControls={authControls} />
     </ResizablePanel>
   );
 }
 
-function SidebarContent({ data, authControls }: { data: WorkspaceData; authControls?: ReactNode }) {
-  const { sidebar, desktop } = data;
+function SidebarContent({ authControls }: { authControls?: ReactNode }) {
+  const { sidebar, desktop } = useWorkspaceShell();
   return (
     <aside
       className={`note-sidebar ${sidebar ? 'open' : ''}`}
       aria-label="Threads"
       inert={!desktop && !sidebar}
     >
-      <SidebarHeader data={data} />
-      <SidebarHistory data={data} />
-      <SidebarFooter data={data} authControls={authControls} />
+      <SidebarHeader />
+      <SidebarHistory />
+      <SidebarFooter authControls={authControls} />
     </aside>
   );
 }
 
-function SidebarHeader({ data }: { data: WorkspaceData }) {
-  const { setSidebar } = data;
+function SidebarHeader() {
+  const { setSidebar } = useWorkspaceShell();
   return (
     <header>
       <div className="brand">
-        {/* Concentric ripples: a stone dropped in the pond. Uses
-              currentColor so it inverts with the theme. */}
         <span className="brand-mark" aria-hidden>
-          <svg viewBox="0 0 24 24" focusable="false">
-            <circle cx="12" cy="12" r="2.1" fill="currentColor" />
-            <circle
-              cx="12"
-              cy="12"
-              r="6"
+          <svg viewBox="8 8 84 84" focusable="false">
+            <g
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.6"
-              opacity="0.72"
-            />
-            <circle
-              cx="12"
-              cy="12"
-              r="9.6"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              opacity="0.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="6"
+              transform="rotate(-90 50 50)"
+            >
+              <path d="M18 36 C25 22 37 16 51 17 C68 16 82 28 84 45 C88 62 76 79 59 83 C42 88 27 79 21 66" />
+              <path d="M34 39 C39 32 45 30 52 31 C64 31 70 40 70 51 C69 62 60 69 49 68 C42 68 37 64 34 59" />
+            </g>
+            <path
+              d="M48 48 C50 46 53 47 54 50 C54 53 52 54 49 54 C46 53 46 50 48 48Z"
+              fill="currentColor"
+              transform="rotate(-90 50 50)"
             />
           </svg>
         </span>
@@ -88,47 +75,48 @@ function SidebarHeader({ data }: { data: WorkspaceData }) {
   );
 }
 
-function SidebarHistory({ data }: { data: WorkspaceData }) {
+function SidebarHistory() {
+  const shell = useWorkspaceShell();
   return (
     <section className="conversation-history" aria-label="Thread history">
       <div className="sidebar-section-heading">
         <span>Threads</span>
-        <button className="text-button" onClick={() => void startNewThread(data)}>
+        <button className="text-button" onClick={() => void startNewThread(shell)}>
           New thread
         </button>
       </div>
-      <SidebarThreadHistory data={data} />
+      <SidebarThreadHistory shell={shell} />
     </section>
   );
 }
 
-function SidebarThreadHistory({ data }: { data: WorkspaceData }) {
+function SidebarThreadHistory({ shell }: { shell: WorkspaceShell }) {
   const {
     activeConversationId,
     activeNoteId,
     threadOptionsId,
     setThreadOptionsId,
-    conversationsQuery,
-    notesQuery,
+    hasThreadOrNote,
+    threadsLoading,
+    threadsLoadError,
+    retryThreads,
+    retrySearch,
     threadSearch,
     setThreadSearch,
-    searchThreadsQuery,
     searchActive,
     searchWaiting,
     searchFailed,
     threadClock,
     visibleThreadGroups,
     standaloneNotes,
-    deleteConversation,
-    deleteNote,
-  } = data;
+    deletingThread,
+    deletingNote,
+  } = shell;
   return (
     <ThreadHistory
-      hasThreadOrNote={
-        (conversationsQuery.data?.length ?? 0) > 0 || (notesQuery.data?.length ?? 0) > 0
-      }
-      loading={conversationsQuery.isPending}
-      loadError={conversationsQuery.isError}
+      hasThreadOrNote={hasThreadOrNote}
+      loading={threadsLoading}
+      loadError={threadsLoadError}
       search={threadSearch}
       searchActive={searchActive}
       searchWaiting={searchWaiting}
@@ -139,86 +127,86 @@ function SidebarThreadHistory({ data }: { data: WorkspaceData }) {
       activeNoteId={activeNoteId}
       now={threadClock}
       threadOptionsId={threadOptionsId}
-      deletingThread={deleteConversation.isPending}
-      deletingNote={deleteNote.isPending}
+      deletingThread={deletingThread}
+      deletingNote={deletingNote}
       onSearchChange={setThreadSearch}
-      onRetryLoad={() => void conversationsQuery.refetch()}
-      onRetrySearch={() => void searchThreadsQuery.refetch()}
+      onRetryLoad={() => void retryThreads()}
+      onRetrySearch={() => void retrySearch()}
       onThreadOptionsChange={setThreadOptionsId}
-      onOpenThread={(thread, retainedNote) => handleOpenThread(data, thread, retainedNote)}
-      onArchiveThread={(thread) => handleArchiveThread(data, thread)}
-      onDeleteThread={(thread) => handleDeleteThread(data, thread)}
-      onOpenNote={(note) => handleOpenNote(data, note)}
-      onDeleteNote={(note) => handleDeleteNote(data, note)}
+      onOpenThread={(thread, retainedNote) => handleOpenThread(shell, thread, retainedNote)}
+      onArchiveThread={(thread) => handleArchiveThread(shell, thread)}
+      onDeleteThread={(thread) => handleDeleteThread(shell, thread)}
+      onOpenNote={(note) => handleOpenNote(shell, note)}
+      onDeleteNote={(note) => handleDeleteNote(shell, note)}
     />
   );
 }
 
-async function startNewThread(data: WorkspaceData) {
-  if ((await data.flush(true)) === false) return;
-  data.setRetainedNoteChatStarted(false);
-  data.setSidebar(false);
-  void data.navigate({ to: '/' });
-  localStorage.removeItem(LAST_NOTE);
-  data.setMobilePane('chat');
+async function startNewThread(shell: WorkspaceShell) {
+  if ((await shell.flush(true)) === false) return;
+  shell.setRetainedNoteChatStarted(false);
+  shell.setSidebar(false);
+  void shell.navigate({ to: '/' });
+  localStorage.removeItem(storageKeys.lastNote);
+  shell.setMobilePane('chat');
 }
 
 async function handleOpenThread(
-  data: WorkspaceData,
+  shell: WorkspaceShell,
   thread: Parameters<NonNullable<ComponentProps<typeof ThreadHistory>['onOpenThread']>>[0],
   retainedNote: Parameters<NonNullable<ComponentProps<typeof ThreadHistory>['onOpenThread']>>[1],
 ) {
-  if ((await data.flush(true)) === false) return;
-  data.setRetainedNoteChatStarted(false);
-  await data.queryClient.invalidateQueries({ queryKey: ['conversation', thread.id] });
-  data.setSidebar(false);
-  void data.navigate({
+  if ((await shell.flush(true)) === false) return;
+  shell.setRetainedNoteChatStarted(false);
+  await shell.queryClient.invalidateQueries({ queryKey: ['conversation', thread.id] });
+  shell.setSidebar(false);
+  void shell.navigate({
     to: '/conversations/$conversationId',
     params: { conversationId: thread.id },
     search: { branch: undefined },
   });
-  data.setMobilePane(retainedNote ? 'note' : 'chat');
+  shell.setMobilePane(retainedNote ? 'note' : 'chat');
 }
 
 function handleArchiveThread(
-  data: WorkspaceData,
+  shell: WorkspaceShell,
   thread: Parameters<NonNullable<ComponentProps<typeof ThreadHistory>['onArchiveThread']>>[0],
 ) {
-  data.deleteConversation.reset();
-  data.setThreadOptionsId(null);
-  data.setThreadToDelete({ thread, mode: 'archive' });
+  shell.resetThreadDeletion();
+  shell.setThreadOptionsId(null);
+  shell.setThreadToDelete({ thread, mode: 'archive' });
 }
 
 function handleDeleteThread(
-  data: WorkspaceData,
+  shell: WorkspaceShell,
   thread: Parameters<NonNullable<ComponentProps<typeof ThreadHistory>['onDeleteThread']>>[0],
 ) {
-  data.deleteConversation.reset();
-  data.setThreadOptionsId(null);
-  data.setThreadToDelete({ thread, mode: 'delete' });
+  shell.resetThreadDeletion();
+  shell.setThreadOptionsId(null);
+  shell.setThreadToDelete({ thread, mode: 'delete' });
 }
 
 async function handleOpenNote(
-  data: WorkspaceData,
+  shell: WorkspaceShell,
   note: Parameters<NonNullable<ComponentProps<typeof ThreadHistory>['onOpenNote']>>[0],
 ) {
-  if ((await data.flush(true)) === false) return;
-  data.setSidebar(false);
-  void data.navigate({ to: '/notes/$noteId', params: { noteId: note.id } });
-  data.setMobilePane('note');
+  if ((await shell.flush(true)) === false) return;
+  shell.setSidebar(false);
+  void shell.navigate({ to: '/notes/$noteId', params: { noteId: note.id } });
+  shell.setMobilePane('note');
 }
 
 function handleDeleteNote(
-  data: WorkspaceData,
+  shell: WorkspaceShell,
   note: Parameters<NonNullable<ComponentProps<typeof ThreadHistory>['onDeleteNote']>>[0],
 ) {
-  data.deleteNote.reset();
-  data.setThreadOptionsId(null);
-  data.setNoteToDelete(note);
+  shell.resetNoteDeletion();
+  shell.setThreadOptionsId(null);
+  shell.setNoteToDelete(note);
 }
 
-function SidebarFooter({ data, authControls }: { data: WorkspaceData; authControls?: ReactNode }) {
-  const { setSettingsOpen, theme, changeTheme } = data;
+function SidebarFooter({ authControls }: { authControls?: ReactNode }) {
+  const { setSettingsOpen, theme, changeTheme } = useWorkspaceShell();
   return (
     <footer>
       <button onClick={() => setSettingsOpen(true)}>

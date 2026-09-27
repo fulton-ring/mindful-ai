@@ -3,7 +3,12 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ChatEvent } from '@walden/contracts';
 import { describe, expect, it } from 'vitest';
-import { conversation, getTransport, props } from '../../tests/_ChatPanel.test-helpers';
+import {
+  conversation,
+  getTransport,
+  props,
+  setComposerValue,
+} from '../../tests/_ChatPanel.test-helpers';
 
 const { ChatPanel } = await import('../../ChatPanel');
 
@@ -18,7 +23,7 @@ describe('streamed response activity', () => {
     });
     const values = props();
     const view = render(<ChatPanel {...values} />);
-    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Read a page' } });
+    setComposerValue(screen.getByLabelText('Message'), 'Read a page');
     fireEvent.click(screen.getByLabelText('Send message'));
     await waitFor(() => expect(transport.streamChat).toHaveBeenCalledTimes(1));
     act(() => emit({ type: 'context-compacted' }));

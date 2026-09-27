@@ -21,7 +21,7 @@ const verificationReason = (error: unknown): string => {
   return 'invalid';
 };
 
-export const ensureUser = async (
+const ensureUser = async (
   c: Context<{ Bindings: Bindings; Variables: Variables }>,
   subject: string,
 ) => {

@@ -1,44 +1,136 @@
 import type { PostHog } from 'posthog-js';
+import { storageKeys } from './storage-keys';
 
 type Interaction =
   | 'page_viewed'
   | 'chat_submitted'
   | 'chat_completed'
   | 'chat_failed'
+  | 'chat_regeneration_started'
+  | 'chat_regeneration_completed'
+  | 'chat_regeneration_failed'
+  | 'file_upload_started'
+  | 'file_upload_completed'
+  | 'file_upload_failed'
+  | 'file_upload_blocked'
+  | 'file_attachment_removed'
+  | 'chat_preference_changed'
+  | 'chat_preference_failed'
+  | 'chat_tools_opened'
+  | 'settings_section_opened'
+  | 'file_picker_opened'
+  | 'action_blocked'
+  | 'note_suggestion_failed'
+  | 'note_suggestion_requested'
+  | 'note_suggestion_generated'
+  | 'note_capture_failed'
+  | 'note_capture_started'
+  | 'note_capture_completed'
+  | 'account_action_failed'
+  | 'account_action_started'
+  | 'account_action_completed'
+  | 'conversation_action_failed'
+  | 'note_deleted'
+  | 'note_saved'
+  | 'note_save_failed'
+  | 'note_history_used'
+  | 'note_history_failed'
   | 'conversation_archived'
   | 'conversation_deleted'
   | 'note_opened'
   | 'note_closed'
-  | 'note_capture_saved'
   | 'note_suggestion_accepted'
   | 'note_suggestion_rejected'
   | 'persona_selected'
   | 'theme_changed';
 type Properties = {
   conversation_id?: string;
-  turn_id?: string;
+  request_id?: string;
   persona_id?: string;
   action?: string;
   characters?: number;
   duration_ms?: number;
   route?: string;
   theme?: 'light' | 'dark';
+  failure_code?: string;
+  http_status?: number;
+  stage?: string;
+  setting?: string;
+  enabled?: boolean;
+  file_type?: string;
+  size_bucket?: string;
+  attachment_count?: number;
+  had_partial_response?: boolean;
+  had_note?: boolean;
+  tool_count?: number;
+  source_count?: number;
+  proposal_count?: number;
 };
+
+/** Bounded diagnostics only. Never send exception messages or user content. */
+function httpFailureCode(status: number): string {
+  const codes: Record<number, string> = {
+    400: 'invalid_request',
+    401: 'unauthorized',
+    403: 'forbidden',
+    404: 'not_found',
+    409: 'conflict',
+    413: 'too_large',
+    415: 'unsupported_file',
+    422: 'invalid_request',
+    429: 'rate_limited',
+  };
+  return codes[status] ?? (status >= 500 ? 'service_error' : 'http_error');
+}
+
+export function failureDetails(error: unknown): Pick<Properties, 'failure_code' | 'http_status'> {
+  if (error instanceof DOMException && error.name === 'AbortError')
+    return { failure_code: 'cancelled' };
+  const status =
+    error && typeof error === 'object' && 'status' in error && typeof error.status === 'number'
+      ? error.status
+      : undefined;
+  if (status !== undefined) return { failure_code: httpFailureCode(status), http_status: status };
+  return { failure_code: 'network_or_client_error' };
+}
+
+export function fileAnalytics(file: File): Pick<Properties, 'file_type' | 'size_bucket'> {
+  const extension = file.name.split('.').at(-1)?.toLowerCase();
+  const file_type =
+    extension &&
+    ['pdf', 'docx', 'xlsx', 'md', 'txt', 'csv', 'json', 'png', 'jpg', 'jpeg', 'webp'].includes(
+      extension,
+    )
+      ? extension
+      : file.type.startsWith('image/')
+        ? 'image_other'
+        : 'other';
+  return {
+    file_type,
+    size_bucket:
+      file.size > 1_000_000
+        ? 'over_1mb'
+        : file.size <= 100_000
+          ? '0-100kb'
+          : file.size <= 500_000
+            ? '100-500kb'
+            : '500kb-1mb',
+  };
+}
 
 let client: PostHog | undefined;
 let identity: string | null = null;
 let loading: Promise<void> | undefined;
 
-const ANALYTICS_PREFERENCE = 'walden:browser-analytics';
 export function browserAnalyticsEnabled(): boolean {
   try {
-    return localStorage.getItem(ANALYTICS_PREFERENCE) !== 'false';
+    return localStorage.getItem(storageKeys.browserAnalytics) !== 'false';
   } catch {
     return true;
   }
 }
 export function setBrowserAnalyticsEnabled(enabled: boolean) {
-  localStorage.setItem(ANALYTICS_PREFERENCE, String(enabled));
+  localStorage.setItem(storageKeys.browserAnalytics, String(enabled));
   if (enabled) client?.opt_in_capturing();
   else client?.opt_out_capturing();
 }
@@ -122,24 +214,5 @@ export function track(event: Interaction, properties: Properties = {}) {
     });
   } catch {
     /* Analytics is best effort. */
-  }
-}
-
-/**
- * Stable id for one working session, so product events can be grouped. Kept in
- * sessionStorage alongside the drafts; a fresh tab starts a fresh session.
- */
-export function productSessionId(): string {
-  const key = 'walden:product-session';
-  try {
-    const existing = sessionStorage.getItem(key);
-    if (existing) return existing;
-    const id = crypto.randomUUID();
-    sessionStorage.setItem(key, id);
-    return id;
-  } catch {
-    // Private windows and blocked site data still get a usable id; it just
-    // stops grouping across reloads, which is better than dropping the event.
-    return crypto.randomUUID();
   }
 }

@@ -1,13 +1,45 @@
 import { SpanType, type TracingEvent } from '@mastra/core/observability';
 import { DefaultObservabilityInstance } from '@mastra/observability';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   ContentPrivacyProcessor,
+  captureChatFailure,
   createApiTelemetry,
   posthogExporterConfig,
   scrubTelemetrySpan,
   turnTracingOptions,
 } from '../observability';
+
+it('sends a bounded server failure event without prompt, response, or provider error text', async () => {
+  const send = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+  vi.stubGlobal('fetch', send);
+  try {
+    await captureChatFailure(
+      { POSTHOG_API_KEY: 'phc_test' },
+      {
+        userId: 'user',
+        conversationId: 'conversation',
+        turnId: 'turn',
+        code: 'provider_unavailable',
+        model: '@cf/model',
+        hadPartialResponse: true,
+        toolCount: 2,
+      },
+    );
+    const request = JSON.parse(send.mock.calls[0]?.[1]?.body as string);
+    expect(request.event).toBe('chat_generation_failed');
+    expect(request.properties).toMatchObject({
+      failure_code: 'provider_unavailable',
+      turn_id: 'turn',
+      had_partial_response: true,
+      tool_count: 2,
+    });
+    expect(JSON.stringify(request)).not.toContain('prompt');
+    expect(JSON.stringify(request)).not.toContain('response_text');
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
 
 describe('API telemetry configuration', () => {
   it('is disabled when no PostHog key is configured', () => {

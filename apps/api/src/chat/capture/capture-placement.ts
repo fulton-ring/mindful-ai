@@ -4,8 +4,8 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { HttpError, jsonBody, newId } from '../../http';
 import type { Bindings, Variables } from '../../types';
-import { loadConversation } from '../conversations/conversations';
-import { loadNote } from '../followups/followups';
+import { loadConversation } from '../conversations/repository';
+import { loadNote } from '../followups/followup-note-proposals';
 
 const requestSchema = z
   .object({

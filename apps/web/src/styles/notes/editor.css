@@ -83,12 +83,6 @@
     background: color-mix(in srgb, var(--accent) 20%, transparent);
     transition: background 180ms ease-out;
   }
-  .account-float {
-    position: fixed;
-    z-index: 45;
-    top: 1rem;
-    right: 1rem;
-  }
   @media (prefers-reduced-motion: reduce) {
     .wash-reveal,
     .note-resizable-panel.is-opening .note-surface {

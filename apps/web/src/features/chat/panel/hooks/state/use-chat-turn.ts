@@ -1,7 +1,20 @@
-import { type Dispatch, type SetStateAction, useRef } from 'react';
+import { useRef } from 'react';
+
+function truncateDisplayedStream(
+  target: string,
+  displayed: { current: string },
+  frame: { current: number | undefined },
+  setStreamed: (text: string) => void,
+) {
+  if (target.length >= displayed.current.length) return;
+  if (frame.current !== undefined) cancelAnimationFrame(frame.current);
+  frame.current = undefined;
+  displayed.current = target;
+  setStreamed(target);
+}
 
 /** Owns the animated response buffer and completion hand-off for a turn. */
-export function useChatTurn(setStreamed: Dispatch<SetStateAction<string>>) {
+export function useChatTurn(setStreamed: (text: string) => void) {
   const streamTarget = useRef('');
   const displayedStream = useRef('');
   const streamCompletionId = useRef<string | null>(null);
@@ -11,6 +24,7 @@ export function useChatTurn(setStreamed: Dispatch<SetStateAction<string>>) {
   const onStreamDrained = useRef<(() => void) | undefined>(undefined);
 
   function displayStreamTarget(target: string) {
+    truncateDisplayedStream(target, displayedStream, streamFrame, setStreamed);
     streamTarget.current = target;
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false) {
       displayedStream.current = target;

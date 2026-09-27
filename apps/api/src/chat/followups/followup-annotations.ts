@@ -1,8 +1,9 @@
 import type { Annotation, AnnotationEvent, Message } from '@walden/contracts';
 import { nowIso } from '../../http';
-import { mergeAnnotationsPreservingExisting } from '../../services/annotations/early-annotations';
+import { mergeAnnotationsPreservingExisting } from '../../services/annotations/annotations';
 import type { AgentService, AgentTurnInput } from '../../services/types';
 import { agentHighlightStatements } from '../highlights/agent-highlights';
+import { createBackgroundSseStream } from '../sse';
 
 type AnnotationGeneration = {
   db: D1Database;
@@ -65,14 +66,14 @@ function mergeStreamedAnnotation(
 
 async function runAnnotationStream(
   generation: AnnotationGeneration,
-  controller: AbortController,
+  signal: AbortSignal,
   emit: (event: AnnotationEvent) => void,
 ) {
   const { agent, input, assistantMessage } = generation;
   let provisional = assistantMessage.annotations ?? [];
-  const events = await agent.streamAnnotations(input, assistantMessage, controller.signal);
+  const events = await agent.streamAnnotations(input, assistantMessage, signal);
   for await (const event of events) {
-    if (controller.signal.aborted) return;
+    if (signal.aborted) return;
     if (event.type === 'annotation') {
       const merged = mergeStreamedAnnotation(provisional, event, assistantMessage.content);
       if (!merged) continue;
@@ -95,40 +96,11 @@ async function runAnnotationStream(
   }
 }
 
-function closeStream(output: ReadableStreamDefaultController<Uint8Array>) {
-  try {
-    output.close();
-  } catch {
-    /* Reader already left. */
-  }
-}
-
 export function createAnnotationStream(generation: AnnotationStream): ReadableStream<Uint8Array> {
-  const controller = new AbortController();
-  const abort = () => controller.abort('client disconnected');
-  generation.requestSignal.addEventListener('abort', abort, { once: true });
-  if (generation.requestSignal.aborted) abort();
-  const encoder = new TextEncoder();
-  return new ReadableStream<Uint8Array>({
-    start(output) {
-      const emit = (event: AnnotationEvent) =>
-        output.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-      const run = async () => {
-        try {
-          await runAnnotationStream(generation, controller, emit);
-        } catch {
-          if (!controller.signal.aborted)
-            emit({
-              type: 'error',
-              message: 'Highlights could not be generated. Please try again.',
-            });
-        } finally {
-          generation.requestSignal.removeEventListener('abort', abort);
-          closeStream(output);
-        }
-      };
-      generation.waitUntil(run());
-    },
-    cancel: abort,
+  return createBackgroundSseStream<AnnotationEvent>({
+    requestSignal: generation.requestSignal,
+    waitUntil: generation.waitUntil,
+    errorEvent: { type: 'error', message: 'Highlights could not be generated. Please try again.' },
+    run: (signal, emit) => runAnnotationStream(generation, signal, emit),
   });
 }

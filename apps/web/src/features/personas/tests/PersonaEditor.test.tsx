@@ -6,6 +6,15 @@ import { PersonaEditor } from '../PersonaEditor';
 import { PersonaPicker } from '../PersonaPicker';
 
 afterEach(cleanup);
+it('offers GLM by default and keeps the model selector enabled', () => {
+  const editor = render(
+    <PersonaEditor persona={DEFAULT_PERSONAS[0]!} onSave={vi.fn()} onClose={vi.fn()} />,
+  );
+  const model = editor.getByRole('combobox', { name: 'Model' });
+  expect(model.textContent).toContain('GLM 5.3 Flash');
+  expect(model.hasAttribute('disabled')).toBe(false);
+});
+
 it('saves the chosen icon and renders it for a custom persona', async () => {
   const onSave = vi.fn();
   const persona = { ...DEFAULT_PERSONAS[0]!, id: 'custom-coach' };

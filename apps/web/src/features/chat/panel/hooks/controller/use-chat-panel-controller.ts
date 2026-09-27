@@ -4,8 +4,9 @@ import { resetAnnotationRetries, useChatAnnotations } from '../actions/use-chat-
 import { useChatLifecycle } from '../actions/use-chat-lifecycle';
 import { useChatPreferences } from '../actions/use-chat-preferences';
 import { useChatProposals } from '../actions/use-chat-proposals';
-import { useChatRegeneration } from '../actions/use-chat-regenerate';
-import { useChatSend } from '../actions/use-chat-send';
+import { chatRegenerationActions } from '../actions/use-chat-regenerate';
+import { chatSendActions } from '../actions/use-chat-send';
+import { useChatUploads } from '../actions/use-chat-uploads';
 import { useMessageActions } from '../actions/use-message-actions';
 import { useChatDisplayState } from '../state/use-chat-display-state';
 import { useChatRuntimeState } from '../state/use-chat-runtime-state';
@@ -39,6 +40,7 @@ function useChatOrchestration(
     turn,
     resetAnnotationRetries: () => resetAnnotationRetries(display),
   });
+  const uploads = useChatUploads(props, display, runtime);
   const preferences = useChatPreferences({ props, display, runtime });
   const proposals = useChatProposals({ props, display, runtime, effectivePersonaId });
   const annotations = useChatAnnotations(
@@ -51,20 +53,20 @@ function useChatOrchestration(
     },
     turn,
   );
-  const send = useChatSend({
+  const send = chatSendActions({
     props,
     display,
     runtime,
+    uploads,
     turn,
     effectivePersonaId,
     pendingEdit: display.pendingEdit,
-    cancelMainTurn: lifecycle.cancelMainTurn,
     resetAnnotationRetries: annotations.resetAnnotationRetries,
     animateAnnotations: annotations.animateAnnotations,
     adoptIncompleteResponse: lifecycle.adoptIncompleteResponse,
     launchFollowups: annotations.launchFollowups,
   });
-  const regeneration = useChatRegeneration({
+  const regeneration = chatRegenerationActions({
     props,
     display,
     runtime,
@@ -79,6 +81,7 @@ function useChatOrchestration(
     ...proposals,
     ...annotations,
     ...send,
+    ...uploads,
     ...regeneration,
   };
 }

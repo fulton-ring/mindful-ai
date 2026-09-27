@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { abortActiveTurn, registerActiveTurn } from '../../turns/active-turns';
-import { loadConversation } from '../conversations';
+import { loadConversation } from '../repository';
 import { type ConversationRecord, database, testApp } from './conversations.fixtures';
 
 const conversation = (overrides: Partial<ConversationRecord> = {}): ConversationRecord => ({
@@ -70,9 +69,7 @@ describe('conversation deletion', () => {
     expect(db.queries.some((query) => query.startsWith('DELETE FROM notes'))).toBe(false);
   });
 
-  it('deletes an owned streaming conversation and aborts its local turn', async () => {
-    const controller = new AbortController();
-    registerActiveTurn('turn', 'conversation', controller);
+  it('deletes an owned streaming conversation', async () => {
     const db = database({
       conversations: [conversation({ noteId: 'note' })],
       streamingConversationIds: ['conversation'],
@@ -80,14 +77,11 @@ describe('conversation deletion', () => {
     const response = await testApp(db)('/api/conversations/conversation', { method: 'DELETE' });
 
     expect(response.status).toBe(204);
-    expect(controller.signal.aborted).toBe(true);
     expect(db.conversations).toHaveLength(0);
     expect(db.queries.some((query) => query.startsWith('DELETE FROM notes'))).toBe(true);
   });
 
-  it("does not abort or delete another owner's streaming conversation", async () => {
-    const controller = new AbortController();
-    registerActiveTurn('turn', 'conversation', controller);
+  it("does not delete another owner's streaming conversation", async () => {
     const db = database({
       conversations: [conversation({ ownerId: 'other' })],
       streamingConversationIds: ['conversation'],
@@ -95,9 +89,7 @@ describe('conversation deletion', () => {
     const response = await testApp(db)('/api/conversations/conversation', { method: 'DELETE' });
 
     expect(response.status).toBe(404);
-    expect(controller.signal.aborted).toBe(false);
     expect(db.conversations).toHaveLength(1);
-    abortActiveTurn('turn', 'test cleanup');
   });
 
   it('deletes an owned expired conversation without attempting renewal', async () => {

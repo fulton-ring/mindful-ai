@@ -1,6 +1,6 @@
 import type { Conversation } from '@walden/contracts';
 import { describe, expect, it } from 'vitest';
-import { editContext, regenerationContext } from '../routes';
+import { editContext, regenerationContext } from '../turn-support';
 
 const messages = (incomplete: boolean): Conversation['messages'] => [
   { id: 'user-1', role: 'user', content: 'Explain tides.', createdAt: '1' },

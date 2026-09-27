@@ -3,7 +3,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ChatEvent, Conversation } from '@walden/contracts';
 import { expect, it } from 'vitest';
-import { conversation, getTransport, props } from '../../tests/_ChatPanel.test-helpers';
+import {
+  conversation,
+  getTransport,
+  props,
+  setComposerValue,
+} from '../../tests/_ChatPanel.test-helpers';
 
 const { ChatPanel } = await import('../../ChatPanel');
 
@@ -44,7 +49,7 @@ it('publishes each annotation before the classifier stream finishes', async () =
     rendered.rerender(<ChatPanel {...values} conversation={next} />);
   });
 
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Question');
   fireEvent.click(screen.getByLabelText('Send message'));
   await waitFor(() => expect(emitAnnotation).toBeTypeOf('function'));
   emitAnnotation?.({
@@ -92,7 +97,7 @@ function configurePriorTurnStreams() {
   let finishFirstAnnotations: ((value: unknown[]) => void) | undefined;
   let emitSecond: ((event: ChatEvent) => void) | undefined;
   let turn = 0;
-  transport.messageAnnotations
+  transport.annotationResults
     .mockReturnValueOnce(new Promise((resolve) => (finishFirstAnnotations = resolve)))
     .mockReturnValue(new Promise(() => undefined));
   transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
@@ -125,11 +130,11 @@ async function beginPriorTurnScenario() {
     latest = next;
     rendered.rerender(<ChatPanel {...values} conversation={next} />);
   });
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'First' } });
+  setComposerValue(screen.getByLabelText('Message'), 'First');
   fireEvent.click(screen.getByLabelText('Send message'));
   await screen.findByText('First answer');
   expect(await screen.findByText('Adding highlights…')).toBeTruthy();
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Second' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Second');
   fireEvent.click(screen.getByLabelText('Send message'));
   await waitFor(() => expect(streams.secondReady()).toBe(true));
   return { ...streams, getLatest: () => latest };
@@ -186,7 +191,7 @@ it('does not present an unfinished highlight action on an unannotated response',
 });
 
 it('hides highlight controls after a successful empty classification', async () => {
-  transport.messageAnnotations.mockResolvedValueOnce([]);
+  transport.annotationResults.mockResolvedValueOnce([]);
   transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
     onEvent({
       type: 'done',
@@ -209,7 +214,7 @@ it('hides highlight controls after a successful empty classification', async () 
     rendered.rerender(<ChatPanel {...values} conversation={next} />);
   });
 
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Okay?' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Okay?');
   fireEvent.click(screen.getByLabelText('Send message'));
   await screen.findByText('Acknowledged.');
   await waitFor(() => expect(screen.queryByText('Adding highlights…')).toBeNull());
@@ -219,7 +224,7 @@ it('hides highlight controls after a successful empty classification', async () 
 
 it('applies annotations that arrive after drain but before finalized props rerender', async () => {
   let finishAnnotations: ((value: unknown[]) => void) | undefined;
-  transport.messageAnnotations.mockReturnValue(
+  transport.annotationResults.mockReturnValue(
     new Promise((resolve) => {
       finishAnnotations = resolve;
     }),
@@ -251,7 +256,7 @@ it('applies annotations that arrive after drain but before finalized props reren
     finalized ??= next;
   });
   const rendered = render(<ChatPanel {...values} />);
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Question');
   fireEvent.click(screen.getByLabelText('Send message'));
   await waitFor(() => expect(finalized?.messages.at(-1)?.id).toBe('assistant-delayed'));
 
@@ -275,7 +280,7 @@ it('applies annotations that arrive after drain but before finalized props reren
 });
 
 it('explains and dismisses a failed highlight refresh while retaining existing marks', async () => {
-  transport.messageAnnotations.mockRejectedValueOnce(
+  transport.annotationResults.mockRejectedValueOnce(
     new Error('The AI service is busy. Please try again shortly.'),
   );
   const values = props();
@@ -295,11 +300,11 @@ it('explains and dismisses a failed highlight refresh while retaining existing m
   fireEvent.click(screen.getByRole('button', { name: 'Dismiss highlight error' }));
   expect(screen.queryByText('The AI service is busy. Please try again shortly.')).toBeNull();
   expect(screen.getByText('Ice floats.').getAttribute('data-annotation-count')).toBe('1');
-  expect(transport.messageAnnotations).toHaveBeenCalledTimes(1);
+  expect(transport.annotationResults).toHaveBeenCalledTimes(1);
 });
 
 it('retries only highlights with the original followup input', async () => {
-  transport.messageAnnotations.mockRejectedValueOnce(new Error('classifier unavailable'));
+  transport.annotationResults.mockRejectedValueOnce(new Error('classifier unavailable'));
   transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
     onEvent({ type: 'text', text: 'Completed answer' });
     onEvent({
@@ -327,12 +332,12 @@ it('retries only highlights with the original followup input', async () => {
     rendered.rerender(<ChatPanel {...values} conversation={next} />);
   });
 
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Question' } });
+  setComposerValue(screen.getByLabelText('Message'), 'Question');
   fireEvent.click(screen.getByLabelText('Send message'));
   const retry = await screen.findByRole('button', { name: 'Retry highlights' });
-  const originalInput = transport.messageAnnotations.mock.calls[0]?.[1];
+  const originalInput = transport.annotationResults.mock.calls[0]?.[1];
   let finishRetry: ((value: unknown[]) => void) | undefined;
-  transport.messageAnnotations.mockReturnValueOnce(
+  transport.annotationResults.mockReturnValueOnce(
     new Promise((resolve) => {
       finishRetry = resolve;
     }),
@@ -340,9 +345,9 @@ it('retries only highlights with the original followup input', async () => {
 
   fireEvent.click(retry);
   expect(await screen.findByText('Adding highlights…')).toBeTruthy();
-  expect(transport.messageAnnotations).toHaveBeenCalledTimes(2);
-  expect(transport.messageAnnotations.mock.calls[1]?.[0]).toBe('assistant-1');
-  expect(transport.messageAnnotations.mock.calls[1]?.[1]).toEqual(originalInput);
+  expect(transport.annotationResults).toHaveBeenCalledTimes(2);
+  expect(transport.annotationResults.mock.calls[1]?.[0]).toBe('assistant-1');
+  expect(transport.annotationResults.mock.calls[1]?.[1]).toEqual(originalInput);
   // Retrying highlights touches only highlights; nothing proposes a note.
   expect(transport.streamNoteProposal).not.toHaveBeenCalled();
   finishRetry?.([]);

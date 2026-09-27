@@ -7,6 +7,7 @@ import type {
   ProvenanceSpan,
 } from '@walden/contracts';
 import { applyProposal, resolveEdit } from '@walden/domain';
+import { storageKeys } from '../../lib/storage-keys';
 
 export type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
 
@@ -18,14 +19,10 @@ export type CachedNoteDraft = {
   dismissedSuggestionIds?: string[];
 };
 
-function personaStorageKey(identity: string) {
-  return `walden:persona:${identity}`;
-}
-
 export function readStoredPersona(identity?: string): string {
   if (!identity) return '';
   try {
-    return localStorage.getItem(personaStorageKey(identity)) ?? '';
+    return localStorage.getItem(storageKeys.persona(identity)) ?? '';
   } catch {
     return '';
   }
@@ -34,8 +31,8 @@ export function readStoredPersona(identity?: string): string {
 export function writeStoredPersona(identity: string | undefined, value: string) {
   if (!identity) return;
   try {
-    if (value) localStorage.setItem(personaStorageKey(identity), value);
-    else localStorage.removeItem(personaStorageKey(identity));
+    if (value) localStorage.setItem(storageKeys.persona(identity), value);
+    else localStorage.removeItem(storageKeys.persona(identity));
   } catch {
     // Private browsing and storage quotas must not block the workspace.
   }
@@ -44,7 +41,7 @@ export function writeStoredPersona(identity: string | undefined, value: string) 
 export function readDismissedNotePanels(identity?: string): Set<string> {
   try {
     const value: unknown = JSON.parse(
-      sessionStorage.getItem(`walden:closed-notes:${identity ?? ''}`) ?? '[]',
+      sessionStorage.getItem(storageKeys.closedNotes(identity)) ?? '[]',
     );
     return new Set(
       Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [],
@@ -56,10 +53,32 @@ export function readDismissedNotePanels(identity?: string): Set<string> {
 
 export function writeDismissedNotePanels(identity: string | undefined, dismissed: Set<string>) {
   try {
-    sessionStorage.setItem(`walden:closed-notes:${identity ?? ''}`, JSON.stringify([...dismissed]));
+    sessionStorage.setItem(storageKeys.closedNotes(identity), JSON.stringify([...dismissed]));
   } catch {
     // Retain in-memory dismissals if browser storage is unavailable.
   }
+}
+
+export function readCachedDraft(noteId: string) {
+  return sessionStorage.getItem(storageKeys.draft(noteId));
+}
+
+/** Keeps a note's unsaved edits for this browser session, until they are saved or discarded. */
+export function writeCachedDraft(note: Note, dismissedSuggestionIds: Iterable<string>) {
+  sessionStorage.setItem(
+    storageKeys.draft(note.id),
+    JSON.stringify({
+      version: 1,
+      baseRevision: note.revision,
+      markdown: note.markdown,
+      provenance: note.provenance,
+      dismissedSuggestionIds: [...dismissedSuggestionIds],
+    } satisfies CachedNoteDraft),
+  );
+}
+
+export function clearCachedDraft(noteId: string) {
+  sessionStorage.removeItem(storageKeys.draft(noteId));
 }
 
 export function restoreCachedNoteDraft(

@@ -33,7 +33,7 @@ describe('atomic first-note capture transactions with SQLite', () => {
       beforeBatch(path) {
         execFileSync('sqlite3', [path], {
           input:
-            "INSERT INTO turns (id,request_id,conversation_id,owner_id,status,created_at) VALUES ('turn','request','conversation','owner','streaming','2026-01-01');",
+            "INSERT INTO turns (id,request_id,conversation_id,owner_id,status,created_at,branch_id,source_branch_id) VALUES ('turn','request','conversation','owner','streaming','2026-01-01','default','default');",
         });
       },
     });

@@ -58,7 +58,7 @@ it('creates a sibling branch from an older response without changing the origina
       expiresAt: '2026-09-25T00:00:00.000Z',
     });
   });
-  transport.messageAnnotations.mockResolvedValue([]);
+  transport.annotationResults.mockResolvedValue([]);
   transport.streamNoteProposal.mockResolvedValue(undefined);
   const history = branchHistory();
   const values = props(history);

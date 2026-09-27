@@ -2,9 +2,12 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "walden",
   "preview_urls": false,
-  "main": "src/index.ts",
+  "main": "src/worker.ts",
   "compatibility_date": "2026-09-18",
   "compatibility_flags": ["nodejs_compat"],
+  // @mastra/cloudflare-d1 imports the `cloudflare` REST SDK only for its
+  // apiToken mode; the D1 binding path never constructs it.
+  "alias": { "cloudflare": "./stubs/cloudflare.ts" },
   "limits": {
     "cpu_ms": 30000
   },
@@ -16,6 +19,10 @@
       "migrations_dir": "migrations"
     }
   ],
+  "workflows": [
+    { "name": "walden-chat", "binding": "CHAT_WORKFLOW", "class_name": "ChatWorkflow" }
+  ],
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "walden-attachments" }],
   "ai": {
     "binding": "AI",
     // Workers AI has no local emulation. Declaring the remote binding up front
@@ -37,13 +44,14 @@
     }
   ],
   "triggers": {
-    "crons": ["17 * * * *"]
+    "crons": ["* * * * *", "17 * * * *"]
   },
   "vars": {
     "AI_PROVIDER": "cloudflare",
-    "AI_MODEL": "@cf/google/gemma-4-26b-a4b-it",
+    "AI_MODEL": "@cf/zai-org/glm-5.3-flash",
+    "R2_ACCOUNT_ID": "e9be35217a75f5d2148e572d8853b3bf",
+    "R2_BUCKET": "walden-attachments",
     "CLOUDFLARE_ACCOUNT_ID": "e9be35217a75f5d2148e572d8853b3bf",
-    "BILLING_ENABLED": "false",
     "POSTHOG_PROJECT_ID": "619294",
     "CLERK_PUBLISHABLE_KEY": "pk_test_bW9yYWwtbGVtdXItNjI4Mi5jbGVyay5hY2NvdW50cy5kZXYk",
     "CLERK_AUTHORIZED_PARTIES": "http://localhost:5173,http://localhost:8788,http://localhost:8787,http://127.0.0.1:5173,http://127.0.0.1:8788,http://127.0.0.1:8787,https://walden.jeremy-herzog.workers.dev",

@@ -1,36 +1,18 @@
-import {
-  defaultKeymap,
-  history,
-  historyKeymap,
-  indentLess,
-  indentMore,
-  invertedEffects,
-} from '@codemirror/commands';
-import { markdown } from '@codemirror/lang-markdown';
-import {
-  ChangeSet,
-  Compartment,
-  EditorState,
-  Prec,
-  StateEffect,
-  StateField,
-  Transaction,
-} from '@codemirror/state';
-import { Decoration, EditorView, keymap, type ViewUpdate } from '@codemirror/view';
+import { ChangeSet, EditorState, type StateEffect } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
 import type { EditProposal, Note, ProvenanceSpan } from '@walden/contracts';
-import { minimalEdit, resolveEdit, updateProvenance } from '@walden/domain';
-import { useEffect, useRef, useState } from 'react';
-import { markdownPreviewDecorations, markdownPreviewTheme } from '../markdown/markdown-preview';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { displayEdit } from '../proposals/NoteSuggestionList';
+import { type PendingProjection, projectPendingEdits } from '../proposals/pending-projection';
 import {
-  createSuggestionDecorations,
-  displayEdit,
-  type SuggestionActions,
-} from '../proposals/NoteSuggestionList';
-import {
-  candidateOnLine,
-  type PendingProjection,
-  projectPendingEdits,
-} from '../proposals/pending-projection';
+  captureRevealEffect,
+  createEditorExtensions,
+  type EditorRefs,
+  type MutableRef,
+  readonlyCompartment,
+  redrawDecorations,
+  syncEditorDocument,
+} from './editor-extensions';
 
 export type NotesEditorProps = {
   note: Note;
@@ -52,361 +34,10 @@ export type NotesEditorProps = {
 };
 
 type HostRef = { current: HTMLDivElement | null };
-type MutableRef<T> = { current: T };
-type EditorCallbacks = Pick<
-  NotesEditorProps,
-  'onChange' | 'onAccept' | 'onDismiss' | 'onUndo' | 'onRedo'
->;
-type EditorRefs = {
-  spans: MutableRef<ProvenanceSpan[]>;
-  proposal: MutableRef<EditProposal | null>;
-  proposals: MutableRef<readonly EditProposal[]>;
-  projection: MutableRef<PendingProjection | null>;
-  projectionChanges: MutableRef<ChangeSet | null>;
-  caret: MutableRef<number | null>;
-  committed: MutableRef<string>;
-  acceptBlocked: MutableRef<boolean>;
-  disabled: MutableRef<boolean>;
-  proposalStreaming: MutableRef<boolean>;
-  streamingProposalIds: MutableRef<ReadonlySet<string>>;
-  callbacks: MutableRef<EditorCallbacks>;
-};
-type UpdateContext = {
-  refs: EditorRefs;
-  note: Note;
-};
+type AdditionQueue = NonNullable<NotesEditorProps['additionQueue']>;
 
-const externalChange = StateEffect.define<void>();
-const suggestionEffect = StateEffect.define<DecorationSet>();
-const previewEffect = StateEffect.define<DecorationSet>();
-const captureRevealEffect = StateEffect.define<{ from: number; to: number } | null>();
-const provenanceValueEffect = StateEffect.define<ProvenanceSpan[]>();
-const readonlyCompartment = new Compartment();
-type DecorationSet = ReturnType<typeof Decoration.set>;
-
-const suggestionField = StateField.define<DecorationSet>({
-  create: () => Decoration.none,
-  update(value, transaction) {
-    for (const effect of transaction.effects) {
-      if (effect.is(suggestionEffect)) return effect.value;
-    }
-    return transaction.docChanged ? value.map(transaction.changes) : value;
-  },
-  provide: (field) => EditorView.decorations.from(field),
-});
-
-const previewField = StateField.define<DecorationSet>({
-  create: () => Decoration.none,
-  update(value, transaction) {
-    for (const effect of transaction.effects) if (effect.is(previewEffect)) return effect.value;
-    return transaction.docChanged || transaction.selection
-      ? markdownPreviewDecorations(
-          transaction.newDoc.toString(),
-          transaction.newSelection.main.head,
-        )
-      : value;
-  },
-  provide: (field) => EditorView.decorations.from(field),
-});
-
-const captureRevealField = StateField.define<DecorationSet>({
-  create: () => Decoration.none,
-  update(value, transaction) {
-    for (const effect of transaction.effects) {
-      if (effect.is(captureRevealEffect)) return revealDecoration(effect.value);
-    }
-    return transaction.docChanged ? value.map(transaction.changes) : value;
-  },
-  provide: (field) => EditorView.decorations.from(field),
-});
-
-const provenanceState = StateField.define<ProvenanceSpan[]>({
-  create: () => [],
-  update(value, transaction) {
-    for (const effect of transaction.effects) {
-      if (effect.is(provenanceValueEffect)) return effect.value;
-    }
-    if (!transaction.docChanged || hasExternalChange(transaction)) return value;
-    return updateProvenanceForChanges(value, transaction.changes);
-  },
-});
-
-function revealDecoration(value: { from: number; to: number } | null): DecorationSet {
-  if (!value || value.to <= value.from) return Decoration.none;
-  return Decoration.set([
-    Decoration.mark({ class: 'notes-editor__capture-reveal' }).range(value.from, value.to),
-  ]);
-}
-
-function hasExternalChange(transaction: Transaction): boolean {
-  return transaction.effects.some((effect) => effect.is(externalChange));
-}
-
-function updateProvenanceForChanges(value: ProvenanceSpan[], changes: ChangeSet): ProvenanceSpan[] {
-  const edits: Array<{ from: number; to: number; insert: string }> = [];
-  changes.iterChanges((from, to, _fromB, _toB, inserted) =>
-    edits.push({ from, to, insert: inserted.toString() }),
-  );
-  let next = value;
-  for (const edit of edits.reverse())
-    next = updateProvenance(next, edit.from, edit.to, edit.insert);
-  return next;
-}
-
-function projectedPosition(
-  canonical: number,
-  projection: PendingProjection | null,
-  document: string,
-): number {
-  const shift = (projection?.ranges ?? [])
-    .filter((range) => range.sourceFrom <= canonical)
-    .reduce((total, range) => total + range.insert.length - (range.sourceTo - range.sourceFrom), 0);
-  return Math.max(0, Math.min(canonical + shift, document.length));
-}
-
-function suggestionActions(refs: EditorRefs): SuggestionActions {
-  return {
-    onAccept: (candidate) =>
-      refs.callbacks.current.onAccept(
-        refs.proposals.current.find((value) => value.id === candidate.id) ?? candidate,
-      ),
-    onDismiss: (candidate) => refs.callbacks.current.onDismiss('reject', candidate),
-    disabled: (candidate) =>
-      refs.disabled.current ||
-      refs.streamingProposalIds.current.has(candidate.id) ||
-      (candidate.id === refs.proposal.current?.id && refs.acceptBlocked.current),
-    streaming: (candidate) =>
-      refs.streamingProposalIds.current.has(candidate.id) ||
-      (candidate.id === refs.proposal.current?.id && refs.proposalStreaming.current),
-  };
-}
-
-type EditorUpdate = ViewUpdate;
-
-function isSuggestionBlocked(refs: EditorRefs, candidate: EditProposal): boolean {
-  return (
-    refs.disabled.current ||
-    refs.streamingProposalIds.current.has(candidate.id) ||
-    (candidate.id === refs.proposal.current?.id && refs.acceptBlocked.current)
-  );
-}
-
-function findSuggestion(refs: EditorRefs, projection: PendingProjection, position: number) {
-  const selected = candidateOnLine(projection, position);
-  if (selected.kind !== 'unique') return null;
-  return refs.proposals.current.find((value) => value.id === selected.proposalId) ?? null;
-}
-
-function acceptSuggestion(refs: EditorRefs, editor: EditorView): boolean {
-  const projection = refs.projection.current;
-  if (!projection) return false;
-  const candidate = findSuggestion(refs, projection, editor.state.selection.main.head);
-  if (!candidate || isSuggestionBlocked(refs, candidate)) return false;
-  refs.callbacks.current.onAccept(candidate);
-  return true;
-}
-
-function dismissSuggestion(refs: EditorRefs, editor: EditorView): boolean {
-  const projection = refs.projection.current;
-  if (!projection) return false;
-  const candidate = findSuggestion(refs, projection, editor.state.selection.main.head);
-  if (!candidate) return false;
-  refs.callbacks.current.onDismiss('reject', candidate);
-  return true;
-}
-
-function historyKeyBindings(refs: EditorRefs) {
-  return [
-    {
-      key: 'Mod-z',
-      run: () => runHistoryAction(refs, 'onUndo'),
-      shift: () => runHistoryAction(refs, 'onRedo'),
-    },
-    { key: 'Mod-y', run: () => runHistoryAction(refs, 'onRedo') },
-  ];
-}
-
-function runHistoryAction(refs: EditorRefs, action: 'onUndo' | 'onRedo'): boolean {
-  const callback = refs.callbacks.current[action];
-  if (!callback) return false;
-  if (!refs.disabled.current) callback();
-  return true;
-}
-
-function suggestionKeyBindings(refs: EditorRefs) {
-  const hasSuggestionOnLine = (editor: EditorView) => {
-    const projection = refs.projection.current;
-    return (
-      projection && candidateOnLine(projection, editor.state.selection.main.head).kind !== 'none'
-    );
-  };
-  const canNestUnderPreviousLine = (editor: EditorView) => {
-    const line = editor.state.doc.lineAt(editor.state.selection.main.from);
-    if (line.number === 1) return false;
-    const previous = editor.state.doc.line(line.number - 1).text;
-    if (!previous.trim()) return false;
-    const previousIndent = previous.match(/^[ \t]*/)?.[0].length ?? 0;
-    const currentIndent = line.text.match(/^[ \t]*/)?.[0].length ?? 0;
-    const previousIsList = /^[ \t]*(?:[-+*]|\d+[.)])[ \t]+/.test(previous);
-    return (previousIsList || previousIndent > 0) && currentIndent <= previousIndent;
-  };
-  return [
-    {
-      key: 'Tab',
-      run: (editor: EditorView) => {
-        if (hasSuggestionOnLine(editor)) {
-          acceptSuggestion(refs, editor);
-          return true;
-        }
-        return canNestUnderPreviousLine(editor) ? indentMore(editor) : true;
-      },
-    },
-    {
-      key: 'Shift-Tab',
-      run: (editor: EditorView) => (hasSuggestionOnLine(editor) ? true : indentLess(editor)),
-    },
-    {
-      key: 'Escape',
-      run: (editor: EditorView) => dismissSuggestion(refs, editor),
-    },
-  ];
-}
-
-function createKeymap(refs: EditorRefs) {
-  return Prec.high(keymap.of([...historyKeyBindings(refs), ...suggestionKeyBindings(refs)]));
-}
-
-function changedRanges(update: EditorUpdate) {
-  const changes: Array<{ from: number; to: number; insert: string }> = [];
-  update.changes.iterChanges((from, to, _fromB, _toB, inserted) =>
-    changes.push({ from, to, insert: inserted.toString() }),
-  );
-  return changes;
-}
-
-function touchesSuggestion(range: PendingProjection['ranges'][number], from: number, to: number) {
-  return range.from === range.to
-    ? from <= range.from && to >= range.to
-    : from === to
-      ? from > range.from && from < range.to
-      : from < range.to && to > range.from;
-}
-
-function dismissTouchedSuggestions(
-  refs: EditorRefs,
-  projection: PendingProjection,
-  update: EditorUpdate,
-) {
-  const touched = new Set<string>();
-  update.changes.iterChangedRanges((from, to) => {
-    for (const range of projection.ranges)
-      if (touchesSuggestion(range, from, to)) touched.add(range.proposalId);
-  });
-  for (const id of touched) {
-    const candidate = refs.proposals.current.find((value) => value.id === id);
-    if (candidate) refs.callbacks.current.onDismiss('typing', candidate);
-  }
-}
-
-function saveProjectedChanges(
-  refs: EditorRefs,
-  projectionChanges: ChangeSet,
-  update: EditorUpdate,
-) {
-  const changes = changedRanges(update);
-  const canonicalChanges = changes.map((change) => ({
-    from: projectionChanges.invertedDesc.mapPos(change.from, -1),
-    to: projectionChanges.invertedDesc.mapPos(change.to, 1),
-    insert: change.insert,
-  }));
-  const lastChange = canonicalChanges.at(-1);
-  refs.caret.current = lastChange ? lastChange.from + lastChange.insert.length : null;
-  const canonical = ChangeSet.of(canonicalChanges, refs.committed.current.length).apply(
-    EditorState.create({ doc: refs.committed.current }).doc,
-  );
-  let spans = refs.spans.current;
-  for (const change of [...canonicalChanges].reverse()) {
-    spans = updateProvenance(spans, change.from, change.to, change.insert);
-  }
-  refs.spans.current = spans;
-  refs.callbacks.current.onChange(canonical.toString(), spans);
-}
-
-function touchesCurrentProposal(
-  resolved: { from: number; to: number } | null,
-  change: { from: number; to: number },
-): boolean {
-  if (!resolved) return false;
-  return resolved.from === resolved.to
-    ? change.from <= resolved.from && change.to >= resolved.to
-    : change.from === change.to
-      ? change.from >= resolved.from && change.from <= resolved.to
-      : change.from < resolved.to && change.to > resolved.from;
-}
-
-function dismissCurrentProposal(refs: EditorRefs, update: EditorUpdate) {
-  const currentProposal = refs.proposal.current;
-  let resolved: { from: number; to: number } | null = null;
-  if (currentProposal) {
-    try {
-      resolved = resolveEdit(
-        update.startState.doc.toString(),
-        currentProposal.oldText,
-        currentProposal.newText,
-      );
-    } catch {
-      resolved = null;
-    }
-  }
-  for (const change of changedRanges(update)) {
-    if (touchesCurrentProposal(resolved, change)) refs.callbacks.current.onDismiss('typing');
-  }
-}
-
-function handleEditorUpdate(update: EditorUpdate, context: UpdateContext) {
-  if (!update.docChanged || update.transactions.some(hasExternalChange)) return;
-  const { refs } = context;
-  const projection = refs.projection.current;
-  const projectionChanges = refs.projectionChanges.current;
-  if (projection && projectionChanges) {
-    dismissTouchedSuggestions(refs, projection, update);
-    saveProjectedChanges(refs, projectionChanges, update);
-    return;
-  }
-  dismissCurrentProposal(refs, update);
-  const changedSpans = update.state.field(provenanceState);
-  refs.spans.current = changedSpans;
-  refs.callbacks.current.onChange(update.state.doc.toString(), changedSpans);
-}
-
-function createEditorExtensions(refs: EditorRefs, note: Note, readOnly: boolean) {
-  const context = { refs, note };
-  return [
-    history(),
-    invertedEffects.of((transaction) => {
-      if (!transaction.docChanged || hasExternalChange(transaction)) return [];
-      return [provenanceValueEffect.of(transaction.startState.field(provenanceState))];
-    }),
-    EditorView.lineWrapping,
-    markdownPreviewTheme,
-    EditorView.theme({
-      '&': { fontFamily: '"IBM Plex Sans", sans-serif', fontSize: '16px' },
-      '&.cm-focused': { outline: 'none' },
-      '.cm-scroller': { fontFamily: 'inherit', lineHeight: '1.65' },
-      '.cm-content': { padding: '0 0 6rem', caretColor: 'var(--ink)' },
-      '.cm-line': { padding: '0' },
-    }),
-    markdown(),
-    suggestionField,
-    previewField,
-    captureRevealField,
-    provenanceState,
-    readonlyCompartment.of(EditorState.readOnly.of(refs.disabled.current || readOnly)),
-    createKeymap(refs),
-    keymap.of([...defaultKeymap, ...historyKeymap]),
-    EditorView.updateListener.of((update) => handleEditorUpdate(update, context)),
-  ];
-}
+const EMPTY_SET: ReadonlySet<string> = new Set();
+const EMPTY_QUEUE: AdditionQueue = [];
 
 function mountEditor(
   host: HostRef,
@@ -416,24 +47,13 @@ function mountEditor(
   readOnly: boolean,
 ) {
   if (!host.current) return undefined;
-  const decorations = createSuggestionDecorations(
-    projection,
-    refs.proposals.current,
-    suggestionActions(refs),
-  );
   const state = EditorState.create({
     doc: projection.text,
-    extensions: createEditorExtensions(refs, note, readOnly),
+    extensions: createEditorExtensions(refs, readOnly),
   });
   const view = new EditorView({ state, parent: host.current });
   refs.spans.current = note.provenance;
-  view.dispatch({
-    effects: [
-      suggestionEffect.of(decorations),
-      previewEffect.of(markdownPreviewDecorations(projection.text, view.state.selection.main.head)),
-      provenanceValueEffect.of(note.provenance),
-    ],
-  });
+  redrawDecorations(view, refs, projection, note.provenance);
   return { view, cleanup: () => view.destroy() };
 }
 
@@ -453,7 +73,7 @@ function useEditorMount(
       mounted.cleanup();
       viewRef.current = null;
     };
-  }, [host, suggestionEffect, previewEffect, provenanceValueEffect, readonlyCompartment]);
+  }, [host]);
   return viewRef;
 }
 
@@ -528,16 +148,7 @@ function useEditorSync(
     const view = viewRef.current;
     if (!view) return;
     syncEditorDocument(view, refs, note, projected);
-    const actions = suggestionActions(refs);
-    view.dispatch({
-      effects: [
-        suggestionEffect.of(createSuggestionDecorations(projected, proposals, actions)),
-        previewEffect.of(
-          markdownPreviewDecorations(projected.text, view.state.selection.main.head),
-        ),
-        provenanceValueEffect.of(note.provenance),
-      ],
-    });
+    redrawDecorations(view, refs, projected, note.provenance);
     scrollToProposal(view, scrolledProposalRef, proposal);
   }, [
     viewRef,
@@ -556,30 +167,6 @@ function useEditorSync(
     targetInsert,
     visibleLength,
   ]);
-}
-
-function syncEditorDocument(
-  view: EditorView,
-  refs: EditorRefs,
-  note: Note,
-  projected: PendingProjection,
-) {
-  const current = view.state.doc.toString();
-  if (current === projected.text) {
-    refs.spans.current = note.provenance;
-    return;
-  }
-  const caret = refs.caret.current;
-  refs.caret.current = null;
-  view.dispatch({
-    changes: minimalEdit(current, projected.text),
-    ...(caret === null
-      ? {}
-      : { selection: { anchor: projectedPosition(caret, projected, projected.text) } }),
-    effects: [externalChange.of(undefined), provenanceValueEffect.of(note.provenance)],
-    annotations: Transaction.addToHistory.of(false),
-  });
-  refs.spans.current = note.provenance;
 }
 
 function scrollToProposal(
@@ -640,7 +227,7 @@ function createEditorRefs(props: NotesEditorProps): EditorRefs {
     acceptBlocked: { current: false },
     disabled: { current: props.disabled ?? false },
     proposalStreaming: { current: props.proposalStreaming ?? false },
-    streamingProposalIds: { current: props.streamingProposalIds ?? new Set() },
+    streamingProposalIds: { current: props.streamingProposalIds ?? EMPTY_SET },
     callbacks: {
       current: {
         onChange: props.onChange,
@@ -669,7 +256,7 @@ function updateEditorRefs(
   refs.acceptBlocked.current = acceptBlocked;
   refs.disabled.current = props.disabled ?? false;
   refs.proposalStreaming.current = props.proposalStreaming ?? false;
-  refs.streamingProposalIds.current = props.streamingProposalIds ?? new Set();
+  refs.streamingProposalIds.current = props.streamingProposalIds ?? EMPTY_SET;
   refs.callbacks.current = {
     onChange: props.onChange,
     onAccept: props.onAccept,
@@ -694,65 +281,85 @@ function targetInsertFor(
   }
 }
 
+/** The note with pending suggestions drawn in, the current one only as far as it has revealed. */
+function useProjection(
+  note: Note,
+  proposals: EditProposal[],
+  proposal: EditProposal | null,
+  visibleInsert: string,
+  additionQueue: AdditionQueue,
+) {
+  const projected = useMemo(
+    () =>
+      projectPendingEdits(
+        note.markdown,
+        proposals,
+        proposal ? new Map([[proposal.id, visibleInsert]]) : new Map(),
+        additionQueue,
+      ) ?? { text: note.markdown, ranges: [], issues: [] },
+    [note.markdown, proposals, proposal, visibleInsert, additionQueue],
+  );
+  const projectionChanges = useMemo(
+    () =>
+      ChangeSet.of(
+        projected.ranges.map((range) => ({
+          from: range.sourceFrom,
+          to: range.sourceTo,
+          insert: range.insert,
+        })),
+        note.markdown.length,
+      ),
+    [projected, note.markdown.length],
+  );
+  return { projected, projectionChanges };
+}
+
 export function useNoteEditor(host: HostRef, props: NotesEditorProps) {
   const refsRef = useRef<EditorRefs | null>(null);
   if (!refsRef.current) refsRef.current = createEditorRefs(props);
   const refs = refsRef.current;
-  const fullProjection = projectPendingEdits(
-    props.note.markdown,
-    props.proposals,
-    undefined,
-    props.additionQueue ?? [],
+  const { note, proposal, proposals } = props;
+  const disabled = props.disabled ?? false;
+  const readOnly = props.readOnly ?? false;
+  const proposalStreaming = props.proposalStreaming ?? false;
+  const additionQueue = props.additionQueue ?? EMPTY_QUEUE;
+  const fullProjection = useMemo(
+    () => projectPendingEdits(note.markdown, proposals, undefined, additionQueue),
+    [note.markdown, proposals, additionQueue],
   );
-  const targetInsert = targetInsertFor(props.note, props.proposal, fullProjection);
+  const targetInsert = targetInsertFor(note, proposal, fullProjection);
   const reveal = useReveal(
-    props.proposal,
+    proposal,
     targetInsert,
-    props.proposalStreaming ?? false,
+    proposalStreaming,
     props.revealProposalImmediately ?? false,
   );
-  const acceptBlocked =
-    (props.disabled ?? false) || (props.proposalStreaming ?? false) || reveal.revealUnfinished;
-  const projected = projectPendingEdits(
-    props.note.markdown,
-    props.proposals,
-    props.proposal
-      ? new Map([[props.proposal.id, targetInsert.slice(0, reveal.visibleLength)]])
-      : new Map(),
-    props.additionQueue ?? [],
-  ) ?? { text: props.note.markdown, ranges: [], issues: [] };
-  const projectionChanges = ChangeSet.of(
-    projected.ranges.map((range) => ({
-      from: range.sourceFrom,
-      to: range.sourceTo,
-      insert: range.insert,
-    })),
-    props.note.markdown.length,
+  const { projected, projectionChanges } = useProjection(
+    note,
+    proposals,
+    proposal,
+    targetInsert.slice(0, reveal.visibleLength),
+    additionQueue,
   );
+  const acceptBlocked = disabled || proposalStreaming || reveal.revealUnfinished;
   updateEditorRefs(refs, props, projected, projectionChanges, acceptBlocked);
-  const viewRef = useEditorMount(
-    host,
-    refs,
-    props.note,
-    projected,
-    (props.disabled ?? false) || (props.readOnly ?? false),
-  );
+  const viewRef = useEditorMount(host, refs, note, projected, disabled || readOnly);
   useEditorSync(
     viewRef,
     refs,
-    props.note,
-    props.proposal,
-    props.proposals,
+    note,
+    proposal,
+    proposals,
     projected,
     acceptBlocked,
-    props.disabled ?? false,
-    props.readOnly ?? false,
-    props.proposalStreaming ?? false,
-    props.streamingProposalIds ?? new Set(),
+    disabled,
+    readOnly,
+    proposalStreaming,
+    props.streamingProposalIds ?? EMPTY_SET,
     targetInsert,
     reveal.visibleLength,
   );
-  useReadonly(viewRef, props.disabled ?? false, props.readOnly ?? false);
+  useReadonly(viewRef, disabled, readOnly);
   useRevealRange(viewRef, props.revealRange);
   return { projected, revealUnfinished: reveal.revealUnfinished };
 }

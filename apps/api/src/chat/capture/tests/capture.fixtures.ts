@@ -50,8 +50,8 @@ function createSqliteDatabase(path: string, options: SqliteOptions) {
       INSERT INTO users (id,auth_subject,created_at,updated_at) VALUES ('owner','subject','2026-01-01','2026-01-01');
       INSERT INTO conversations (id,owner_id,note_id,title,last_user_activity_at,expires_at,status,created_at)
       VALUES ('conversation','owner',NULL,'Capture test','2026-01-01','2999-01-01','active','2026-01-01');
-      INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,last_user_activity_at,expires_at,created_at)
-      VALUES ('default','conversation','owner',1,'2026-01-01','2999-01-01','2026-01-01');`,
+      INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,created_at)
+      VALUES ('default','conversation','owner',1,'2026-01-01');`,
   });
   return sqliteD1(path, options);
 }

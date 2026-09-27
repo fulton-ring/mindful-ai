@@ -30,32 +30,6 @@ export const accountPrivacy = sqliteTable(
   ],
 );
 
-export const billingCustomers = sqliteTable(
-  'billing_customers',
-  {
-    ownerId: text('owner_id').references((): AnySQLiteColumn => users.id, {
-      onDelete: 'cascade',
-      onUpdate: 'no action',
-    }),
-    customerId: text('customer_id').notNull(),
-    subscriptionId: text('subscription_id'),
-    updatedAt: text('updated_at').notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.ownerId] }),
-    uniqueIndex('billing_customers_customer_id_unique').on(table.customerId),
-  ],
-);
-
-export const billingEvents = sqliteTable(
-  'billing_events',
-  {
-    id: text('id'),
-    processedAt: text('processed_at').notNull(),
-  },
-  (table) => [primaryKey({ columns: [table.id] })],
-);
-
 export const conversationBranches = sqliteTable(
   'conversation_branches',
   {
@@ -79,8 +53,6 @@ export const conversationBranches = sqliteTable(
     ),
     isDefault: integer('is_default').notNull().default(sql.raw('0')),
     status: text('status').notNull().default(sql.raw("'active'")),
-    lastUserActivityAt: text('last_user_activity_at').notNull(),
-    expiresAt: text('expires_at').notNull(),
     createdAt: text('created_at').notNull(),
   },
   (table) => [
@@ -88,7 +60,8 @@ export const conversationBranches = sqliteTable(
     uniqueIndex('one_default_conversation_branch')
       .on(table.conversationId)
       .where(sql.raw('is_default=1')),
-    index('conversation_branches_expiry').on(table.status, table.expiresAt),
+    index('conversation_branches_conversation').on(table.conversationId),
+    check('conversation_branches_check_1', sql.raw('is_default IN (0,1)')),
   ],
 );
 
@@ -104,7 +77,6 @@ export const conversations = sqliteTable(
       onUpdate: 'no action',
     }),
     personaId: text('persona_id'),
-    personaSnapshotJson: text('persona_snapshot_json'),
     lastUserActivityAt: text('last_user_activity_at').notNull(),
     expiresAt: text('expires_at').notNull(),
     status: text('status').notNull().default(sql.raw("'active'")),
@@ -116,8 +88,10 @@ export const conversations = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.id] }),
     uniqueIndex('one_conversation_per_note').on(table.noteId).where(sql.raw('note_id IS NOT NULL')),
-    index('conversations_expiry').on(table.status, table.expiresAt),
+    index('conversations_owner_activity').on(table.ownerId, table.lastUserActivityAt),
+    index('conversations_expiry').on(table.expiresAt),
     check('conversations_check_1', sql.raw('web_search_enabled IN (0,1)')),
+    check('conversations_check_2', sql.raw('learning_checks_enabled IN (0,1)')),
   ],
 );
 
@@ -153,13 +127,16 @@ export const interventions = sqliteTable(
     payloadJson: text('payload_json').notNull(),
     status: text('status').notNull().default(sql.raw("'pending'")),
     createdAt: text('created_at').notNull(),
-    branchId: text('branch_id').references((): AnySQLiteColumn => conversationBranches.id, {
-      onDelete: 'cascade',
-      onUpdate: 'no action',
-    }),
+    branchId: text('branch_id')
+      .notNull()
+      .references((): AnySQLiteColumn => conversationBranches.id, {
+        onDelete: 'cascade',
+        onUpdate: 'no action',
+      }),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
+    index('interventions_turn').on(table.turnId),
     uniqueIndex('one_pending_intervention_per_branch')
       .on(table.branchId)
       .where(sql.raw("status='pending'")),
@@ -189,7 +166,6 @@ export const messageHighlights = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.messageId, table.origin, table.start, table.end] }),
     index('message_highlights_owner_message').on(table.ownerId, table.messageId),
-    index('message_highlights_message_origin').on(table.messageId, table.origin),
     check('message_highlights_check_1', sql.raw("origin IN ('user','agent')")),
     check('message_highlights_check_2', sql.raw('start>=0 AND end>start')),
     check(
@@ -220,7 +196,6 @@ export const messages = sqliteTable(
     role: text('role').notNull(),
     content: text('content').notNull(),
     incomplete: integer('incomplete').notNull().default(sql.raw('0')),
-    sequence: integer('sequence').notNull(),
     createdAt: text('created_at').notNull(),
     reasoning: text('reasoning'),
     activityJson: text('activity_json').notNull().default(sql.raw("'{}'")),
@@ -236,11 +211,10 @@ export const messages = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
-    index('messages_conversation').on(table.conversationId, table.sequence),
-    uniqueIndex('messages_conversation_id_sequence_unique').on(
-      table.conversationId,
-      table.sequence,
-    ),
+    index('messages_conversation').on(table.conversationId),
+    index('messages_turn').on(table.turnId),
+    index('messages_parent').on(table.parentMessageId),
+    check('messages_check_1', sql.raw('incomplete IN (0,1)')),
   ],
 );
 
@@ -264,11 +238,11 @@ export const noteEdits = sqliteTable(
     undone: integer('undone').notNull().default(sql.raw('0')),
     createdAt: text('created_at').notNull(),
     discarded: integer('discarded').notNull().default(sql.raw('0')),
-    undoneAt: text('undone_at'),
     suggestionChangesJson: text('suggestion_changes_json'),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
+    check('note_edits_check_1', sql.raw('undone IN (0,1) AND discarded IN (0,1)')),
     index('note_edits_note_revision').on(table.noteId, sql`${table.resultRevision} desc`),
     uniqueIndex('note_edits_owner_id_note_id_operation_id_unique').on(
       table.ownerId,
@@ -331,8 +305,8 @@ export const noteSuggestions = sqliteTable(
     ownerId: text('owner_id')
       .notNull()
       .references((): AnySQLiteColumn => users.id, { onDelete: 'cascade', onUpdate: 'no action' }),
-    conversationId: text('conversation_id'),
-    sourceMessageId: text('source_message_id'),
+    conversationId: text('conversation_id').notNull(),
+    sourceMessageId: text('source_message_id').notNull(),
     baseRevision: integer('base_revision').notNull(),
     oldText: text('old_text').notNull(),
     newText: text('new_text').notNull(),
@@ -340,18 +314,25 @@ export const noteSuggestions = sqliteTable(
     status: text('status').notNull().default(sql.raw("'pending'")),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
-    decidedAt: text('decided_at'),
-    branchId: text('branch_id').references((): AnySQLiteColumn => conversationBranches.id, {
-      onDelete: 'cascade',
-      onUpdate: 'no action',
-    }),
-    generationKey: text('generation_key'),
+    branchId: text('branch_id')
+      .notNull()
+      .references((): AnySQLiteColumn => conversationBranches.id, {
+        onDelete: 'cascade',
+        onUpdate: 'no action',
+      }),
+    generationKey: text('generation_key').notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
     uniqueIndex('one_pending_note_suggestion_per_generation')
       .on(table.ownerId, table.conversationId, table.branchId, table.generationKey)
       .where(sql.raw("status='pending'")),
+    index('note_suggestions_generation').on(
+      table.ownerId,
+      table.conversationId,
+      table.branchId,
+      table.generationKey,
+    ),
     index('note_suggestions_note_status').on(
       table.noteId,
       table.status,
@@ -389,10 +370,10 @@ export const personas = sqliteTable(
       .references((): AnySQLiteColumn => users.id, { onDelete: 'cascade', onUpdate: 'no action' }),
     name: text('name').notNull(),
     prompt: text('prompt').notNull(),
+    model: text('model'),
     brevity: text('brevity').notNull(),
     challenge: text('challenge').notNull(),
     tone: text('tone').notNull(),
-    revision: integer('revision').notNull().default(sql.raw('0')),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
     replacesPersonaId: text('replaces_persona_id'),
@@ -411,21 +392,6 @@ export const personas = sqliteTable(
       ),
     ),
   ],
-);
-
-export const productEvents = sqliteTable(
-  'product_events',
-  {
-    id: text('id'),
-    ownerId: text('owner_id')
-      .notNull()
-      .references((): AnySQLiteColumn => users.id, { onDelete: 'cascade', onUpdate: 'no action' }),
-    sessionId: text('session_id').notNull(),
-    kind: text('kind').notNull(),
-    metadataJson: text('metadata_json').notNull().default(sql.raw("'{}'")),
-    occurredAt: text('occurred_at').notNull(),
-  },
-  (table) => [primaryKey({ columns: [table.id] })],
 );
 
 export const telemetryDeletions = sqliteTable(
@@ -452,14 +418,24 @@ export const turns = sqliteTable(
       .notNull()
       .references((): AnySQLiteColumn => users.id, { onDelete: 'cascade', onUpdate: 'no action' }),
     status: text('status').notNull(),
-    inputTokens: integer('input_tokens').notNull().default(sql.raw('0')),
-    outputTokens: integer('output_tokens').notNull().default(sql.raw('0')),
     createdAt: text('created_at').notNull(),
     completedAt: text('completed_at'),
-    branchId: text('branch_id').references((): AnySQLiteColumn => conversationBranches.id, {
-      onDelete: 'cascade',
-      onUpdate: 'no action',
-    }),
+    branchId: text('branch_id')
+      .notNull()
+      .references((): AnySQLiteColumn => conversationBranches.id, {
+        onDelete: 'cascade',
+        onUpdate: 'no action',
+      }),
+    sourceBranchId: text('source_branch_id')
+      .notNull()
+      .references((): AnySQLiteColumn => conversationBranches.id, {
+        onDelete: 'cascade',
+        onUpdate: 'no action',
+      }),
+    inputJson: text('input_json'),
+    requestJson: text('request_json'),
+    userMessageId: text('user_message_id'),
+    executionEpoch: integer('execution_epoch').notNull().default(0),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
@@ -467,24 +443,32 @@ export const turns = sqliteTable(
       .on(table.branchId)
       .where(sql.raw("status='streaming'")),
     uniqueIndex('turns_owner_id_request_id_unique').on(table.ownerId, table.requestId),
+    index('turns_conversation').on(table.conversationId),
   ],
 );
 
-export const usagePeriods = sqliteTable(
-  'usage_periods',
+export const turnEvents = sqliteTable(
+  'turn_events',
   {
-    ownerId: text('owner_id').references((): AnySQLiteColumn => users.id, {
-      onDelete: 'cascade',
-      onUpdate: 'no action',
-    }),
-    plan: text('plan').notNull().default(sql.raw("'free'")),
-    used: integer('used').notNull().default(sql.raw('0')),
-    unitLimit: integer('unit_limit').notNull().default(sql.raw('10')),
-    resetsAt: text('resets_at').notNull(),
-    inputTokens: integer('input_tokens').notNull().default(sql.raw('0')),
-    outputTokens: integer('output_tokens').notNull().default(sql.raw('0')),
+    seq: integer('seq').primaryKey({ autoIncrement: true }),
+    turnId: text('turn_id')
+      .notNull()
+      .references((): AnySQLiteColumn => turns.id, { onDelete: 'cascade', onUpdate: 'no action' }),
+    eventJson: text('event_json').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.ownerId] })],
+  (table) => [index('turn_events_replay').on(table.turnId, table.seq)],
+);
+
+export const turnCancellations = sqliteTable(
+  'turn_cancellations',
+  {
+    ownerId: text('owner_id')
+      .notNull()
+      .references((): AnySQLiteColumn => users.id, { onDelete: 'cascade', onUpdate: 'no action' }),
+    requestId: text('request_id').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.ownerId, table.requestId] })],
 );
 
 export const users = sqliteTable(
@@ -499,5 +483,6 @@ export const users = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.id] }),
     uniqueIndex('users_auth_subject_unique').on(table.authSubject),
+    check('users_check_1', sql.raw('deletion_pending IN (0,1)')),
   ],
 );

@@ -8,8 +8,8 @@ const mocks = vi.hoisted(() => ({
   loadConversation: vi.fn(),
   loadNote: vi.fn(),
 }));
-vi.mock('../../conversations/conversations', () => ({ loadConversation: mocks.loadConversation }));
-vi.mock('../../followups/followups', () => ({ loadNote: mocks.loadNote }));
+vi.mock('../../conversations/repository', () => ({ loadConversation: mocks.loadConversation }));
+vi.mock('../../followups/followup-note-proposals', () => ({ loadNote: mocks.loadNote }));
 
 import { capturePlacementRoutes } from '../capture-placement';
 
