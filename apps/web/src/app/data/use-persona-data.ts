@@ -17,23 +17,21 @@ export function usePersonaData(identity?: string) {
 
   async function savePersona(value: Persona) {
     const replacesBuiltIn = Boolean(value.id && DEFAULT_PERSONAS.some((p) => p.id === value.id));
+    const { id: _id, ...fields } = value;
     const saved =
       !value.id || replacesBuiltIn
         ? await api.createPersona({
-            name: value.name,
-            icon: value.icon,
-            prompt: value.prompt,
-            brevity: value.brevity,
-            challenge: value.challenge,
-            tone: value.tone,
+            ...fields,
             ...(replacesBuiltIn ? { replacesPersonaId: value.id } : {}),
           })
         : await api.updatePersona(value);
     if (replacesBuiltIn) await api.deletePersona(value.id);
-    queryClient.setQueryData<Persona[]>(['personas'], (all = []) => [
-      ...all.filter((p) => p.id !== saved.id && (!replacesBuiltIn || p.id !== value.id)),
-      saved,
-    ]);
+    // An edited persona keeps its place (an override takes its built-in's slot); a new one is last.
+    queryClient.setQueryData<Persona[]>(['personas'], (all = []) =>
+      value.id && all.some((p) => p.id === value.id)
+        ? all.map((p) => (p.id === value.id ? saved : p))
+        : [...all.filter((p) => p.id !== saved.id), saved],
+    );
     setPersonaId(saved.id);
     setPersonaEditing(null);
   }
