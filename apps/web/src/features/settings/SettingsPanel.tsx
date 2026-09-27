@@ -153,7 +153,8 @@ function UnavailableConnectorsTab() {
 }
 
 function Usage() {
-  const query = useQuery({ queryKey: ['usage'], queryFn: api.usage });
+  // Every message spends from the budget, so refetch whenever Usage opens.
+  const query = useQuery({ queryKey: ['usage'], queryFn: api.usage, staleTime: 0 });
   if (query.isLoading)
     return (
       <section>

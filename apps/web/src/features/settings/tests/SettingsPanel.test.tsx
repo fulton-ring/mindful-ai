@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render } from '@testing-library/react';
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../../lib/api';
 import { SettingsPanel } from '../SettingsPanel';
@@ -20,7 +20,10 @@ afterEach(() => {
 });
 
 function renderSettings(onClose = vi.fn()) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // Mirror the app's defaults (main.tsx) so caching behaves as in production.
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { staleTime: 20_000, retry: false } },
+  });
   const view = render(
     <QueryClientProvider client={queryClient}>
       <SettingsPanel
@@ -104,6 +107,20 @@ it('shows usage with the remaining message limit and when it resets', async () =
   expect(meter.getAttribute('aria-valuenow')).toBe('14');
   expect(meter.getAttribute('aria-valuemax')).toBe('20');
   expect(view.getByText(/^Resets at /)).toBeTruthy();
+});
+
+it('refetches usage each time the section opens', async () => {
+  const usage = vi.spyOn(api, 'usage').mockResolvedValue({
+    budget: { used: 1, limit: 20, windowHours: 4, resetsAt: null },
+    messagesSent: 1,
+    favoritePersona: null,
+  });
+  const view = renderSettings();
+  fireEvent.click(view.getByRole('button', { name: /usage/i }));
+  await view.findByText('Messages sent');
+  fireEvent.click(view.getByRole('button', { name: /account/i }));
+  fireEvent.click(view.getByRole('button', { name: /usage/i }));
+  await waitFor(() => expect(usage).toHaveBeenCalledTimes(2));
 });
 
 it('shows a full bar and no reset time before a window opens', async () => {
