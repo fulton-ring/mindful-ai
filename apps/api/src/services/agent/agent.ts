@@ -5,6 +5,7 @@ import {
   uiMessageText,
   type WaldenUIMessage,
 } from '@walden/contracts';
+import { wrapLanguageModel } from 'ai';
 import { createWorkersAI } from 'workers-ai-provider';
 import type { AgentCheckpoints } from '../../agent/checkpoints';
 import { streamNoteProposal } from '../../agent/note-proposals/note-proposal-stream';
@@ -13,6 +14,7 @@ import { ServiceUnavailableError } from '../../http';
 import { createApiTelemetry } from '../../observability';
 import type { AgentService, AgentTurnInput, ServiceEnv } from '../types';
 import { streamTurnChunks } from './agent-stream';
+import { leadingSystemPromptMiddleware } from './leading-system-prompt';
 
 export const DEFAULT_AI_MODEL = PERSONA_MODELS[0].id;
 export const OPENROUTER_DEFAULT_MODEL = 'google/gemma-4-26b-a4b-it';
@@ -53,7 +55,7 @@ export function createCloudflareModel(env: ServiceEnv, modelName: string) {
   );
 }
 
-export function createConfiguredModel(env: ServiceEnv, modelName: string) {
+function createProviderModel(env: ServiceEnv, modelName: string) {
   if ((env.AI_PROVIDER ?? 'cloudflare') === 'openrouter') {
     if (!env.OPENROUTER_API_KEY)
       throw new ServiceUnavailableError('AI inference is not configured. Set OPENROUTER_API_KEY.');
@@ -65,6 +67,13 @@ export function createConfiguredModel(env: ServiceEnv, modelName: string) {
     }).chatModel(modelName);
   }
   return createCloudflareModel(env, modelName);
+}
+
+export function createConfiguredModel(env: ServiceEnv, modelName: string) {
+  return wrapLanguageModel({
+    model: createProviderModel(env, modelName),
+    middleware: leadingSystemPromptMiddleware,
+  });
 }
 
 export function modelNameForPersona(env: ServiceEnv, persona: Persona): string {
