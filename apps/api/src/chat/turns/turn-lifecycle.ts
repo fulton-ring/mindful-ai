@@ -12,7 +12,7 @@ import { first, parseJson } from '../../db/client';
 import { HttpError, newId, nowIso } from '../../http';
 import type { LoadedAttachment } from '../attachments/attachments';
 import { loadConversation, RETENTION_MS } from '../conversations/repository';
-import { assertWithinMessageLimit, loadMessageUsage, type MessageLimit } from './message-limit';
+import { chargeMessage, type MessageLimit, refundMessage } from './message-limit';
 import {
   batchIfAny,
   editContext,
@@ -424,11 +424,8 @@ export async function prepareTurn(
     throw new HttpError(409, 'Completed response not found on this branch');
   if (request.editMessageId && !records.edit)
     throw new HttpError(404, 'Message to edit was not found');
-  const [, usage, persona, pendingRow] = await Promise.all([
+  const [, persona, pendingRow] = await Promise.all([
     rejectOverlappingTurn(runtime, conversation),
-    runtime.messageLimit
-      ? loadMessageUsage(runtime.db, runtime.ownerId, runtime.messageLimit)
-      : undefined,
     personaFor(runtime.db, runtime.ownerId, request.personaId),
     first<{ id: string; payload_json: string }>(
       runtime.db
@@ -444,14 +441,6 @@ export async function prepareTurn(
   validateLearningCheck(request, pendingIntervention);
   const model = runtime.modelFor?.(persona) ?? persona.model ?? null;
   const turnModel = { model, weight: modelWeight(model ?? '') };
-  if (runtime.messageLimit && usage)
-    await assertWithinMessageLimit(
-      runtime.db,
-      runtime.ownerId,
-      runtime.messageLimit,
-      usage,
-      turnModel.weight,
-    );
   const input: TurnInput = {
     request,
     attachments,
@@ -463,11 +452,20 @@ export async function prepareTurn(
     requestMessage,
     pendingRow: pendingRow ?? undefined,
   };
-  return {
-    kind: 'stream',
-    turn: {
-      ...(await prepareStreamTurn(runtime, input, persona, pendingIntervention, turnModel)),
-      attachments,
-    },
-  };
+  // Charge last, once every check has passed, and refund if admission fails.
+  const window = runtime.messageLimit
+    ? await chargeMessage(runtime.db, runtime.ownerId, runtime.messageLimit, turnModel.weight)
+    : null;
+  try {
+    return {
+      kind: 'stream',
+      turn: {
+        ...(await prepareStreamTurn(runtime, input, persona, pendingIntervention, turnModel)),
+        attachments,
+      },
+    };
+  } catch (error) {
+    if (window) await refundMessage(runtime.db, runtime.ownerId, window, turnModel.weight);
+    throw error;
+  }
 }

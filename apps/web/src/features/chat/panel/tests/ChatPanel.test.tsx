@@ -152,10 +152,7 @@ it.each([
 describe('message limit', () => {
   it('shows the limit and keeps the draft when the server refuses the message', async () => {
     transport.streamChat.mockRejectedValueOnce(
-      new ApiError(
-        429,
-        "You've reached your message limit for the last 4 hours. You can send another message in 2h 10m.",
-      ),
+      new ApiError(429, "You've reached your message limit. It resets in 2h 10m."),
     );
     render(<ChatPanel {...props()} />);
     setComposerValue(screen.getByLabelText('Message'), 'One more question');

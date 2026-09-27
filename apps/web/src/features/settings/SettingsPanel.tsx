@@ -197,27 +197,19 @@ function resetTime(iso: string) {
 
 function MessageBudgetMeter({ budget }: { budget: MessageBudget }) {
   const remaining = Math.max(0, budget.limit - budget.used);
-  const window = budget.windowHours === 1 ? 'hour' : `${budget.windowHours} hours`;
   return (
     <div className="message-budget">
-      <p>
-        <strong>{remaining}</strong> of {budget.limit} message points left
-      </p>
       <div
         className="meter"
         role="meter"
-        aria-label="Message points left"
+        aria-label="Message limit remaining"
         aria-valuemin={0}
         aria-valuemax={budget.limit}
         aria-valuenow={remaining}
       >
         <span style={{ width: `${(remaining / budget.limit) * 100}%` }} />
       </div>
-      <p className="muted">
-        {budget.nextResetAt && budget.fullResetAt
-          ? `Points come back ${window} after each message: the next at ${resetTime(budget.nextResetAt)}, all by ${resetTime(budget.fullResetAt)}.`
-          : `Each message uses points for ${window}; heavier models use more.`}
-      </p>
+      {budget.resetsAt && <p className="muted">Resets at {resetTime(budget.resetsAt)}</p>}
     </div>
   );
 }

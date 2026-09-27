@@ -87,6 +87,8 @@ it('admits one immutable turn, protects replay, and persists Stop', async () => 
   });
   expect((await start('same', 'Changed')).status).toBe(409);
   expect((await start('another')).status).toBe(409);
+  // One admitted turn is charged once; replays and refused turns cost nothing.
+  expect(await DB.prepare('SELECT used FROM message_windows').first()).toEqual({ used: 1 });
   expect(
     (
       await app.request(

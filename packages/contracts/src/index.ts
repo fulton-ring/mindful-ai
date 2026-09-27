@@ -351,15 +351,13 @@ export type AppConfig = {
   clerkPublishableKey?: string;
   telemetry?: { key: string; host: string };
 };
-/** The sliding message budget: points come back as old messages leave the window. */
+/** The anchored message budget: the first message opens a window that resets in full. */
 export type MessageBudget = {
   used: number;
   limit: number;
   windowHours: number;
-  /** When the oldest message in the window ages out, or null when nothing is used. */
-  nextResetAt: string | null;
-  /** When the newest message ages out and the full budget is back. */
-  fullResetAt: string | null;
+  /** When the current window ends, or null when no window is open. */
+  resetsAt: string | null;
 };
 export type Usage = {
   budget: MessageBudget;

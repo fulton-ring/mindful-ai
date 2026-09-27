@@ -6,17 +6,17 @@ import { describe, expect, it } from 'vitest';
 import { sqliteD1Binding } from '../../../agent/memory/tests/d1-test-binding';
 import { HttpError } from '../../../http';
 import {
-  assertWithinMessageLimit,
+  chargeMessage,
   loadMessageBudget,
-  loadMessageUsage,
-  type MessageLimit,
   messageLimitFrom,
+  refundMessage,
 } from '../message-limit';
 
 const NOW = Date.parse('2026-09-27T12:00:00.000Z');
 const HOUR = 60 * 60 * 1000;
+const limit = { limit: 4, windowHours: 4 };
 
-async function fixture(turns: { hoursAgo: number; weight: number }[]) {
+async function fixture() {
   const file = join(mkdtempSync(join(tmpdir(), 'walden-message-limit-')), 'db.sqlite');
   const migrations = new URL('../../../../migrations/', import.meta.url);
   execFileSync('sqlite3', [file], {
@@ -28,84 +28,65 @@ async function fixture(turns: { hoursAgo: number; weight: number }[]) {
   });
   const db = sqliteD1Binding(file);
   await db.prepare("INSERT INTO users VALUES ('owner','subject','now','now',0)").run();
-  await db
-    .prepare(
-      "INSERT INTO conversations (id,owner_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('chat','owner','Title','now','2999-01-01','active','now')",
-    )
-    .run();
-  await db
-    .prepare(
-      "INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,created_at) VALUES ('branch','chat','owner',1,'now')",
-    )
-    .run();
-  for (const [index, turn] of turns.entries())
-    await db
-      .prepare(
-        "INSERT INTO turns (id,request_id,conversation_id,owner_id,status,created_at,branch_id,source_branch_id,weight) VALUES (?,?,'chat','owner','completed',?,'branch','branch',?)",
-      )
-      .bind(
-        `turn-${index}`,
-        `request-${index}`,
-        new Date(NOW - turn.hoursAgo * HOUR).toISOString(),
-        turn.weight,
-      )
-      .run();
   return db;
 }
 
-async function check(db: D1Database, limit: MessageLimit, weight: number) {
-  const usage = await loadMessageUsage(db, 'owner', limit, NOW);
-  return assertWithinMessageLimit(db, 'owner', limit, usage, weight, NOW);
-}
+const at = (hours: number) => NOW + hours * HOUR;
 
-describe('sliding message limit', () => {
-  const limit = { limit: 4, windowHours: 5 };
-
-  it('sums model weights inside the window and ignores older turns', async () => {
-    const db = await fixture([
-      { hoursAgo: 6, weight: 3 },
-      { hoursAgo: 4, weight: 1 },
-      { hoursAgo: 1, weight: 2 },
-    ]);
-    expect((await loadMessageUsage(db, 'owner', limit, NOW)).used).toBe(3);
-    await expect(check(db, limit, 1)).resolves.toBeUndefined();
-  });
-
-  it('rejects a message whose weight would exceed the budget, with the reopening time', async () => {
-    const db = await fixture([
-      { hoursAgo: 4, weight: 1 },
-      { hoursAgo: 2, weight: 2 },
-      { hoursAgo: 1, weight: 1 },
-    ]);
-    const error = await check(db, limit, 2).catch((caught: unknown) => caught);
-    expect(error).toBeInstanceOf(HttpError);
-    expect(error).toMatchObject({ status: 429, details: { code: 'message_limit' } });
-    // Dropping the 4-hour-old turn frees only 1 of the 2 needed; the 2-hour-old one frees enough.
-    expect((error as HttpError).details).toMatchObject({
-      retryAt: new Date(NOW - 2 * HOUR + 5 * HOUR).toISOString(),
-    });
-    expect((error as HttpError).message).toContain('in 3h');
-  });
-
-  it('reports the budget with when points start and finish coming back', async () => {
-    const db = await fixture([
-      { hoursAgo: 6, weight: 3 },
-      { hoursAgo: 4, weight: 1 },
-      { hoursAgo: 1, weight: 2 },
-    ]);
-    expect(await loadMessageBudget(db, 'owner', limit, NOW)).toEqual({
+describe('anchored message limit', () => {
+  it('opens a window with the first message and spends model weights from it', async () => {
+    const db = await fixture();
+    expect(await chargeMessage(db, 'owner', limit, 1, at(0))).toBe(new Date(at(0)).toISOString());
+    await chargeMessage(db, 'owner', limit, 2, at(1));
+    expect(await loadMessageBudget(db, 'owner', limit, at(2))).toEqual({
       used: 3,
       limit: 4,
-      windowHours: 5,
-      nextResetAt: new Date(NOW + 1 * HOUR).toISOString(),
-      fullResetAt: new Date(NOW + 4 * HOUR).toISOString(),
+      windowHours: 4,
+      resetsAt: new Date(at(4)).toISOString(),
     });
-    const empty = await fixture([]);
-    expect(await loadMessageBudget(empty, 'owner', limit, NOW)).toMatchObject({
+  });
+
+  it('refuses a message that would exceed the limit until the window resets', async () => {
+    const db = await fixture();
+    await chargeMessage(db, 'owner', limit, 3, at(0));
+    const error = await chargeMessage(db, 'owner', limit, 2, at(1.5)).catch(
+      (caught: unknown) => caught,
+    );
+    expect(error).toBeInstanceOf(HttpError);
+    expect(error).toMatchObject({
+      status: 429,
+      details: { code: 'message_limit', retryAt: new Date(at(4)).toISOString() },
+    });
+    expect((error as HttpError).message).toBe(
+      "You've reached your message limit. It resets in 2h 30m.",
+    );
+    // The refused message spent nothing, and a lighter one still fits.
+    await chargeMessage(db, 'owner', limit, 1, at(2));
+    expect((await loadMessageBudget(db, 'owner', limit, at(2))).used).toBe(4);
+  });
+
+  it('starts a fresh window after the old one ends', async () => {
+    const db = await fixture();
+    await chargeMessage(db, 'owner', limit, 4, at(0));
+    expect(await loadMessageBudget(db, 'owner', limit, at(4))).toMatchObject({
       used: 0,
-      nextResetAt: null,
-      fullResetAt: null,
+      resetsAt: null,
     });
+    expect(await chargeMessage(db, 'owner', limit, 1, at(5))).toBe(new Date(at(5)).toISOString());
+    expect(await loadMessageBudget(db, 'owner', limit, at(5))).toMatchObject({
+      used: 1,
+      resetsAt: new Date(at(9)).toISOString(),
+    });
+  });
+
+  it('refunds a charge only within the window that took it', async () => {
+    const db = await fixture();
+    const window = await chargeMessage(db, 'owner', limit, 2, at(0));
+    await refundMessage(db, 'owner', window, 2);
+    expect((await loadMessageBudget(db, 'owner', limit, at(0))).used).toBe(0);
+    await chargeMessage(db, 'owner', limit, 1, at(5));
+    await refundMessage(db, 'owner', window, 1);
+    expect((await loadMessageBudget(db, 'owner', limit, at(5))).used).toBe(1);
   });
 
   it('reads the budget from Worker vars with safe defaults', () => {

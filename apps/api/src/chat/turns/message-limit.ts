@@ -1,11 +1,14 @@
 import type { MessageBudget } from '@walden/contracts';
-import { all, first } from '../../db/client';
+import { first } from '../../db/client';
 import { HttpError } from '../../http';
 import type { Bindings } from '../../types';
 
-/** A sliding budget: the weights of the owner's turns in the window may not exceed `limit`. */
+/**
+ * An anchored budget: an account's first message opens a window of
+ * `windowHours`, messages spend their model's weight from `limit`, and the
+ * whole budget comes back when the window ends.
+ */
 export type MessageLimit = { limit: number; windowHours: number };
-export type MessageUsage = { used: number; since: string; windowMs: number };
 
 const DEFAULT_LIMIT: MessageLimit = { limit: 20, windowHours: 4 };
 
@@ -21,53 +24,14 @@ export const messageLimitFrom = (
   windowHours: positive(env.MESSAGE_WINDOW_HOURS, DEFAULT_LIMIT.windowHours),
 });
 
-/**
- * Every send, regenerate, and edit is a model call, so each admitted turn
- * counts with its model's weight. Turns of deleted threads drop out.
- */
-export async function loadMessageUsage(
-  db: D1Database,
-  ownerId: string,
-  { windowHours }: MessageLimit,
-  now = Date.now(),
-): Promise<MessageUsage> {
-  const windowMs = windowHours * 60 * 60 * 1000;
-  const since = new Date(now - windowMs).toISOString();
-  const row = await first<{ used: number }>(
-    db
-      .prepare(
-        'SELECT COALESCE(SUM(weight),0) AS used FROM turns WHERE owner_id=? AND created_at>?',
-      )
-      .bind(ownerId, since),
-  );
-  return { used: row?.used ?? 0, since, windowMs };
-}
+const windowMs = ({ windowHours }: MessageLimit) => windowHours * 60 * 60 * 1000;
 
-/** Current budget for display: how much is used and when points return. */
-export async function loadMessageBudget(
-  db: D1Database,
-  ownerId: string,
-  limit: MessageLimit,
-  now = Date.now(),
-): Promise<MessageBudget> {
-  const windowMs = limit.windowHours * 60 * 60 * 1000;
-  const row = await first<{ used: number; oldest: string | null; newest: string | null }>(
-    db
-      .prepare(
-        'SELECT COALESCE(SUM(weight),0) AS used,MIN(created_at) AS oldest,MAX(created_at) AS newest FROM turns WHERE owner_id=? AND created_at>?',
-      )
-      .bind(ownerId, new Date(now - windowMs).toISOString()),
+type WindowRow = { started_at: string; used: number };
+
+const loadWindow = (db: D1Database, ownerId: string) =>
+  first<WindowRow>(
+    db.prepare('SELECT started_at,used FROM message_windows WHERE owner_id=?').bind(ownerId),
   );
-  const after = (at: string | null | undefined) =>
-    at ? new Date(Date.parse(at) + windowMs).toISOString() : null;
-  return {
-    used: row?.used ?? 0,
-    limit: limit.limit,
-    windowHours: limit.windowHours,
-    nextResetAt: after(row?.oldest),
-    fullResetAt: after(row?.newest),
-  };
-}
 
 function waitText(ms: number) {
   const minutes = Math.ceil(ms / 60_000);
@@ -78,36 +42,67 @@ function waitText(ms: number) {
   return `in ${hours}h${rest ? ` ${rest}m` : ''}`;
 }
 
-export async function assertWithinMessageLimit(
+/**
+ * Spends `weight` in one statement: an ended (or missing) window restarts at
+ * `now`, and an open one only accepts the message if it stays within the limit.
+ * Returns the window start so a failed admission can refund the charge.
+ */
+export async function chargeMessage(
   db: D1Database,
   ownerId: string,
-  { limit, windowHours }: MessageLimit,
-  usage: MessageUsage,
+  limit: MessageLimit,
   weight: number,
   now = Date.now(),
-) {
-  if (usage.used + weight <= limit) return;
-  // Room reopens once enough of the oldest turns age out of the window.
-  const turns = await all<{ created_at: string; weight: number }>(
-    db
-      .prepare(
-        'SELECT created_at,weight FROM turns WHERE owner_id=? AND created_at>? ORDER BY created_at',
-      )
-      .bind(ownerId, usage.since),
-  );
-  let remaining = usage.used;
-  let retryAt = now + usage.windowMs;
-  for (const turn of turns) {
-    remaining -= turn.weight;
-    if (remaining + weight <= limit) {
-      retryAt = Date.parse(turn.created_at) + usage.windowMs;
-      break;
-    }
-  }
-  const window = windowHours === 1 ? 'hour' : `${windowHours} hours`;
+): Promise<string> {
+  const startedAt = new Date(now).toISOString();
+  const expiredBefore = new Date(now - windowMs(limit)).toISOString();
+  const result = await db
+    .prepare(
+      `INSERT INTO message_windows (owner_id,started_at,used) VALUES (?,?,?)
+       ON CONFLICT(owner_id) DO UPDATE SET
+         started_at=CASE WHEN started_at<=? THEN excluded.started_at ELSE started_at END,
+         used=CASE WHEN started_at<=? THEN excluded.used ELSE used+excluded.used END
+       WHERE started_at<=? OR used+excluded.used<=?`,
+    )
+    .bind(ownerId, startedAt, weight, expiredBefore, expiredBefore, expiredBefore, limit.limit)
+    .run();
+  const window = await loadWindow(db, ownerId);
+  if ((result.meta.changes ?? 0) > 0 && window) return window.started_at;
+  const resetsAt = window ? Date.parse(window.started_at) + windowMs(limit) : now + windowMs(limit);
   throw new HttpError(
     429,
-    `You've reached your message limit for the last ${window}. You can send another message ${waitText(retryAt - now)}.`,
-    { code: 'message_limit', retryAt: new Date(retryAt).toISOString() },
+    `You've reached your message limit. It resets ${waitText(resetsAt - now)}.`,
+    { code: 'message_limit', retryAt: new Date(resetsAt).toISOString() },
   );
+}
+
+/** Returns a charge when the turn it paid for was never admitted. */
+export async function refundMessage(
+  db: D1Database,
+  ownerId: string,
+  startedAt: string,
+  weight: number,
+) {
+  await db
+    .prepare('UPDATE message_windows SET used=MAX(used-?,0) WHERE owner_id=? AND started_at=?')
+    .bind(weight, ownerId, startedAt)
+    .run();
+}
+
+/** Current budget for display. An ended window reads as a full budget. */
+export async function loadMessageBudget(
+  db: D1Database,
+  ownerId: string,
+  limit: MessageLimit,
+  now = Date.now(),
+): Promise<MessageBudget> {
+  const window = await loadWindow(db, ownerId);
+  const resetsAt = window ? Date.parse(window.started_at) + windowMs(limit) : 0;
+  const open = window !== null && resetsAt > now;
+  return {
+    used: open ? window.used : 0,
+    limit: limit.limit,
+    windowHours: limit.windowHours,
+    resetsAt: open ? new Date(resetsAt).toISOString() : null,
+  };
 }

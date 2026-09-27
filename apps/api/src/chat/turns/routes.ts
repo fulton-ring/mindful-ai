@@ -1,4 +1,4 @@
-import { chatRequestSchema } from '@walden/contracts';
+import { type ChatRequest, chatRequestSchema } from '@walden/contracts';
 import { Hono } from 'hono';
 import { first, parseJson } from '../../db/client';
 import { HttpError, jsonBody, nowIso } from '../../http';
@@ -21,7 +21,7 @@ import { cancelTurn, type DurableTurnRow } from './durable-store';
 import { createTurnEventsResponse } from './event-stream';
 import { messageLimitFrom } from './message-limit';
 import { ensureTurnScheduled } from './scheduling';
-import { prepareTurn } from './turn-lifecycle';
+import { type PreparedTurn, prepareTurn } from './turn-lifecycle';
 export const chatRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 chatRoutes.post('/attachments/:conversationId/initiate', async (c) => {
@@ -125,6 +125,35 @@ async function findOwnedTurn(db: D1Database, ownerId: string, id: string) {
   );
 }
 
+/** What the Workflow needs to run the turn; attachment bytes are reloaded there. */
+function durableInput(
+  ownerId: string,
+  telemetryUserId: string,
+  request: ChatRequest,
+  turn: PreparedTurn,
+) {
+  return {
+    ownerId,
+    telemetryUserId,
+    turnId: turn.turnId,
+    requestId: request.requestId,
+    conversation: turn.conversation,
+    note: turn.note,
+    persona: turn.persona,
+    message: turn.requestMessage,
+    attachments: (turn.attachments ?? []).map(({ id, name, mimeType, size }) => ({
+      id,
+      name,
+      mimeType,
+      size,
+    })),
+    action: request.action,
+    pendingIntervention: turn.pendingIntervention,
+    userMessageId: turn.userMessageId,
+    forked: turn.branchFork,
+  };
+}
+
 chatRoutes.post('/turns', async (c) => {
   if (!c.env.CHAT_WORKFLOW) throw new HttpError(503, 'Durable chat is unavailable.');
   const parsed = chatRequestSchema.safeParse(await jsonBody<unknown>(c));
@@ -174,21 +203,7 @@ chatRoutes.post('/turns', async (c) => {
     return c.json({ turnId: replay.id });
   }
   const turn = result.turn;
-  const input = {
-    ownerId,
-    telemetryUserId: c.get('authSubject'),
-    turnId: turn.turnId,
-    requestId: request.requestId,
-    conversation: turn.conversation,
-    note: turn.note,
-    persona: turn.persona,
-    message: turn.requestMessage,
-    attachments: attachments.map(({ id, name, mimeType, size }) => ({ id, name, mimeType, size })),
-    action: request.action,
-    pendingIntervention: turn.pendingIntervention,
-    userMessageId: turn.userMessageId,
-    forked: turn.branchFork,
-  };
+  const input = durableInput(ownerId, c.get('authSubject'), request, turn);
   const row = await first<DurableTurnRow>(
     c.env.DB.prepare(
       "UPDATE turns SET input_json=?,request_json=?,user_message_id=? WHERE id=? AND owner_id=? AND status='streaming' RETURNING *",

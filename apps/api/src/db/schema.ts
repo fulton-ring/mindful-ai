@@ -447,7 +447,6 @@ export const turns = sqliteTable(
       .where(sql.raw("status='streaming'")),
     uniqueIndex('turns_owner_id_request_id_unique').on(table.ownerId, table.requestId),
     index('turns_conversation').on(table.conversationId),
-    index('turns_owner_created').on(table.ownerId, table.createdAt),
   ],
 );
 
@@ -473,6 +472,20 @@ export const turnCancellations = sqliteTable(
     createdAt: text('created_at').notNull(),
   },
   (table) => [primaryKey({ columns: [table.ownerId, table.requestId] })],
+);
+
+/** Anchored message budget: the account's current window start and weight spent in it. */
+export const messageWindows = sqliteTable(
+  'message_windows',
+  {
+    ownerId: text('owner_id').references((): AnySQLiteColumn => users.id, {
+      onDelete: 'cascade',
+      onUpdate: 'no action',
+    }),
+    startedAt: text('started_at').notNull(),
+    used: integer('used').notNull().default(sql.raw('0')),
+  },
+  (table) => [primaryKey({ columns: [table.ownerId] })],
 );
 
 export const users = sqliteTable(

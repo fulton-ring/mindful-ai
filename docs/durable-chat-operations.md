@@ -15,7 +15,7 @@ Run `pnpm verify`, `pnpm lint`, `pnpm db:check`, and `git diff --check` before r
 
 ## Message limit
 
-Admission enforces a sliding budget per account: the summed weights of turns created in the last `MESSAGE_WINDOW_HOURS` (default 4) may not exceed `MESSAGE_LIMIT` (default 20). Every send, regenerate, and edit counts. A turn's weight comes from its model's `weight` in `PERSONA_MODELS` (`packages/contracts`), and each turn stores `model` and `weight`. Over the budget, `POST /api/chat/turns` returns 429 with `details.retryAt`, and the composer keeps the unsent draft. Both values are Worker vars in `wrangler.jsonc`, so changing them needs only a redeploy. Turns of deleted threads drop out of the window.
+Each account has an anchored message window. Its first message opens a window of `MESSAGE_WINDOW_HOURS` (default 4); every send, regenerate, and edit spends its model's `weight` (from `PERSONA_MODELS` in `packages/contracts`) out of `MESSAGE_LIMIT` (default 20), and the whole budget comes back when the window ends. `message_windows` holds each account's window start and spend. Admission charges atomically after every other check and refunds if the turn is not admitted, so replays and refused turns cost nothing, and deleting threads does not return spend. Over the limit, `POST /api/chat/turns` returns 429 with `details.retryAt`, and the composer keeps the unsent draft. Settings → Usage shows the remaining budget and the reset time. Both values are Worker vars in `wrangler.jsonc`, so changing them needs only a redeploy. Each turn also records its `model` and `weight`.
 
 ## Production rollout
 
