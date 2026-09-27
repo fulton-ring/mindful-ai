@@ -22,13 +22,16 @@ type Background = (task: Promise<void>) => void;
 
 export function createCloudflareModel(env: ServiceEnv, modelName: string) {
   // Gemma needs thinking disabled to leave room for visible output. GLM 5.3
-  // Flash does not support disabling reasoning, so use its lowest effort.
+  // Flash does not support disabling reasoning, so use its lowest effort. Qwen
+  // 3.8 is the deliberate option (weight 2), so it reasons at high effort.
   const modelSettings =
     modelName === '@cf/google/gemma-4-26b-a4b-it'
       ? ({ reasoning_effort: null, chat_template_kwargs: { enable_thinking: false } } as const)
       : modelName === DEFAULT_AI_MODEL
         ? ({ reasoning_effort: 'low' } as const)
-        : {};
+        : modelName === '@cf/qwen/qwen3.8-27b'
+          ? ({ reasoning_effort: 'high' } as const)
+          : {};
   if (env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN) {
     return createWorkersAI({
       accountId: env.CLOUDFLARE_ACCOUNT_ID,

@@ -86,6 +86,7 @@ export const personaIconSchema = z.enum([
 export const PERSONA_MODELS = [
   { id: '@cf/zai-org/glm-5.3-flash', label: 'GLM 5.3 Flash', weight: 1 },
   { id: '@cf/google/gemma-4-26b-a4b-it', label: 'Gemma 4', weight: 1 },
+  { id: '@cf/qwen/qwen3.8-27b', label: 'Qwen 3.8', weight: 2 },
 ] as const;
 export type PersonaModel = (typeof PERSONA_MODELS)[number]['id'];
 /** Models outside the persona list (such as a development provider override) cost 1. */
