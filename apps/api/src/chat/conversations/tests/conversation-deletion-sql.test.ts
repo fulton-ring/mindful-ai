@@ -75,7 +75,7 @@ describe('conversation aggregate deletion', () => {
         INSERT INTO conversations (id,owner_id,note_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('thread','owner','note','Thread','now','2999','active','now');
         INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,status,created_at) VALUES ('default','thread','owner',1,'active','now');
         INSERT INTO turns (id,request_id,conversation_id,owner_id,status,created_at,branch_id,source_branch_id) VALUES ('turn','request','thread','owner','completed','now','default','default');
-        INSERT INTO messages (id,conversation_id,turn_id,owner_id,role,content,created_at) VALUES ('message','thread','turn','owner','assistant','Answer','now');
+        INSERT INTO messages (id,conversation_id,turn_id,owner_id,role,ui_message,created_at) VALUES ('message','thread','turn','owner','assistant',json_object('id','message','role','assistant','parts',json_array(json_object('type','text','text','Answer')),'metadata',json_object('createdAt','now')),'now');
         INSERT INTO note_edits (id,note_id,owner_id,operation_id,base_revision,result_revision,before_markdown,before_provenance_json,after_markdown,after_provenance_json,created_at) VALUES ('edit','note','owner','edit-op',0,1,'','[]','Body','[]','now');
         ${bind(EXPLICIT_ARCHIVE_CONVERSATION_SQL, 'thread', 'owner')};`,
     });
@@ -97,7 +97,7 @@ describe('conversation aggregate deletion', () => {
         INSERT INTO conversations (id,owner_id,note_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('thread','owner','note','Thread','now','2999','active','now');
         INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,status,created_at) VALUES ('default','thread','owner',1,'active','now');
         INSERT INTO turns (id,request_id,conversation_id,owner_id,status,created_at,branch_id,source_branch_id) VALUES ('turn','request','thread','owner','completed','now','default','default');
-        INSERT INTO messages (id,conversation_id,turn_id,owner_id,role,content,created_at) VALUES ('message','thread','turn','owner','assistant','Answer','now');
+        INSERT INTO messages (id,conversation_id,turn_id,owner_id,role,ui_message,created_at) VALUES ('message','thread','turn','owner','assistant',json_object('id','message','role','assistant','parts',json_array(json_object('type','text','text','Answer')),'metadata',json_object('createdAt','now')),'now');
         INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,branch_id,generation_key,base_revision,old_text,new_text,reason,status,created_at,updated_at) VALUES ('suggestion','note','owner','thread','message','default','message',1,'Body','Better','Reason','pending','now','now');
         INSERT INTO note_edits (id,note_id,owner_id,operation_id,base_revision,result_revision,before_markdown,before_provenance_json,after_markdown,after_provenance_json,created_at) VALUES ('edit','note','owner','edit-op',0,1,'','[]','Body','[]','now');
         INSERT INTO note_history_requests VALUES ('owner','note','undo-op','undo',1,'edit','now');
@@ -135,7 +135,7 @@ describe('conversation aggregate deletion', () => {
         INSERT INTO conversations (id,owner_id,note_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('thread','owner','note','Thread','old','2020','active','old');
         INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,status,created_at) VALUES ('default','thread','owner',1,'active','old');
         INSERT INTO turns (id,request_id,conversation_id,owner_id,status,created_at,branch_id,source_branch_id) VALUES ('turn','request','thread','owner','completed','old','default','default');
-        INSERT INTO messages (id,conversation_id,turn_id,owner_id,role,content,created_at) VALUES ('message','thread','turn','owner','assistant','Answer','old');
+        INSERT INTO messages (id,conversation_id,turn_id,owner_id,role,ui_message,created_at) VALUES ('message','thread','turn','owner','assistant',json_object('id','message','role','assistant','parts',json_array(json_object('type','text','text','Answer')),'metadata',json_object('createdAt','now')),'old');
         INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,branch_id,generation_key,base_revision,old_text,new_text,reason,status,created_at,updated_at) VALUES ('suggestion','note','owner','thread','message','default','message',0,'Body','Better','Reason','pending','old','old');`,
     });
     await purgeExpiredConversations(sqliteD1(db));

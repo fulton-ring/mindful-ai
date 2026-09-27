@@ -1,5 +1,7 @@
+import { uiMessageText } from '@walden/contracts';
 import { expect, it } from 'vitest';
 import { HttpError } from '../../../http';
+import { textMessage } from '../../../tests/ui-messages';
 import type { Bindings } from '../../../types';
 import {
   assistantMessage,
@@ -63,7 +65,16 @@ it('rejects an unowned conversation without calling a model', async () => {
 
 it.each([
   ['missing', [userMessage]],
-  ['incomplete', [userMessage, { ...assistantMessage, incomplete: true }]],
+  [
+    'incomplete',
+    [
+      userMessage,
+      {
+        ...assistantMessage,
+        metadata: { ...assistantMessage.metadata!, status: 'interrupted' as const },
+      },
+    ],
+  ],
 ])('rejects a %s assistant response without calling a model', async (_label, messages) => {
   mocks.loadConversation.mockResolvedValue(conversation(messages));
 
@@ -84,12 +95,8 @@ it('rejects a stale note revision before calling the proposal model', async () =
 });
 
 it('generates a proposal from an older completed response using the current note', async () => {
-  const laterUser = { ...userMessage, id: 'later-user', content: 'A later question.' };
-  const laterAssistant = {
-    ...assistantMessage,
-    id: 'later-assistant',
-    content: 'A later answer.',
-  };
+  const laterUser = textMessage('later-user', 'user', 'A later question.');
+  const laterAssistant = textMessage('later-assistant', 'assistant', 'A later answer.');
   const history = conversation([userMessage, assistantMessage, laterUser, laterAssistant]);
   mocks.loadConversation.mockResolvedValue(history);
   mocks.streamNoteProposal.mockResolvedValue(
@@ -105,7 +112,7 @@ it('generates a proposal from an older completed response using the current note
   expect(events(body)).toEqual([{ type: 'done', proposal: attemptedProposal }]);
   expect(mocks.streamNoteProposal).toHaveBeenCalledWith(
     expect.objectContaining({
-      message: userMessage.content,
+      message: uiMessageText(userMessage),
       conversation: expect.objectContaining({ messages: [] }),
       note: expect.objectContaining({ revision: 3 }),
     }),
@@ -196,7 +203,7 @@ it('persists annotations on the owned completed assistant message', async () => 
   expect(response.status).toBe(200);
   expect(await response.json()).toEqual({ annotations });
   expect(mocks.annotateTurn).toHaveBeenCalledWith(
-    expect.objectContaining({ turnId: 'turn', message: userMessage.content }),
+    expect.objectContaining({ turnId: 'turn', message: uiMessageText(userMessage) }),
     assistantMessage,
     expect.any(AbortSignal),
   );
@@ -303,7 +310,10 @@ it('preserves existing annotations and filters overlapping additions before stre
     whose: 'assistant' as const,
   };
   mocks.loadConversation.mockResolvedValue(
-    conversation([userMessage, { ...assistantMessage, annotations: [existing] }]),
+    conversation([
+      userMessage,
+      { ...assistantMessage, metadata: { ...assistantMessage.metadata!, annotations: [existing] } },
+    ]),
   );
   mocks.streamAnnotations.mockResolvedValue(
     (async function* () {
@@ -333,7 +343,10 @@ it('returns four existing annotations without another model call', async () => {
     whose: 'assistant' as const,
   }));
   mocks.loadConversation.mockResolvedValue(
-    conversation([userMessage, { ...assistantMessage, annotations }]),
+    conversation([
+      userMessage,
+      { ...assistantMessage, metadata: { ...assistantMessage.metadata!, annotations } },
+    ]),
   );
 
   const { response } = await testApp(database())('annotations', 3, true);

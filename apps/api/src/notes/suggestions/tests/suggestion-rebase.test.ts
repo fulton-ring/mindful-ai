@@ -38,7 +38,7 @@ async function fixture(markdown: string) {
     .run();
   await db
     .prepare(
-      "INSERT INTO messages (id,conversation_id,owner_id,role,content,created_at,origin_branch_id) VALUES ('source','conversation','owner','assistant','Source','now','branch')",
+      "INSERT INTO messages (id,conversation_id,owner_id,role,ui_message,created_at,origin_branch_id) VALUES ('source','conversation','owner','assistant',json_object('id','source','role','assistant','parts',json_array(json_object('type','text','text','Source')),'metadata',json_object('createdAt','now')),'now','branch')",
     )
     .run();
   await db

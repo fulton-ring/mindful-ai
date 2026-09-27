@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { HttpError } from '../../../http';
+import { textMessage } from '../../../tests/ui-messages';
 import {
   assistantMessage,
   attemptedProposal,
@@ -137,10 +138,7 @@ it('persists an older response proposal when newer conversation messages arrive 
   mocks.loadConversation
     .mockResolvedValueOnce(conversation())
     .mockResolvedValueOnce(
-      conversation([
-        assistantMessage,
-        { ...userMessage, id: 'new-user-message', content: 'One more thing.' },
-      ]),
+      conversation([assistantMessage, textMessage('new-user-message', 'user', 'One more thing.')]),
     );
   mocks.streamNoteProposal.mockResolvedValue(
     (async function* () {

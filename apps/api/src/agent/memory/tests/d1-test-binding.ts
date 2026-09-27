@@ -6,10 +6,17 @@ const sqlValue = (value: unknown): string => {
   return `'${String(value).replaceAll("'", "''")}'`;
 };
 
+/** Binds `?` in order and `?NNN` by position, as D1 does. */
 const interpolate = (sql: string, values: unknown[]): string => {
   let index = 0;
-  const rendered = sql.replaceAll('?', () => sqlValue(values[index++]));
-  if (index !== values.length) throw new Error(`Unused SQL parameters: ${values.length - index}`);
+  const used = new Set<number>();
+  const rendered = sql.replace(/\?(\d+)?/g, (_match, position?: string) => {
+    const at = position ? Number(position) - 1 : index++;
+    used.add(at);
+    return sqlValue(values[at]);
+  });
+  if (used.size !== values.length)
+    throw new Error(`Unused SQL parameters: ${values.length - used.size}`);
   return rendered;
 };
 

@@ -1,5 +1,7 @@
-import type { Message } from '@walden/contracts';
+import type { WaldenUIMessage } from '@walden/contracts';
 import { useEffect, useRef, useState } from 'react';
+
+import { messageText } from '../../../message-parts';
 
 type CopyFailure = (message: string) => void;
 
@@ -15,9 +17,9 @@ export function useMessageActions(onFailure: CopyFailure) {
     };
   }, []);
 
-  async function copyMessage(message: Message) {
+  async function copyMessage(message: WaldenUIMessage) {
     try {
-      await navigator.clipboard.writeText(message.content);
+      await navigator.clipboard.writeText(messageText(message));
       setCopiedMessageId(message.id);
       if (copiedMessageTimeout.current !== undefined)
         window.clearTimeout(copiedMessageTimeout.current);

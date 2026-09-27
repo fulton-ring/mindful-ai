@@ -4,13 +4,19 @@ import type {
   LanguageModelV3StreamPart,
 } from '@ai-sdk/provider';
 import { createTool } from '@mastra/core/tools';
-import { type ChatEvent, DEFAULT_PERSONAS } from '@walden/contracts';
+import { DEFAULT_PERSONAS, type WaldenUIMessageChunk } from '@walden/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import { createCloudflareModel, DEFAULT_AI_MODEL } from '../../../services/agent/agent';
 import { streamMastraTurn } from '../../mastra-turn';
-import { researchModel, researchTools, turnInput, usage } from '../fixtures/research-tools';
+import {
+  chunkText,
+  researchModel,
+  researchTools,
+  turnInput,
+  usage,
+} from '../fixtures/research-tools';
 
 it('sends attached image bytes to the model as image content', async () => {
   const calls: LanguageModelV3CallOptions[] = [];
@@ -49,7 +55,7 @@ it('passes screenshot image content to the next model step', async () => {
     }),
   });
 
-  const events: ChatEvent[] = [];
+  const events: WaldenUIMessageChunk[] = [];
   for await (const event of streamMastraTurn({
     input: turnInput(),
     model: screenshotModel(calls),
@@ -63,8 +69,9 @@ it('passes screenshot image content to the next model step', async () => {
   expect(JSON.stringify(calls[1]?.prompt)).toContain('image/jpeg');
   expect(JSON.stringify(calls[1]?.prompt)).toContain('/9j/');
   expect(events).toContainEqual({
-    type: 'source',
-    source: { id: 'screenshot-1:0', url: 'https://example.com/' },
+    type: 'source-url',
+    sourceId: 'screenshot-1:0',
+    url: 'https://example.com/',
   });
 });
 
@@ -109,7 +116,7 @@ it('allows fifteen sequential tool calls followed by a final answer', async () =
     inputSchema: z.object({}),
     execute: async () => ({ result: 'found' }),
   });
-  const events: ChatEvent[] = [];
+  const events: WaldenUIMessageChunk[] = [];
   for await (const event of streamMastraTurn({
     input: turnInput(),
     model,
@@ -121,16 +128,13 @@ it('allows fifteen sequential tool calls followed by a final answer', async () =
     events.push(event);
 
   expect(calls).toHaveLength(16);
-  expect(events.find((event) => event.type === 'done')).toEqual(
-    expect.objectContaining({
-      message: expect.objectContaining({ content: 'Research complete.' }),
-    }),
-  );
+  expect(chunkText(events)).toBe('Research complete.');
+  expect(events.filter((event) => event.type === 'tool-output-available')).toHaveLength(15);
 });
 
 describe('research tools in a Mastra turn', () => {
   it('stops a failed web lookup before the model can turn it into an unsupported answer', async () => {
-    const events: ChatEvent[] = [];
+    const events: WaldenUIMessageChunk[] = [];
     const calls: LanguageModelV3CallOptions[] = [];
     const run = async () => {
       for await (const event of streamMastraTurn({
@@ -152,13 +156,12 @@ describe('research tools in a Mastra turn', () => {
     };
     await expect(run()).rejects.toThrow('Web search failed');
     expect(calls[0]?.toolChoice).not.toEqual({ type: 'tool', toolName: 'searchWeb' });
-    expect(events.some((event) => event.type === 'text')).toBe(false);
-    expect(events).toContainEqual(
-      expect.objectContaining({
-        type: 'tool',
-        tool: expect.objectContaining({ name: 'searchWeb', state: 'error' }),
-      }),
-    );
+    expect(events.some((event) => event.type === 'text-delta')).toBe(false);
+    expect(events).toContainEqual({
+      type: 'tool-output-error',
+      toolCallId: expect.any(String),
+      errorText: 'Web search failed',
+    });
   });
   it('keeps the source usable but exposes failed search indexing', async () => {
     const controller = new AbortController();
@@ -173,18 +176,17 @@ describe('research tools in a Mastra turn', () => {
     }))
       events.push(event);
     expect(events).toContainEqual({
-      type: 'tool',
-      tool: {
-        id: 'read-1',
-        name: 'readWebPage',
-        state: 'complete',
+      type: 'tool-output-available',
+      toolCallId: 'read-1',
+      output: {
+        sources: [{ url: 'https://example.com/research' }],
         summary: 'Read, but not saved to search',
-        sources: [{ id: 'read-1:0', url: 'https://example.com/research' }],
       },
     });
     expect(events).toContainEqual({
-      type: 'source',
-      source: { id: 'read-1:0', url: 'https://example.com/research' },
+      type: 'source-url',
+      sourceId: 'read-1:0',
+      url: 'https://example.com/research',
     });
   });
 });
@@ -320,13 +322,8 @@ describe.skipIf(!runLive)('live Gemma research tool calling', () => {
 
     expect(fixture.quickAction).toHaveBeenCalledOnce();
     expect(fixture.search).toHaveBeenCalledOnce();
-    const done = events.find((event) => event.type === 'done');
-    expect(done?.type === 'done' ? done.message.content : '').toMatch(
-      /deterministic tests avoid external dependencies/i,
-    );
-    expect(done?.type === 'done' ? done.message.content : '').toContain(
-      'https://example.com/research',
-    );
+    expect(chunkText(events)).toMatch(/deterministic tests avoid external dependencies/i);
+    expect(chunkText(events)).toContain('https://example.com/research');
   }, 90_000);
 });
 
@@ -336,7 +333,7 @@ it('ends the model loop once a learning check is ready for the user', async () =
   input.persona = DEFAULT_PERSONAS.find((p) => p.id === 'study-partner')!;
   input.message = 'Help me study photosynthesis';
   const calls: LanguageModelV3CallOptions[] = [];
-  const events: ChatEvent[] = [];
+  const events: WaldenUIMessageChunk[] = [];
   for await (const event of streamMastraTurn({
     input,
     model: researchModel(calls, false, true),
@@ -346,8 +343,8 @@ it('ends the model loop once a learning check is ready for the user', async () =
   expect(calls).toHaveLength(1);
   expect(events).toContainEqual(
     expect.objectContaining({
-      type: 'intervention',
-      intervention: expect.objectContaining({
+      type: 'data-intervention',
+      data: expect.objectContaining({
         kind: 'learning_check',
         questions: [
           expect.objectContaining({
@@ -358,7 +355,7 @@ it('ends the model loop once a learning check is ready for the user', async () =
       }),
     }),
   );
-  expect(events.at(-1)?.type).toBe('done');
+  expect(events.at(-1)?.type).toBe('data-intervention');
 });
 
 it.each(['study-partner', 'account-override'])(
@@ -370,7 +367,7 @@ it.each(['study-partner', 'account-override'])(
       ...DEFAULT_PERSONAS.find((persona) => persona.id === 'study-partner')!,
       id: personaId,
     };
-    const events: ChatEvent[] = [];
+    const events: WaldenUIMessageChunk[] = [];
     for await (const event of streamMastraTurn({
       input,
       model: silentModel(
@@ -383,8 +380,8 @@ it.each(['study-partner', 'account-override'])(
 
     expect(events).toContainEqual(
       expect.objectContaining({
-        type: 'intervention',
-        intervention: expect.objectContaining({
+        type: 'data-intervention',
+        data: expect.objectContaining({
           kind: 'learning_check',
           questions: [
             expect.objectContaining({
@@ -396,7 +393,7 @@ it.each(['study-partner', 'account-override'])(
         }),
       }),
     );
-    expect(events.at(-1)).toMatchObject({ type: 'done', message: { content: '' } });
+    expect(events.at(-1)?.type).toBe('data-intervention');
   },
 );
 
@@ -404,7 +401,7 @@ it('turns an introduced, numbered multiple-choice reply into a learning-check ca
   const input = turnInput();
   input.conversation.learningChecksEnabled = true;
   input.persona = DEFAULT_PERSONAS.find((persona) => persona.id === 'study-partner')!;
-  const events: ChatEvent[] = [];
+  const events: WaldenUIMessageChunk[] = [];
   for await (const event of streamMastraTurn({
     input,
     model: silentModel(
@@ -417,8 +414,8 @@ it('turns an introduced, numbered multiple-choice reply into a learning-check ca
 
   expect(events).toContainEqual(
     expect.objectContaining({
-      type: 'intervention',
-      intervention: expect.objectContaining({
+      type: 'data-intervention',
+      data: expect.objectContaining({
         kind: 'learning_check',
         questions: [
           expect.objectContaining({
@@ -430,7 +427,7 @@ it('turns an introduced, numbered multiple-choice reply into a learning-check ca
       }),
     }),
   );
-  expect(events.at(-1)).toMatchObject({ type: 'done', message: { content: '' } });
+  expect(events.at(-1)?.type).toBe('data-intervention');
 });
 
 it('recovers a short-answer card when Gemma calls the quiz tool with empty arguments then writes its question', async () => {
@@ -480,7 +477,7 @@ it('recovers a short-answer card when Gemma calls the quiz tool with empty argum
       };
     },
   };
-  const events: ChatEvent[] = [];
+  const events: WaldenUIMessageChunk[] = [];
   for await (const event of streamMastraTurn({
     input,
     model,
@@ -490,8 +487,8 @@ it('recovers a short-answer card when Gemma calls the quiz tool with empty argum
 
   expect(events).toContainEqual(
     expect.objectContaining({
-      type: 'intervention',
-      intervention: expect.objectContaining({
+      type: 'data-intervention',
+      data: expect.objectContaining({
         kind: 'learning_check',
         questions: [
           expect.objectContaining({
@@ -503,12 +500,9 @@ it('recovers a short-answer card when Gemma calls the quiz tool with empty argum
     }),
   );
   expect(events).not.toContainEqual(
-    expect.objectContaining({
-      type: 'tool',
-      tool: expect.objectContaining({ name: 'proposeLearningCheck' }),
-    }),
+    expect.objectContaining({ type: 'tool-input-available', toolName: 'proposeLearningCheck' }),
   );
-  expect(events.at(-1)).toMatchObject({ type: 'done', message: { content: '' } });
+  expect(events.at(-1)?.type).toBe('data-intervention');
 });
 
 it('removes web search from the model tools when disabled for the conversation', async () => {

@@ -2,12 +2,15 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { WaldenUIMessageChunk } from '@walden/contracts';
+import { uiMessageText } from '@walden/contracts';
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { sqliteD1Binding } from '../../../agent/memory/tests/d1-test-binding';
 import { HttpError } from '../../../http';
+import { uiMessageSql } from '../../../tests/ui-messages';
 import type { Bindings, Variables } from '../../../types';
-import { readTurnEvents } from '../durable-store';
+import { readTurnChunks } from '../durable-store';
 import { runChatTurn } from '../workflow-runner';
 
 const mocks = vi.hoisted(() => ({ streamTurn: vi.fn() }));
@@ -50,9 +53,9 @@ async function fixture() {
   for (const [id, role, content, parent] of rows)
     await db
       .prepare(
-        "INSERT INTO messages (id,conversation_id,owner_id,role,content,created_at,parent_message_id,origin_branch_id) VALUES (?,'conversation','owner',?,?,'now',?,'default')",
+        `INSERT INTO messages (id,conversation_id,owner_id,role,created_at,parent_message_id,origin_branch_id,ui_message) VALUES (?,'conversation','owner',?,'now',?,'default',${uiMessageSql(id, role, content, role === 'assistant' ? { status: 'complete' } : {})})`,
       )
-      .bind(id, role, content, parent)
+      .bind(id, role, parent)
       .run();
   await db
     .prepare("UPDATE conversation_branches SET head_message_id='a2' WHERE id='default'")
@@ -94,35 +97,28 @@ async function requestTurn(db: Bindings['DB'], payload: Record<string, unknown>)
     env,
     { waitUntil: () => undefined } as unknown as ExecutionContext,
   );
-  if (!response.ok) return response.text();
+  if (!response.ok) throw new Error(await response.text());
   const { turnId } = (await response.json()) as { turnId: string };
   await execution;
-  return (await readTurnEvents(db, turnId, 0))
-    .map(({ event }) => `data: ${JSON.stringify(event)}\n\n`)
-    .join('');
+  return (await readTurnChunks(db, turnId)).map(({ chunk }) => chunk);
 }
 
-function parseEvents(body: string) {
-  return body
-    .split('\n\n')
-    .filter(Boolean)
-    .map(
-      (line) =>
-        JSON.parse(line.replace(/^data: /, '')) as {
-          type: string;
-          message?: string;
-          partialMessage?: {
-            id: string;
-            content: string;
-            reasoning?: string;
-            incomplete?: boolean;
-            tools?: { id: string; name: string; state: string; summary: string }[];
-            sources?: { url: string; title: string }[];
-            contextCompacted?: boolean;
-          };
-        },
-    );
+/** The branch the turn ran on, from its opening `data-turn` chunk. */
+function turnBranch(chunks: WaldenUIMessageChunk[]) {
+  const turn = chunks.find((chunk) => chunk.type === 'data-turn');
+  return turn?.type === 'data-turn' ? turn.data.branchId : undefined;
 }
+
+const answer = (id: string, text: string): WaldenUIMessageChunk[] => [
+  { type: 'text-start', id },
+  { type: 'text-delta', id, delta: text },
+  { type: 'text-end', id },
+];
+const replying = (...chunks: WaldenUIMessageChunk[]) =>
+  (async function* () {
+    yield* chunks;
+  })();
+const texts = (messages: Parameters<typeof uiMessageText>[0][]) => messages.map(uiMessageText);
 
 const failureCases = [
   {
@@ -156,25 +152,8 @@ describe('conversation branches: regeneration', () => {
 
   it('regenerates an older response into a sibling branch without changing the original path', async () => {
     const db = await fixture();
-    mocks.streamTurn.mockImplementation(
-      async (input: { conversation: { id: string; branchId: string } }) =>
-        (async function* () {
-          yield {
-            type: 'done',
-            message: {
-              id: 'replacement',
-              role: 'assistant',
-              content: 'Replacement answer',
-              createdAt: '2026-09-18T17:00:00.000Z',
-            },
-            conversationId: input.conversation.id,
-            branchId: input.conversation.branchId,
-            title: 'Title',
-            expiresAt: '2999-01-01',
-          } as const;
-        })(),
-    );
-    const body = await requestTurn(db, {
+    mocks.streamTurn.mockImplementation(async () => replying(...answer('t', 'Replacement answer')));
+    const chunks = await requestTurn(db, {
       requestId: 'regenerate',
       conversationId: 'conversation',
       branchId: 'default',
@@ -183,31 +162,24 @@ describe('conversation branches: regeneration', () => {
       personaId: 'thinking-partner',
       regenerateMessageId: 'a1',
     });
-    expect(body).toContain('"type":"done"');
-    const done = body
-      .split('\n\n')
-      .filter(Boolean)
-      .map((line) => JSON.parse(line.replace(/^data: /, '')))
-      .find((event) => event.type === 'done');
-
-    expect(done.branchId).not.toBe('default');
+    expect(chunks.at(-1)).toMatchObject({
+      type: 'finish',
+      messageMetadata: { status: 'complete' },
+    });
+    const branchId = turnBranch(chunks)!;
+    expect(branchId).not.toBe('default');
     expect(mocks.streamTurn).toHaveBeenCalledWith(
       expect.objectContaining({
-        conversation: expect.objectContaining({
-          branchId: done.branchId,
-          messages: [],
-        }),
+        conversation: expect.objectContaining({ branchId, messages: [] }),
       }),
       expect.objectContaining({ do: expect.any(Function) }),
       expect.any(AbortSignal),
     );
-    expect(
-      await db.prepare("SELECT content FROM messages WHERE id IN ('a1','a2') ORDER BY id").all(),
-    ).toMatchObject({ results: [{ content: 'Original answer' }, { content: 'Later answer' }] });
-    const branch = await loadConversation(db, 'owner', 'conversation', { branchId: done.branchId });
-    expect(branch.messages.map(({ content }) => content)).toEqual(['First', 'Replacement answer']);
+    const branch = await loadConversation(db, 'owner', 'conversation', { branchId });
+    expect(texts(branch.messages)).toEqual(['First', 'Replacement answer']);
     const original = await loadConversation(db, 'owner', 'conversation', { branchId: 'default' });
     expect(original.messages.map(({ id }) => id)).toEqual(['u1', 'a1', 'u2', 'a2']);
+    expect(texts(original.messages)).toEqual(['First', 'Original answer', 'Later', 'Later answer']);
   });
 });
 
@@ -216,30 +188,13 @@ describe('conversation branches: editing', () => {
   it('edits a prompt into a sibling branch without appending to the original path', async () => {
     const db = await fixture();
     mocks.streamTurn.mockImplementation(
-      async (input: {
-        conversation: { id: string; branchId: string; messages: { id: string }[] };
-        message: string;
-      }) => {
+      async (input: { conversation: { messages: { id: string }[] }; message: string }) => {
         expect(input.conversation.messages.map(({ id }) => id)).toEqual(['u1', 'a1']);
         expect(input.message).toBe('Edited prompt');
-        return (async function* () {
-          yield {
-            type: 'done',
-            message: {
-              id: 'edited-answer',
-              role: 'assistant',
-              content: 'Edited answer',
-              createdAt: '2026-09-18T17:00:00.000Z',
-            },
-            conversationId: input.conversation.id,
-            branchId: input.conversation.branchId,
-            title: 'Title',
-            expiresAt: '2999-01-01',
-          } as const;
-        })();
+        return replying(...answer('t', 'Edited answer'));
       },
     );
-    const body = await requestTurn(db, {
+    const chunks = await requestTurn(db, {
       requestId: 'edit-message',
       conversationId: 'conversation',
       branchId: 'default',
@@ -248,13 +203,10 @@ describe('conversation branches: editing', () => {
       personaId: 'thinking-partner',
       editMessageId: 'u2',
     });
-    const done = body
-      .split('\n\n')
-      .filter(Boolean)
-      .map((line) => JSON.parse(line.replace(/^data: /, '')))
-      .find((event) => event.type === 'done');
-    const edited = await loadConversation(db, 'owner', 'conversation', { branchId: done.branchId });
-    expect(edited.messages.map(({ content }) => content)).toEqual([
+    const edited = await loadConversation(db, 'owner', 'conversation', {
+      branchId: turnBranch(chunks)!,
+    });
+    expect(texts(edited.messages)).toEqual([
       'First',
       'Original answer',
       'Edited prompt',
@@ -269,25 +221,13 @@ describe('conversation branches: interrupted responses', () => {
   beforeEach(() => vi.clearAllMocks());
   it('retries an edited prompt in place when its response was interrupted', async () => {
     const db = await fixture();
-    await db.prepare("UPDATE messages SET incomplete=1,content='' WHERE id='a2'").run();
-    mocks.streamTurn.mockResolvedValue(
-      (async function* () {
-        yield {
-          type: 'done',
-          message: {
-            id: 'retried-answer',
-            role: 'assistant',
-            content: 'Recovered answer',
-            createdAt: '2026-09-18T17:00:00.000Z',
-          },
-          conversationId: 'conversation',
-          branchId: 'default',
-          title: 'Title',
-          expiresAt: '2999-01-01',
-        } as const;
-      })(),
-    );
-    const body = await requestTurn(db, {
+    await db
+      .prepare(
+        `UPDATE messages SET ui_message=${uiMessageSql('a2', 'assistant', '', { status: 'interrupted' })} WHERE id='a2'`,
+      )
+      .run();
+    mocks.streamTurn.mockResolvedValue(replying(...answer('t', 'Recovered answer')));
+    const chunks = await requestTurn(db, {
       requestId: 'retry-edited-message',
       conversationId: 'conversation',
       branchId: 'default',
@@ -296,18 +236,17 @@ describe('conversation branches: interrupted responses', () => {
       personaId: 'thinking-partner',
       editMessageId: 'u2',
     });
-    expect(body).toContain('"branchId":"default"');
+    expect(turnBranch(chunks)).toBe('default');
     const reloaded = await loadConversation(db, 'owner', 'conversation', { branchId: 'default' });
-    expect(reloaded.messages.map(({ content }) => content)).toEqual([
+    expect(texts(reloaded.messages)).toEqual([
       'First',
       'Original answer',
       'Repaired prompt',
       'Recovered answer',
     ]);
+    expect(reloaded.messages.map(({ id }) => id).slice(0, 3)).toEqual(['u1', 'a1', 'u2']);
     expect(await db.prepare('SELECT count(*) AS count FROM conversation_branches').first()).toEqual(
-      {
-        count: 1,
-      },
+      { count: 1 },
     );
   });
 });
@@ -320,59 +259,118 @@ describe('conversation branches: failures', () => {
       const db = await fixture();
       mocks.streamTurn.mockResolvedValue(
         (async function* () {
-          yield { type: 'text', text: 'A useful answer that stops early.' } as const;
-          yield { type: 'reasoning', text: 'Partial reasoning.' } as const;
+          yield* answer('t', 'A useful answer that stops early.');
+          yield { type: 'reasoning-start', id: 'r' } as const;
+          yield { type: 'reasoning-delta', id: 'r', delta: 'Partial reasoning.' } as const;
           yield {
-            type: 'tool',
-            tool: { id: 'tool-1', name: 'searchSources', state: 'running', summary: 'Searching…' },
+            type: 'tool-input-available',
+            toolCallId: 'tool-1',
+            toolName: 'searchSources',
+            input: { query: 'tides' },
           } as const;
           yield {
-            type: 'source',
-            source: { url: 'https://example.com/source', title: 'Example source' },
+            type: 'source-url',
+            sourceId: 'tool-1:0',
+            url: 'https://example.com/source',
+            title: 'Example source',
           } as const;
-          yield { type: 'context-compacted' } as const;
+          yield {
+            type: 'message-metadata',
+            messageMetadata: { contextCompacted: true },
+          } as WaldenUIMessageChunk;
           throw new Error(failure);
         })(),
       );
-      const events = parseEvents(
-        await requestTurn(db, {
-          requestId: 'output-limit',
-          conversationId: 'conversation',
-          branchId: 'default',
-          noteRevision: null,
-          message: 'Give me a detailed answer.',
-          personaId: 'thinking-partner',
-        }),
-      );
-      expect(events).toContainEqual({ type: 'text', text: 'A useful answer that stops early.' });
-      const error = events.find(({ type }) => type === 'error');
-      expect(error).toMatchObject({
-        type: 'error',
-        message: expected,
-        code: expectedCode,
-        partialMessage: {
-          role: 'assistant',
-          content: 'A useful answer that stops early.',
-          reasoning: 'Partial reasoning.',
-          incomplete: true,
-          tools: [{ id: 'tool-1', name: 'searchSources', state: 'error', summary: 'Stopped' }],
-          sources: [{ url: 'https://example.com/source', title: 'Example source' }],
-          contextCompacted: true,
-        },
+      const chunks = await requestTurn(db, {
+        requestId: 'output-limit',
+        conversationId: 'conversation',
+        branchId: 'default',
+        noteRevision: null,
+        message: 'Give me a detailed answer.',
+        personaId: 'thinking-partner',
       });
-      expect(events.some(({ type }) => type === 'done')).toBe(false);
+      expect(chunks.slice(-4)).toEqual([
+        {
+          type: 'data-turn',
+          transient: true,
+          data: expect.objectContaining({ branchId: 'default', failureCode: expectedCode }),
+        },
+        { type: 'message-metadata', messageMetadata: { status: 'interrupted' } },
+        { type: 'error', errorText: expected },
+        { type: 'finish', finishReason: 'error', messageMetadata: { status: 'interrupted' } },
+      ]);
 
       const reloaded = await loadConversation(db, 'owner', 'conversation', { branchId: 'default' });
-      expect(reloaded.messages.at(-1)).toMatchObject({
-        id: error?.partialMessage?.id,
+      const partial = reloaded.messages.at(-1)!;
+      expect(partial).toMatchObject({
         role: 'assistant',
-        content: 'A useful answer that stops early.',
-        reasoning: 'Partial reasoning.',
-        sources: [{ url: 'https://example.com/source', title: 'Example source' }],
-        contextCompacted: true,
-        incomplete: true,
-        tools: [{ id: 'tool-1', name: 'searchSources', state: 'error', summary: 'Stopped' }],
+        metadata: { status: 'interrupted', contextCompacted: true, model: 'test-model' },
+        parts: [
+          { type: 'text', text: 'A useful answer that stops early.', state: 'done' },
+          { type: 'reasoning', text: 'Partial reasoning.', state: 'done' },
+          {
+            type: 'tool-searchSources',
+            toolCallId: 'tool-1',
+            state: 'output-error',
+            errorText: 'Stopped',
+          },
+          { type: 'source-url', url: 'https://example.com/source', title: 'Example source' },
+        ],
       });
+      expect(chunks[0]).toMatchObject({ type: 'start', messageId: partial.id });
     },
   );
+});
+
+describe('durable model preview', () => {
+  beforeEach(() => vi.clearAllMocks());
+  it('streams the preview once, rewinds a retried call, and drops the replayed duplicate', async () => {
+    const db = await fixture();
+    mocks.streamTurn.mockImplementation(
+      async (_input: unknown, checkpoints: import('../../../agent/checkpoints').AgentCheckpoints) =>
+        (async function* () {
+          const preview = checkpoints.preview!;
+          const mark = preview.mark();
+          await preview.write([
+            { type: 'start-step' },
+            { type: 'text-start', id: 'call:t' },
+            { type: 'text-delta', id: 'call:t', delta: 'Half an ans' },
+          ]);
+          // The model call failed and is retried inside its checkpoint.
+          await preview.rewind(mark);
+          await preview.write([{ type: 'start-step' }, ...answer('call:t', 'Whole answer')]);
+          await preview.write([{ type: 'finish-step' }]);
+          // After the checkpoint, the agent replays the same output; it is a duplicate.
+          yield { type: 'start-step' } as const;
+          yield* answer('t', 'Whole answer');
+          yield { type: 'finish-step' } as const;
+        })(),
+    );
+    const chunks = await requestTurn(db, {
+      requestId: 'preview',
+      conversationId: 'conversation',
+      branchId: 'default',
+      noteRevision: null,
+      message: 'Explain.',
+      personaId: 'thinking-partner',
+    });
+    expect(chunks[0]).toMatchObject({ type: 'data-turn', data: { reset: true } });
+    expect(chunks.slice(1).map(({ type }) => type)).toEqual([
+      'start',
+      'data-turn',
+      'data-status',
+      'start-step',
+      'text-start',
+      'text-delta',
+      'text-end',
+      'finish-step',
+      'data-turn',
+      'finish',
+    ]);
+    const reloaded = await loadConversation(db, 'owner', 'conversation', { branchId: 'default' });
+    expect(reloaded.messages.at(-1)?.parts).toEqual([
+      { type: 'step-start' },
+      { type: 'text', text: 'Whole answer', state: 'done' },
+    ]);
+  });
 });

@@ -121,7 +121,7 @@ beforeEach(async () => {
     .run();
   await db
     .prepare(
-      "INSERT INTO messages (id,conversation_id,owner_id,role,content,created_at) VALUES ('source','conversation','owner','assistant','Source','now'),('later','conversation','owner','assistant','Later','now')",
+      "INSERT INTO messages (id,conversation_id,owner_id,role,ui_message,created_at) VALUES ('source','conversation','owner','assistant',json_object('id','source','role','assistant','parts',json_array(json_object('type','text','text','Source')),'metadata',json_object('createdAt','now')),'now'),('later','conversation','owner','assistant',json_object('id','later','role','assistant','parts',json_array(json_object('type','text','text','Later')),'metadata',json_object('createdAt','now')),'now')",
     )
     .run();
 });

@@ -45,7 +45,7 @@ it.skipIf(!key)(
       inlineCheckpoints,
     );
     let text = '';
-    for await (const event of stream) if (event.type === 'text') text += event.text;
+    for await (const event of stream) if (event.type === 'text-delta') text += event.delta;
     expect(text.toLowerCase()).toContain('openrouter is connected');
   },
   90_000,
@@ -88,8 +88,8 @@ it.skipIf(!key)(
       {
         id: 'openrouter-note-assistant',
         role: 'assistant',
-        content: 'The fictional blue kite festival starts at noon.',
-        createdAt: new Date().toISOString(),
+        parts: [{ type: 'text', text: 'The fictional blue kite festival starts at noon.' }],
+        metadata: { createdAt: new Date().toISOString() },
       },
     );
     let final: Extract<NoteProposalEvent, { type: 'done' | 'error' }> | undefined;

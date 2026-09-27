@@ -2,10 +2,11 @@ import {
   type Annotation,
   type AnnotationEvent,
   type Conversation,
-  type Message,
   type MessageFollowupRequest,
   messageFollowupRequestSchema,
   type NoteProposalEvent,
+  uiMessageText,
+  type WaldenUIMessage,
 } from '@walden/contracts';
 import { type Context, Hono } from 'hono';
 import { z } from 'zod';
@@ -23,6 +24,7 @@ import { annotationBudget } from '../../services/annotations/annotations';
 import type { AgentTurnInput } from '../../services/types';
 import type { Bindings, Variables } from '../../types';
 import { loadConversation } from '../conversations/repository';
+import { isInterrupted } from '../messages';
 import { encodeSse, sseResponse } from '../sse';
 import { personaFor } from '../turns/turn-support';
 import {
@@ -40,7 +42,7 @@ type FollowupTarget = {
   ownerId: string;
   conversation: Conversation;
   index: number;
-  assistantMessage: Message;
+  assistantMessage: WaldenUIMessage;
   generationKey: string;
 };
 
@@ -88,7 +90,7 @@ async function loadTarget(
     (message) => message.id === requestParam(c, 'messageId'),
   );
   const assistantMessage = conversation.messages[index];
-  if (!assistantMessage || assistantMessage.role !== 'assistant' || assistantMessage.incomplete)
+  if (!assistantMessage || assistantMessage.role !== 'assistant' || isInterrupted(assistantMessage))
     throw new HttpError(404, 'Completed response not found');
   return {
     ownerId,
@@ -102,14 +104,15 @@ async function loadTarget(
 function cachedAnnotationResponse(
   c: FollowupContext,
   operation: FollowupOperation,
-  assistantMessage: Message,
+  assistantMessage: WaldenUIMessage,
 ) {
   if (
     operation !== 'annotations' ||
-    (assistantMessage.annotations?.length ?? 0) < annotationBudget(assistantMessage.content)
+    (assistantMessage.metadata?.annotations?.length ?? 0) <
+      annotationBudget(uiMessageText(assistantMessage))
   )
     return null;
-  const annotations = assistantMessage.annotations ?? [];
+  const annotations = assistantMessage.metadata?.annotations ?? [];
   if (c.req.query('stream') === '1') {
     const event = { type: 'done', annotations } satisfies AnnotationEvent;
     return sseResponse(encodeSse(event));
@@ -174,7 +177,7 @@ async function buildAgentInput(
     conversation: { ...conversation, messages: conversation.messages.slice(0, index - 1) },
     note,
     persona: await personaFor(c.env.DB, ownerId, request.personaId),
-    message: request.captureText ?? userMessage.content,
+    message: request.captureText ?? uiMessageText(userMessage),
     action: request.action,
     noteProposalRequested: request.noteProposalRequested,
     pendingProposals:

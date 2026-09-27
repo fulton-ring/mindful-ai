@@ -1,17 +1,16 @@
-import type { Message } from '@walden/contracts';
 import type { AgentTurnInput } from '../../../services/types';
+import { textMessage } from '../../../tests/ui-messages';
 
 type NoteProposalStream = typeof import('../note-proposal-stream')['streamNoteProposal'];
 
 export const model = {} as Parameters<NoteProposalStream>[2];
 
-export const assistantMessage: Message = {
-  id: 'assistant-1',
-  role: 'assistant',
-  content:
-    'Sunlight refracts and disperses as it enters a raindrop. It reflects inside the drop, then refracts again as it exits. Different wavelengths leave at different angles, producing the visible arc.',
-  createdAt: '2026-09-18T12:00:00.000Z',
-};
+export const assistantMessage = textMessage(
+  'assistant-1',
+  'assistant',
+  'Sunlight refracts and disperses as it enters a raindrop. It reflects inside the drop, then refracts again as it exits. Different wavelengths leave at different angles, producing the visible arc.',
+  { createdAt: '2026-09-18T12:00:00.000Z' },
+);
 
 export const input = (
   message: string,

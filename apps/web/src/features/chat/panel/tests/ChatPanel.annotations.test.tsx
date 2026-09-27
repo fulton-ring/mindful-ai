@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { ChatEvent, Conversation } from '@walden/contracts';
+import type { Conversation } from '@walden/contracts';
 import { expect, it } from 'vitest';
 import {
+  assistantMessage,
   conversation,
   getTransport,
+  hang,
   props,
+  reply,
+  replyChunks,
   setComposerValue,
 } from '../../tests/_ChatPanel.test-helpers';
 
@@ -25,21 +29,7 @@ it('publishes each annotation before the classifier stream finishes', async () =
       });
     },
   );
-  transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
-    onEvent({
-      type: 'done',
-      message: {
-        id: 'assistant-progressive',
-        role: 'assistant',
-        content: 'First claim. Second claim.',
-        createdAt: new Date().toISOString(),
-      },
-      conversationId: 'conversation-1',
-      branchId: 'branch-1',
-      title: 'Conversation',
-      expiresAt: '2026-09-25T00:00:00.000Z',
-    });
-  });
+  reply(replyChunks('assistant-progressive', 'First claim. Second claim.'));
   transport.streamNoteProposal.mockResolvedValue(undefined);
   const values = props();
   let latest = values.conversation;
@@ -64,7 +54,8 @@ it('publishes each annotation before the classifier stream finishes', async () =
 
   await waitFor(() =>
     expect(
-      latest.messages.find((message) => message.id === 'assistant-progressive')?.annotations,
+      latest.messages.find((message) => message.id === 'assistant-progressive')?.metadata
+        ?.annotations,
     ).toEqual([expect.objectContaining({ id: 'annotation-first' })]),
   );
   expect(finishAnnotations).toBeTypeOf('function');
@@ -82,33 +73,13 @@ it('publishes each annotation before the classifier stream finishes', async () =
   finishAnnotations?.();
 });
 
-function completedEvent(id: string, content: string): ChatEvent {
-  return {
-    type: 'done',
-    message: { id, role: 'assistant', content, createdAt: new Date().toISOString() },
-    conversationId: 'conversation-1',
-    branchId: 'branch-1',
-    title: 'Conversation',
-    expiresAt: '2026-09-25T00:00:00.000Z',
-  };
-}
-
 function configurePriorTurnStreams() {
   let finishFirstAnnotations: ((value: unknown[]) => void) | undefined;
-  let emitSecond: ((event: ChatEvent) => void) | undefined;
-  let turn = 0;
   transport.annotationResults
     .mockReturnValueOnce(new Promise((resolve) => (finishFirstAnnotations = resolve)))
     .mockReturnValue(new Promise(() => undefined));
-  transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
-    turn += 1;
-    if (turn === 1) {
-      onEvent(completedEvent('assistant-first', 'First answer'));
-      return;
-    }
-    emitSecond = onEvent;
-    return new Promise<void>(() => undefined);
-  });
+  reply(replyChunks('assistant-first', 'First answer'), 'turn-first');
+  const second = hang('turn-second');
   transport.streamNoteProposal.mockImplementation(
     async (_messageId, _input, onEvent: (event: unknown) => void) => {
       onEvent({ type: 'done', proposal: null });
@@ -116,8 +87,11 @@ function configurePriorTurnStreams() {
   );
   return {
     finishFirstAnnotations: (value: unknown[]) => finishFirstAnnotations?.(value),
-    secondReady: () => emitSecond !== undefined,
-    finishSecond: () => emitSecond?.(completedEvent('assistant-second', 'Second answer')),
+    secondReady: () => transport.turnEvents.mock.calls.length === 2,
+    finishSecond: () => {
+      second.emit(...replyChunks('assistant-second', 'Second answer'));
+      second.done();
+    },
   };
 }
 
@@ -154,7 +128,8 @@ it.each(['before', 'after'] as const)(
       finishFirstAnnotations([annotation]);
       await waitFor(() =>
         expect(
-          getLatest().messages.find((message) => message.id === 'assistant-first')?.annotations,
+          getLatest().messages.find((message) => message.id === 'assistant-first')?.metadata
+            ?.annotations,
         ).toHaveLength(1),
       );
       finishSecond();
@@ -166,7 +141,8 @@ it.each(['before', 'after'] as const)(
     await waitFor(() => {
       expect(getLatest().messages).toHaveLength(4);
       expect(
-        getLatest().messages.find((message) => message.id === 'assistant-first')?.annotations,
+        getLatest().messages.find((message) => message.id === 'assistant-first')?.metadata
+          ?.annotations,
       ).toEqual([expect.objectContaining({ id: 'annotation-first' })]);
     });
   },
@@ -175,14 +151,7 @@ it.each(['before', 'after'] as const)(
 it('does not present an unfinished highlight action on an unannotated response', () => {
   const history = {
     ...conversation('conversation-1'),
-    messages: [
-      {
-        id: 'assistant-history',
-        role: 'assistant' as const,
-        content: 'A historical response',
-        createdAt: new Date().toISOString(),
-      },
-    ],
+    messages: [assistantMessage('assistant-history', 'A historical response')],
   };
   render(<ChatPanel {...props(history)} />);
 
@@ -192,21 +161,7 @@ it('does not present an unfinished highlight action on an unannotated response',
 
 it('hides highlight controls after a successful empty classification', async () => {
   transport.annotationResults.mockResolvedValueOnce([]);
-  transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
-    onEvent({
-      type: 'done',
-      message: {
-        id: 'assistant-empty',
-        role: 'assistant',
-        content: 'Acknowledged.',
-        createdAt: new Date().toISOString(),
-      },
-      conversationId: 'conversation-1',
-      branchId: 'branch-1',
-      title: 'Conversation',
-      expiresAt: '2026-09-25T00:00:00.000Z',
-    });
-  });
+  reply(replyChunks('assistant-empty', 'Acknowledged.'));
   transport.streamNoteProposal.mockResolvedValue(undefined);
   const values = props();
   const rendered = render(<ChatPanel {...values} />);
@@ -229,22 +184,7 @@ it('applies annotations that arrive after drain but before finalized props reren
       finishAnnotations = resolve;
     }),
   );
-  transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
-    onEvent({ type: 'text', text: 'A useful claim' });
-    onEvent({
-      type: 'done',
-      message: {
-        id: 'assistant-delayed',
-        role: 'assistant',
-        content: 'A useful claim',
-        createdAt: new Date().toISOString(),
-      },
-      conversationId: 'conversation-1',
-      branchId: 'branch-1',
-      title: 'Conversation',
-      expiresAt: '2026-09-25T00:00:00.000Z',
-    });
-  });
+  reply(replyChunks('assistant-delayed', 'A useful claim'));
   transport.streamNoteProposal.mockImplementation(
     async (_messageId, _input, onEvent: (event: unknown) => void) => {
       onEvent({ type: 'done', proposal: null });
@@ -273,9 +213,9 @@ it('applies annotations that arrive after drain but before finalized props reren
   rendered.rerender(<ChatPanel {...values} conversation={finalized!} />);
 
   await waitFor(() =>
-    expect(values.onConversation.mock.calls.at(-1)?.[0].messages.at(-1)?.annotations).toEqual([
-      expect.objectContaining({ id: 'annotation-delayed' }),
-    ]),
+    expect(
+      values.onConversation.mock.calls.at(-1)?.[0].messages.at(-1)?.metadata?.annotations,
+    ).toEqual([expect.objectContaining({ id: 'annotation-delayed' })]),
   );
 });
 
@@ -285,13 +225,9 @@ it('explains and dismisses a failed highlight refresh while retaining existing m
   );
   const values = props();
   values.conversation.messages = [
-    {
-      id: 'answer',
-      role: 'assistant',
-      content: 'Ice floats.',
-      createdAt: '',
+    assistantMessage('answer', 'Ice floats.', {
       annotations: [{ id: 'fact', kind: 'fact', whose: 'assistant', quote: 'Ice floats.' }],
-    },
+    }),
   ];
   render(<ChatPanel {...values} />);
   fireEvent.click(screen.getByRole('button', { name: 'Highlight response' }));
@@ -305,22 +241,7 @@ it('explains and dismisses a failed highlight refresh while retaining existing m
 
 it('retries only highlights with the original followup input', async () => {
   transport.annotationResults.mockRejectedValueOnce(new Error('classifier unavailable'));
-  transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
-    onEvent({ type: 'text', text: 'Completed answer' });
-    onEvent({
-      type: 'done',
-      message: {
-        id: 'assistant-1',
-        role: 'assistant',
-        content: 'Completed answer',
-        createdAt: new Date().toISOString(),
-      },
-      conversationId: 'conversation-1',
-      branchId: 'branch-1',
-      title: 'Conversation',
-      expiresAt: '2026-09-25T00:00:00.000Z',
-    });
-  });
+  reply(replyChunks('assistant-1', 'Completed answer'));
   transport.streamNoteProposal.mockImplementation(
     async (_messageId, _input, onEvent: (event: unknown) => void) => {
       onEvent({ type: 'done', proposal: null });

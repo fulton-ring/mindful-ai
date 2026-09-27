@@ -135,7 +135,7 @@ it('turns an already-applied invalid correction into the repair agent contextual
     }),
     {
       ...assistantMessage,
-      content: 'The fictional observatory opens at one. Version A.',
+      parts: [{ type: 'text', text: 'The fictional observatory opens at one. Version A.' }],
     },
     model,
     new AbortController().signal,

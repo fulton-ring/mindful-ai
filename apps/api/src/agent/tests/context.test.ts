@@ -1,6 +1,10 @@
 import { type MastraDBMessage, MessageList } from '@mastra/core/agent/message-list';
 import type { ProcessInputStepArgs } from '@mastra/core/processors';
-import type { Message, Note } from '@walden/contracts';
+import { type Note, uiMessageText, type WaldenUIMessage } from '@walden/contracts';
+import { attachmentPart } from '../../chat/messages';
+
+type Message = WaldenUIMessage;
+
 import { expect, it } from 'vitest';
 import { buildTurnContext, contextBudgetProcessor } from '../context';
 
@@ -56,7 +60,12 @@ it('keeps attachment IDs available when Mastra memory supplies the transcript', 
   };
   const result = buildTurnContext({
     note: null,
-    messages: [{ ...message('u1', 'user', 'Look at my image'), attachments: [image] }],
+    messages: [
+      {
+        ...message('u1', 'user', 'Look at my image'),
+        parts: [{ type: 'text', text: 'Look at my image' }, attachmentPart('thread', image)],
+      },
+    ],
     currentMessage: 'Does it contain text?',
     requestId: 'r2',
     dynamicContext: '',
@@ -65,12 +74,14 @@ it('keeps attachment IDs available when Mastra memory supplies the transcript', 
   expect(result.context.map(({ content }) => content).join('\n')).toContain(image.id);
 });
 
-const message = (id: string, role: Message['role'], content: string): Message => ({
+const message = (id: string, role: 'user' | 'assistant', content: string): Message => ({
   id,
   role,
-  content,
-  reasoning: `private reasoning for ${id}`,
-  createdAt: '2026-09-18T12:00:00.000Z',
+  parts: [
+    { type: 'reasoning', text: `private reasoning for ${id}` },
+    { type: 'text', text: content },
+  ],
+  metadata: { createdAt: '2026-09-18T12:00:00.000Z' },
 });
 
 const note = (markdown: string): Note => ({
@@ -160,7 +171,11 @@ it('retains a recent user-only turn but ignores an orphan assistant message', ()
 });
 
 it('marks interrupted assistant history without changing stored text or the current request', () => {
-  const interrupted = { ...message('a1', 'assistant', 'The next step is'), incomplete: true };
+  const base = message('a1', 'assistant', 'The next step is');
+  const interrupted: Message = {
+    ...base,
+    metadata: { createdAt: base.metadata!.createdAt, status: 'interrupted' },
+  };
   const result = buildTurnContext({
     note: null,
     messages: [message('u1', 'user', 'Explain the steps'), interrupted],
@@ -169,7 +184,7 @@ it('marks interrupted assistant history without changing stored text or the curr
     dynamicContext: '',
   });
   expect(result.messages[1]?.content).toContain('[Interrupted response; not a completed answer]');
-  expect(interrupted.content).toBe('The next step is');
+  expect(uiMessageText(interrupted)).toBe('The next step is');
   expect(result.messages.at(-1)?.content).toBe('Continue');
   expect(result.context.map((item) => item.content).join('\n')).not.toContain(
     'earlier messages are unavailable',

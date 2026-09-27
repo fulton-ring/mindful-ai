@@ -1,14 +1,14 @@
 import type { LanguageModelV3CallOptions } from '@ai-sdk/provider';
+import type { WaldenUIMessageChunk } from '@walden/contracts';
 import { expect, it } from 'vitest';
-
 import { streamMastraTurn } from '../../mastra-turn';
-import { researchModel, researchTools, turnInput } from '../fixtures/research-tools';
+import { chunkText, researchModel, researchTools, turnInput } from '../fixtures/research-tools';
 
 async function collectResearchSequence() {
   const controller = new AbortController();
   const calls: LanguageModelV3CallOptions[] = [];
   const fixture = researchTools(controller.signal);
-  const events = [];
+  const events: WaldenUIMessageChunk[] = [];
   for await (const event of streamMastraTurn({
     input: turnInput(),
     model: researchModel(calls),
@@ -23,73 +23,48 @@ it('reads, searches, exposes tool results to later model steps, and returns a ci
   const { calls, events } = await collectResearchSequence();
 
   expect(calls).toHaveLength(3);
-  expect(events).toContainEqual(
-    expect.objectContaining({
-      type: 'tool',
-      tool: expect.objectContaining({
-        name: 'searchSources',
-        query: 'deterministic research result',
-        state: 'complete',
-        sources: [expect.objectContaining({ url: 'https://example.com/research' })],
-      }),
-    }),
-  );
+  expect(events).toContainEqual({
+    type: 'tool-input-available',
+    toolCallId: 'search-1',
+    toolName: 'searchSources',
+    input: { query: 'deterministic research result' },
+  });
+  expect(events).toContainEqual({
+    type: 'tool-output-available',
+    toolCallId: 'search-1',
+    output: { sources: [expect.objectContaining({ url: 'https://example.com/research' })] },
+  });
   expect(JSON.stringify(calls[1]?.prompt)).toContain(
     'Deterministic tests avoid external dependencies.',
   );
   expect(JSON.stringify(calls[2]?.prompt)).toContain('https://example.com/research');
   expect(events).toEqual(
     expect.arrayContaining([
-      { type: 'status', text: 'Reading source…' },
-      { type: 'status', text: 'Searching sources…' },
+      { type: 'data-status', data: { text: 'Reading source…' }, transient: true },
+      { type: 'data-status', data: { text: 'Searching sources…' }, transient: true },
+      { type: 'tool-input-available', toolCallId: 'read-1', toolName: 'readWebPage', input: {} },
       {
-        type: 'tool',
-        tool: {
-          id: 'read-1',
-          name: 'readWebPage',
-          state: 'running',
-          summary: 'Reading source…',
-        },
+        type: 'tool-output-available',
+        toolCallId: 'read-1',
+        output: { sources: [{ url: 'https://example.com/research' }] },
       },
-      {
-        type: 'tool',
-        tool: {
-          id: 'read-1',
-          name: 'readWebPage',
-          state: 'complete',
-          summary: '',
-          sources: [{ id: 'read-1:0', url: 'https://example.com/research' }],
-        },
-      },
-      {
-        type: 'source',
-        source: {
-          id: 'read-1:0',
-          url: 'https://example.com/research',
-        },
-      },
+      { type: 'source-url', sourceId: 'read-1:0', url: 'https://example.com/research' },
     ]),
   );
-  expect(JSON.stringify(events.filter((event) => event.type === 'tool'))).not.toContain(
+  // Tool parts carry only public queries and sources, never raw results.
+  expect(JSON.stringify(events.filter((event) => event.type.startsWith('tool-')))).not.toContain(
     'Deterministic tests avoid external dependencies.',
   );
-  const done = events.find((event) => event.type === 'done');
-  expect(done).toMatchObject({
-    type: 'done',
-    message: {
-      content: expect.stringContaining('[Example research](https://example.com/research)'),
-      tools: [
-        expect.objectContaining({ id: 'read-1', state: 'complete' }),
-        expect.objectContaining({ id: 'search-1', state: 'complete' }),
-      ],
-      sources: [
-        { id: 'read-1:0', url: 'https://example.com/research' },
-        {
-          id: 'native-source',
-          url: 'https://docs.example.com/native',
-          title: 'Native source',
-        },
-      ],
+  expect(chunkText(events)).toContain('[Example research](https://example.com/research)');
+  expect(events.filter((event) => event.type === 'source-url')).toEqual([
+    { type: 'source-url', sourceId: 'read-1:0', url: 'https://example.com/research' },
+    {
+      type: 'source-url',
+      sourceId: 'native-source',
+      url: 'https://docs.example.com/native',
+      title: 'Native source',
     },
-  });
+  ]);
+  const tools = events.filter((event) => event.type === 'tool-output-available');
+  expect(tools.map((event) => event.toolCallId)).toEqual(['read-1', 'search-1']);
 });

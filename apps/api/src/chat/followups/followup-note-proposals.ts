@@ -1,9 +1,9 @@
 import type {
   Conversation,
   EditProposal,
-  Message,
   Note,
   NoteProposalEvent,
+  WaldenUIMessage,
 } from '@walden/contracts';
 import { resolveEdit } from '@walden/domain';
 import { HttpError, newId, nowIso } from '../../http';
@@ -11,13 +11,14 @@ import { selectNote, toNote } from '../../notes/repository';
 import { persistNoteSuggestion } from '../../notes/suggestions/suggestions';
 import type { AgentService, AgentTurnInput } from '../../services/types';
 import { loadConversation } from '../conversations/repository';
+import { isInterrupted } from '../messages';
 import { createBackgroundSseStream } from '../sse';
 
 type NoteProposalGeneration = {
   db: D1Database;
   ownerId: string;
   conversation: Conversation;
-  assistantMessage: Message;
+  assistantMessage: WaldenUIMessage;
   note: Note | null;
   input: AgentTurnInput;
   agent: AgentService;
@@ -111,7 +112,7 @@ async function latestProposalNote(
   if (signal.aborted) return null;
   const sourceStillExists = latest.messages.some(
     (message) =>
-      message.id === assistantMessage.id && message.role === 'assistant' && !message.incomplete,
+      message.id === assistantMessage.id && message.role === 'assistant' && !isInterrupted(message),
   );
   if (!sourceStillExists || latest.expiresAt <= nowIso() || latest.noteId !== conversation.noteId) {
     emit({ type: 'done', proposal: null });

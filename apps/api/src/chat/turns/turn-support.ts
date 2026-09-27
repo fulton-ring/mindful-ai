@@ -1,6 +1,7 @@
 import { type Conversation, DEFAULT_PERSONAS, type Persona } from '@walden/contracts';
 import { HttpError } from '../../http';
 import { loadPersona } from '../../personas/repository';
+import { isInterrupted } from '../messages';
 
 export function regenerationContext(messages: Conversation['messages'], assistantId: string) {
   const assistantIndex = messages.findIndex(({ id }) => id === assistantId);
@@ -10,7 +11,7 @@ export function regenerationContext(messages: Conversation['messages'], assistan
     !assistant ||
     assistant.id !== assistantId ||
     assistant.role !== 'assistant' ||
-    assistant.incomplete ||
+    isInterrupted(assistant) ||
     !user ||
     user.role !== 'user'
   )

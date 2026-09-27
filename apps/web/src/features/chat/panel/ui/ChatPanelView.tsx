@@ -2,6 +2,7 @@ import { FileText, X } from 'lucide-react';
 
 import { InterventionCard } from '../../../capture/InterventionCard';
 import { BranchSelector } from '../../BranchSelector';
+import { isInterrupted, learningCheckOf, messageText } from '../../message-parts';
 import type { ChatPanelProps } from '../chat-panel-types';
 import type { ChatPanelController } from '../hooks/controller/use-chat-panel-controller';
 import { ChatComposer } from './ChatComposer';
@@ -84,28 +85,24 @@ function TranscriptMessage({
   message,
   index,
 }: ViewProps & { message: ChatPanelViewModel['renderedMessages'][number]; index: number }) {
-  const isLive = model.hasLiveResponse && message.id === model.liveResponseId;
+  const isLive = message.id === model.liveResponseId;
+  const learningCheck = learningCheckOf(message);
   return (
     <ChatMessage
       message={message}
-      conversationId={props.conversation?.id}
       index={index}
       messages={model.renderedMessages}
       isLive={isLive}
       selectedPersonaName={controller.selectedPersona?.name}
       sending={controller.sending}
-      streamed={controller.streamed}
       visible={props.visible !== false}
       learningCheckResponse={model.learningResponse(model.renderedMessages, index)}
       answeredCheck={model.answeredLearningCheck(model.renderedMessages, index)}
       editing={controller.editingMessageId === message.id}
       editedMessage={controller.editedMessage}
       input={controller.input}
-      liveAnnotations={controller.liveAnnotations}
       toolbar={
-        !isLive && !message.incomplete && !message.learningCheck
-          ? model.messageToolbar(message)
-          : null
+        !isLive && !isInterrupted(message) && !learningCheck ? model.messageToolbar(message) : null
       }
       captureStatus={model.captureStatus(message.id)}
       messageAnimation={(messageId) =>
@@ -115,7 +112,7 @@ function TranscriptMessage({
       }
       onLearningCheck={(value) =>
         void controller.send(
-          model.learningCheckResponseText(message.learningCheck!, value),
+          model.learningCheckResponseText(learningCheck!, value),
           'feedback',
           undefined,
           value,
@@ -123,7 +120,7 @@ function TranscriptMessage({
       }
       onDismissLearningCheck={() =>
         void controller.send('Skip this learning check.', 'feedback', undefined, {
-          checkId: message.learningCheck!.id,
+          checkId: learningCheck!.id,
           answers: {},
         })
       }
@@ -131,7 +128,7 @@ function TranscriptMessage({
       onAction={(action, quote) => model.contextual(isLive ? null : message.id, action, quote)}
       onEdit={() => {
         controller.setEditingMessageId(message.id);
-        controller.setEditedMessage(message.content);
+        controller.setEditedMessage(messageText(message));
       }}
       onEditedMessage={controller.setEditedMessage}
       onCancelEdit={() => {
@@ -177,9 +174,6 @@ function TranscriptArea({ props, controller, model }: ViewProps) {
         )}
         <ChatTranscript
           messages={model.renderedMessages}
-          renderKey={(message) =>
-            controller.responseRenderKeys.current.get(message.id) ?? message.id
-          }
           renderMessage={(message, index) => (
             <TranscriptMessage
               props={props}
@@ -190,9 +184,7 @@ function TranscriptArea({ props, controller, model }: ViewProps) {
             />
           )}
         />
-        {controller.sending && !controller.streamed && !controller.reasoning && (
-          <ThinkingIndicator status={controller.status} />
-        )}
+        {model.thinking && <ThinkingIndicator status={controller.status} />}
         <InterventionPanel props={props} controller={controller} model={model} />
       </div>
     </div>

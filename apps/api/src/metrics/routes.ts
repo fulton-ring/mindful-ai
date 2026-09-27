@@ -19,7 +19,7 @@ metricsRoutes.get('/usage', async (c) => {
     // deleted persona still reports something meaningful.
     first<{ persona_name: string }>(
       c.env.DB.prepare(
-        `SELECT persona_name FROM messages
+        `SELECT json_extract(ui_message,'$.metadata.personaName') AS persona_name FROM messages
          WHERE owner_id=? AND role='assistant' AND persona_name IS NOT NULL
          GROUP BY persona_name ORDER BY COUNT(DISTINCT conversation_id) DESC, MAX(created_at) DESC LIMIT 1`,
       ).bind(ownerId),

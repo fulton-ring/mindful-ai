@@ -41,7 +41,7 @@ async function seedFixture(db: D1Database) {
     .run();
   await db
     .prepare(
-      "INSERT INTO messages (id,conversation_id,owner_id,role,content,created_at,origin_branch_id) VALUES ('source-a','conversation','owner','assistant','Source A','now','branch:conversation'),('source-b','conversation','owner','assistant','Source B','now','branch:conversation')",
+      "INSERT INTO messages (id,conversation_id,owner_id,role,ui_message,created_at,origin_branch_id) VALUES ('source-a','conversation','owner','assistant',json_object('id','source-a','role','assistant','parts',json_array(json_object('type','text','text','Source A')),'metadata',json_object('createdAt','now')),'now','branch:conversation'),('source-b','conversation','owner','assistant',json_object('id','source-b','role','assistant','parts',json_array(json_object('type','text','text','Source B')),'metadata',json_object('createdAt','now')),'now','branch:conversation')",
     )
     .run();
   await db

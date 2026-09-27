@@ -1,8 +1,14 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, expect, it, vi } from 'vitest';
-import { AttachmentBadge } from '../ui/AttachmentBadge';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+
+const fetchAttachment = vi.hoisted(() => vi.fn());
+vi.mock('../../../../lib/api', () => ({ fetchAttachment }));
+
+const { AttachmentBadge } = await import('../ui/AttachmentBadge');
+
+afterEach(cleanup);
 
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = vi.fn();
@@ -48,4 +54,24 @@ it('does not display spreadsheet bytes as text', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Open table.xlsx' }));
   expect(await screen.findByText(/Preview is not available/)).toBeTruthy();
   expect(screen.queryByText('binary')).toBeNull();
+});
+
+it('fetches a sent attachment from its file part URL with authentication', async () => {
+  fetchAttachment.mockResolvedValue(new Blob(['%PDF-1.4'], { type: 'application/pdf' }));
+  render(
+    <AttachmentBadge
+      file={{
+        type: 'file',
+        mediaType: 'application/pdf',
+        filename: 'paper.pdf',
+        url: '/api/chat/attachments/conversation-1/file-1',
+      }}
+    />,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Open paper.pdf' }));
+  expect((await screen.findByTitle('paper.pdf')).getAttribute('src')).toBe('blob:preview');
+  expect(fetchAttachment).toHaveBeenCalledWith(
+    '/api/chat/attachments/conversation-1/file-1',
+    expect.any(AbortSignal),
+  );
 });

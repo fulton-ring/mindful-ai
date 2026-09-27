@@ -1,4 +1,4 @@
-import type { Intervention } from '@walden/contracts';
+import { type Intervention, uiMessageText, type WaldenUIMessage } from '@walden/contracts';
 import { z } from 'zod';
 import { stableId } from './interventions';
 import {
@@ -193,4 +193,20 @@ export function standaloneShortAnswerCheck(text: string, turnId: string): Interv
   if (question.includes('\n') || !question.endsWith('?')) return null;
   const parsed = singleLearningCheckInputSchema.safeParse({ question });
   return parsed.success ? normalizeLearningCheck(parsed.data, turnId) : null;
+}
+
+/**
+ * A reply that was nothing but a quiz is shown as the quiz card, so its
+ * duplicate text is not kept in the stored message.
+ */
+export function withoutQuizText(message: WaldenUIMessage): WaldenUIMessage {
+  const check = message.parts.find(
+    (part) => part.type === 'data-intervention' && part.data.kind === 'learning_check',
+  );
+  if (check?.type !== 'data-intervention') return message;
+  const text = uiMessageText(message);
+  const recovered =
+    standaloneLearningCheck(text, message.id) ?? standaloneShortAnswerCheck(text, message.id);
+  if (recovered?.id !== check.data.id) return message;
+  return { ...message, parts: message.parts.filter((part) => part.type !== 'text') };
 }

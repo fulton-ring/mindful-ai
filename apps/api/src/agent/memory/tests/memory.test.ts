@@ -67,11 +67,14 @@ const conversation = (count = 3): Conversation => ({
   messages: Array.from({ length: count }, (_, index) => ({
     id: `message-${index}`,
     role: index % 2 ? ('assistant' as const) : ('user' as const),
-    content: `content-${index}`,
-    reasoning: 'private reasoning',
-    annotations: [],
-    incomplete: index === count - 1,
-    createdAt: new Date(index * 1_000).toISOString(),
+    parts: [
+      { type: 'reasoning' as const, text: 'private reasoning' },
+      { type: 'text' as const, text: `content-${index}` },
+    ],
+    metadata: {
+      createdAt: new Date(index * 1_000).toISOString(),
+      ...(index === count - 1 ? { status: 'interrupted' as const } : {}),
+    },
   })),
 });
 

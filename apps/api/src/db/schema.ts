@@ -194,11 +194,7 @@ export const messages = sqliteTable(
       .notNull()
       .references((): AnySQLiteColumn => users.id, { onDelete: 'cascade', onUpdate: 'no action' }),
     role: text('role').notNull(),
-    content: text('content').notNull(),
-    incomplete: integer('incomplete').notNull().default(sql.raw('0')),
     createdAt: text('created_at').notNull(),
-    reasoning: text('reasoning'),
-    activityJson: text('activity_json').notNull().default(sql.raw("'{}'")),
     parentMessageId: text('parent_message_id').references((): AnySQLiteColumn => messages.id, {
       onDelete: 'set null',
       onUpdate: 'no action',
@@ -207,14 +203,15 @@ export const messages = sqliteTable(
       (): AnySQLiteColumn => conversationBranches.id,
       { onDelete: 'set null', onUpdate: 'no action' },
     ),
-    personaName: text('persona_name'),
+    /** The WaldenUIMessage JSON; highlights and annotations are attached on load. */
+    uiMessage: text('ui_message').notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
     index('messages_conversation').on(table.conversationId),
     index('messages_turn').on(table.turnId),
     index('messages_parent').on(table.parentMessageId),
-    check('messages_check_1', sql.raw('incomplete IN (0,1)')),
+    check('messages_check_1', sql.raw("role IN ('user','assistant')")),
   ],
 );
 
@@ -457,7 +454,8 @@ export const turnEvents = sqliteTable(
     turnId: text('turn_id')
       .notNull()
       .references((): AnySQLiteColumn => turns.id, { onDelete: 'cascade', onUpdate: 'no action' }),
-    eventJson: text('event_json').notNull(),
+    /** One UI message stream chunk (JSON) of the turn's current execution epoch. */
+    chunkJson: text('chunk_json').notNull(),
   },
   (table) => [index('turn_events_replay').on(table.turnId, table.seq)],
 );

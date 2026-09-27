@@ -1,13 +1,14 @@
 import { Workspace } from '@mastra/core/workspace';
-import type { ChatEvent } from '@walden/contracts';
+import { uiMessageText, type WaldenUIMessageChunk } from '@walden/contracts';
 import { type AgentCheckpoints, checkpointModel } from '../../agent/checkpoints';
 import { createDocumentTools } from '../../agent/document-tool';
-import { GemmaToolLeakDecoder } from '../../agent/learning-checks';
 import { streamMastraTurn } from '../../agent/mastra-turn';
 import { type MemoryLifecycleEvent, prepareAgentMemory } from '../../agent/memory/memory';
+import { modelPreview } from '../../agent/model-preview';
 import { R2WorkspaceFilesystem } from '../../agent/r2-workspace';
 import { agentTrace } from '../../agent/stream-events';
 import { loadAttachments } from '../../chat/attachments/attachments';
+import { messageAttachments } from '../../chat/messages';
 import { isConversationLive } from '../../chat/turns/durable-store';
 import { type ApiTelemetry, createApiTelemetry } from '../../observability';
 import { captureConversation, contentPreference } from '../../privacy/content-telemetry';
@@ -34,9 +35,7 @@ type TurnStreamOptions = {
 function collectAllowedUrls(input: AgentTurnInput): Set<string> {
   const userText = [
     input.message,
-    ...input.conversation.messages
-      .filter((message) => message.role === 'user')
-      .map((message) => message.content),
+    ...input.conversation.messages.filter((message) => message.role === 'user').map(uiMessageText),
   ].join('\n');
   const allowedUrls = new Set<string>();
   for (const match of userText.matchAll(/https?:\/\/[^\s<>"`]+/g)) {
@@ -70,27 +69,15 @@ function restoreSearchUrls(allowedUrls: Set<string>) {
   };
 }
 
-function modelProgress(checkpoints: AgentCheckpoints) {
-  if (!checkpoints.publish) return undefined;
-  const previews = new Map<string, { text: string; reasoning: string }>();
-  return async (step: string, text: string, reasoning: string, complete: boolean) => {
-    const decoder = new GemmaToolLeakDecoder();
-    const visible = decoder.push(text).text + (complete ? decoder.finish() : '');
-    previews.set(step, { text: visible, reasoning });
-    await checkpoints.publish!({
-      type: 'text-snapshot',
-      text: [...previews.values()].map((value) => value.text).join(''),
-      reasoning: [...previews.values()].map((value) => value.reasoning).join(''),
-    });
-  };
-}
-
 async function* prepareTurnMemory(
   env: ServiceEnv,
   input: AgentTurnInput,
   model: AgentModel,
   signal: AbortSignal,
-): AsyncGenerator<ChatEvent, Awaited<ReturnType<typeof prepareAgentMemory>> | undefined> {
+): AsyncGenerator<
+  WaldenUIMessageChunk,
+  Awaited<ReturnType<typeof prepareAgentMemory>> | undefined
+> {
   const { ownerId } = input;
   if (!env.DB || !ownerId) return;
   const preparation = streamMemoryPreparation(
@@ -123,7 +110,7 @@ export async function includeRecentImage(
 ): Promise<AgentTurnInput> {
   if (!env.FILES || !input.ownerId || input.attachments?.some(({ bytes }) => bytes)) return input;
   const recentImage = input.conversation.messages
-    .flatMap((message) => message.attachments ?? [])
+    .flatMap(messageAttachments)
     .reverse()
     .find(({ mimeType }) => mimeType.startsWith('image/'));
   if (!recentImage) return input;
@@ -143,7 +130,7 @@ async function createPrimaryStream(
   memory: Awaited<ReturnType<typeof prepareAgentMemory>> | undefined,
   workspace: Workspace | undefined,
   telemetry: ApiTelemetry | null,
-): Promise<AsyncIterable<ChatEvent>> {
+): Promise<AsyncIterable<WaldenUIMessageChunk>> {
   const { env, input, model, modelName, signal, checkpoints } = options;
   const mcpTools = await createMcpService(env).tools();
   const allowedUrls = collectAllowedUrls(input);
@@ -155,7 +142,13 @@ async function createPrimaryStream(
   };
   return streamMastraTurn({
     input: await includeRecentImage(env, input),
-    model: checkpointModel(model, checkpoints, 'chat', undefined, modelProgress(checkpoints)),
+    model: checkpointModel(
+      model,
+      checkpoints,
+      'chat',
+      undefined,
+      checkpoints.preview && modelPreview(checkpoints.preview),
+    ),
     signal,
     tools,
     trace: agentTrace(telemetry, input.telemetryUserId, modelName),
@@ -163,15 +156,15 @@ async function createPrimaryStream(
   });
 }
 
-function appendVisibleResponse(visibleResponse: string, event: ChatEvent): string {
-  if (event.type === 'text') return (visibleResponse + event.text).slice(0, 24_000);
-  if (event.type !== 'intervention' || event.intervention.kind !== 'learning_check') {
+function appendVisibleResponse(visibleResponse: string, chunk: WaldenUIMessageChunk): string {
+  if (chunk.type === 'text-delta') return (visibleResponse + chunk.delta).slice(0, 24_000);
+  if (chunk.type !== 'data-intervention' || chunk.data.kind !== 'learning_check') {
     return visibleResponse;
   }
   return (
     visibleResponse +
     '\n' +
-    event.intervention.questions.map(({ question }) => question).join('\n')
+    chunk.data.questions.map(({ question }) => question).join('\n')
   ).slice(0, 24_000);
 }
 
@@ -200,7 +193,9 @@ async function finishTurnStream(
   await telemetry?.flush();
 }
 
-export async function* streamTurnEvents(options: TurnStreamOptions): AsyncGenerator<ChatEvent> {
+export async function* streamTurnChunks(
+  options: TurnStreamOptions,
+): AsyncGenerator<WaldenUIMessageChunk> {
   const { env, input, model } = options;
   const telemetry = input.telemetryUserId ? createApiTelemetry(env) : null;
   const startedAt = Date.now();
@@ -212,11 +207,11 @@ export async function* streamTurnEvents(options: TurnStreamOptions): AsyncGenera
     const workspace = createTurnWorkspace(env, input);
     const stream = await createPrimaryStream(options, memory, workspace, telemetry);
     options.signal.throwIfAborted();
-    for await (const event of stream) {
-      visibleResponse = appendVisibleResponse(visibleResponse, event);
-      // Highlights are generated after the reply commits, through the
-      // follow-up annotations stream, so they never hold the composer.
-      yield event.type === 'done' ? { ...event, annotationsHandled: false } : event;
+    // Highlights are generated after the reply commits, through the follow-up
+    // annotations stream, so they never hold the composer.
+    for await (const chunk of stream) {
+      visibleResponse = appendVisibleResponse(visibleResponse, chunk);
+      yield chunk;
     }
     completed = true;
   } finally {

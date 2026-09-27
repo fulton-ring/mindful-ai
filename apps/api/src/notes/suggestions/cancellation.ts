@@ -26,7 +26,7 @@ async function markSuggestionAttemptCancelled(
          JOIN conversation_branches b ON b.conversation_id=c.id AND b.owner_id=c.owner_id
          JOIN messages m ON m.conversation_id=c.id AND m.owner_id=c.owner_id
          WHERE c.id=? AND c.owner_id=? AND b.id=? AND m.id=?
-           AND m.role='assistant' AND m.incomplete=0
+           AND m.role='assistant' AND json_extract(m.ui_message,'$.metadata.status') IS NOT 'interrupted'
        )`,
     )
     .bind(

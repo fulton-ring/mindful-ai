@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@ai-sdk/react": "3.0.289",
     "@clerk/react": "^6.16.1",
     "@codemirror/commands": "^6.8.1",
     "@codemirror/lang-markdown": "^6.3.4",
@@ -26,6 +27,7 @@
     "@tanstack/react-router": "^1.131.35",
     "@walden/contracts": "workspace:*",
     "@walden/domain": "workspace:*",
+    "ai": "6.0.286",
     "cn": "^0.4.0",
     "katex": "^0.16.47",
     "lucide-react": "^0.544.0",

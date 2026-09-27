@@ -1,4 +1,4 @@
-import { type ChatEvent, DEFAULT_PERSONAS } from '@walden/contracts';
+import { DEFAULT_PERSONAS, type WaldenUIMessageChunk } from '@walden/contracts';
 import { expect, it } from 'vitest';
 import type { AgentCheckpoints } from '../../../agent/checkpoints';
 import { createAgentService, DEFAULT_AI_MODEL } from '../../agent/agent';
@@ -37,13 +37,15 @@ it.skipIf(!CLOUDFLARE_API_TOKEN || !CLOUDFLARE_ACCOUNT_ID || !OPENROUTER_API_KEY
       },
       inlineCheckpoints,
     );
-    const events: ChatEvent[] = [];
+    const events: WaldenUIMessageChunk[] = [];
     for await (const event of stream) events.push(event);
-    expect(events.some((event) => event.type === 'tool' && event.tool.name === 'searchWeb')).toBe(
-      true,
-    );
-    expect(events.some((event) => event.type === 'source')).toBe(true);
-    expect(events.at(-1)?.type).toBe('done');
+    expect(
+      events.some(
+        (event) => event.type === 'tool-input-available' && event.toolName === 'searchWeb',
+      ),
+    ).toBe(true);
+    expect(events.some((event) => event.type === 'source-url')).toBe(true);
+    expect(events.some((event) => event.type === 'text-delta')).toBe(true);
   },
   300_000,
 );

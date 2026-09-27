@@ -1,15 +1,15 @@
 import type {
   Annotation,
   AnnotationEvent,
-  ChatEvent,
   ChatRequest,
   Conversation,
   EditProposal,
   Intervention,
-  Message,
   Note,
   NoteProposalEvent,
   Persona,
+  WaldenUIMessage,
+  WaldenUIMessageChunk,
 } from '@walden/contracts';
 import type { AgentCheckpoints } from '../agent/checkpoints';
 import type { LoadedAttachment } from '../chat/attachments/attachments';
@@ -38,20 +38,20 @@ export type AgentService = {
     input: AgentTurnInput,
     checkpoints: AgentCheckpoints,
     signal?: AbortSignal,
-  ): Promise<AsyncIterable<ChatEvent>>;
+  ): Promise<AsyncIterable<WaldenUIMessageChunk>>;
   annotateTurn(
     input: AgentTurnInput,
-    assistantMessage: Message,
+    assistantMessage: WaldenUIMessage,
     signal?: AbortSignal,
   ): Promise<Annotation[]>;
   streamAnnotations(
     input: AgentTurnInput,
-    assistantMessage: Message,
+    assistantMessage: WaldenUIMessage,
     signal?: AbortSignal,
   ): Promise<AsyncIterable<AnnotationEvent>>;
   streamNoteProposal(
     input: AgentTurnInput,
-    assistantMessage: Message,
+    assistantMessage: WaldenUIMessage,
     signal?: AbortSignal,
   ): Promise<AsyncIterable<NoteProposalEvent>>;
 };

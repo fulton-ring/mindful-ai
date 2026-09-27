@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { attachmentPart } from '../../../chat/messages';
 import type { AgentTurnInput } from '../../types';
 import { createTurnWorkspace, includeRecentImage } from '../agent-stream';
 
@@ -26,8 +27,12 @@ describe('turn workspace', () => {
         id: 'thread',
         messages: [
           {
+            id: 'u1',
             role: 'user',
-            attachments: [{ id: imageId, name: 'blue.png', mimeType: 'image/png', size: 3 }],
+            parts: [
+              { type: 'text', text: 'Look' },
+              attachmentPart('thread', { id: imageId, name: 'blue.png', mimeType: 'image/png' }),
+            ],
           },
         ],
       },

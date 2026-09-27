@@ -1,3 +1,4 @@
+import type { InferUIMessageChunk, UIMessage } from 'ai';
 import { z } from 'zod';
 
 export const provenanceSpanSchema = z.object({
@@ -173,36 +174,61 @@ export type Intervention =
   | { id: string; kind: 'ask'; question: string; options: string[] }
   | { id: string; kind: 'record'; text: string; reason: string }
   | LearningCheck;
-export type ToolActivity = {
-  id: string;
-  name: string;
-  state: 'running' | 'complete' | 'error';
-  summary: string;
-  /** Public research query, never raw tool arguments. */
-  query?: string;
-  sources?: MessageSource[];
-};
-export type MessageSource = { id: string; url: string; title?: string };
-export type Message = {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  attachments?: Array<{ id: string; name: string; mimeType: string; size: number }>;
+/** Message-level facts that are not content. Highlights and annotations are attached on load from their own tables. */
+export const messageMetadataSchema = z.object({
+  createdAt: z.string(),
   /** Persona that produced an assistant reply, as named when it was written. */
-  personaName?: string;
-  reasoning?: string;
-  createdAt: string;
-  annotations?: Annotation[];
-  highlights?: MessageHighlight[];
-  tools?: ToolActivity[];
-  sources?: MessageSource[];
-  /** A structured assistant request rendered as an interactive quiz card. */
-  learningCheck?: LearningCheck;
-  /** Structured answers rendered separately from ordinary user prose. */
-  learningCheckResponse?: LearningCheckResponse;
-  contextCompacted?: boolean;
-  incomplete?: boolean;
+  personaName: z.string().optional(),
+  model: z.string().optional(),
+  /** `interrupted`: the reply stopped early (Stop, failure, or timeout) and keeps its partial parts. */
+  status: z.enum(['complete', 'interrupted']).optional(),
+  contextCompacted: z.boolean().optional(),
+  highlights: z.array(messageHighlightSchema).optional(),
+  annotations: z.array(annotationSchema).optional(),
+});
+export type WaldenMessageMetadata = z.infer<typeof messageMetadataSchema>;
+/**
+ * `data-*` parts. `intervention` and `learning-check-response` are persisted on the
+ * message; `status` and `turn` are transient stream signals and never stored.
+ */
+export type WaldenDataParts = {
+  intervention: Intervention;
+  'learning-check-response': LearningCheckResponse;
+  status: { text: string };
+  turn: {
+    conversationId: string;
+    branchId: string;
+    userMessageId?: string;
+    title?: string;
+    expiresAt?: string;
+    failureCode?: ChatFailureCode;
+    /** The turn restarted: discard the partial assistant message and replay the turn from seq 0. */
+    reset?: boolean;
+  };
 };
+export const dataPartSchemas = {
+  intervention: z.custom<Intervention>((value) => typeof value === 'object' && value !== null),
+  'learning-check-response': z.custom<LearningCheckResponse>(
+    (value) => typeof value === 'object' && value !== null,
+  ),
+  status: z.object({ text: z.string() }),
+  turn: z.object({
+    conversationId: z.string(),
+    branchId: z.string(),
+    userMessageId: z.string().optional(),
+    title: z.string().optional(),
+    expiresAt: z.string().optional(),
+    failureCode: z.string().optional(),
+    reset: z.boolean().optional(),
+  }),
+} satisfies { [K in keyof WaldenDataParts]: z.ZodType<unknown> };
+/** The stored, streamed, and rendered message: AI SDK UIMessage with Walden metadata and data parts. */
+export type WaldenUIMessage = UIMessage<WaldenMessageMetadata, WaldenDataParts>;
+/** One chunk of a turn's UI message stream, as stored and served by the turn events endpoint. */
+export type WaldenUIMessageChunk = InferUIMessageChunk<WaldenUIMessage>;
+/** Attachment files are `file` parts whose `url` is this path, served to the owner only. */
+export const attachmentUrl = (conversationId: string, attachmentId: string) =>
+  `/api/chat/attachments/${encodeURIComponent(conversationId)}/${encodeURIComponent(attachmentId)}`;
 export type ConversationBranch = {
   id: string;
   forkedFromMessageId: string | null;
@@ -213,7 +239,7 @@ export type Conversation = {
   id: string;
   title: string;
   noteId: string | null;
-  messages: Message[];
+  messages: WaldenUIMessage[];
   expiresAt: string;
   /** False only when the user has turned learning checks off for this thread. */
   learningChecksEnabled: boolean;
@@ -231,36 +257,6 @@ export type ConversationSummary = {
   updatedAt: string;
   expiresAt: string;
 };
-export type ChatEvent =
-  | { type: 'reset' }
-  | { type: 'text-snapshot'; text: string; reasoning: string }
-  | { type: 'text'; text: string }
-  | { type: 'reasoning'; text: string }
-  | { type: 'status'; text: string }
-  | { type: 'tool'; tool: ToolActivity }
-  | { type: 'source'; source: MessageSource }
-  | { type: 'context-compacted' }
-  | { type: 'annotation'; annotation: Annotation }
-  | { type: 'intervention'; intervention: Intervention }
-  | {
-      type: 'done';
-      userMessageId?: string;
-      message: Message;
-      conversationId: string;
-      branchId: string;
-      title: string;
-      expiresAt: string;
-      annotationsHandled?: boolean;
-    }
-  | { type: 'usage'; usage: { inputTokens: number; outputTokens: number } }
-  | {
-      type: 'error';
-      message: string;
-      code?: ChatFailureCode;
-      partialMessage?: Message;
-      userMessageId?: string;
-      branchId?: string;
-    };
 export type ChatFailureCode =
   | 'cancelled'
   | 'timeout'
@@ -326,6 +322,8 @@ export const chatRequestSchema = z
     },
   );
 export type ChatRequest = z.infer<typeof chatRequestSchema>;
+/** POST /api/chat/turns. `userMessageId` is the server id of the request's user message. */
+export type TurnStart = { turnId: string; userMessageId: string | null };
 /** Body of the per-message follow-up routes (annotations and note proposals). */
 export const messageFollowupRequestSchema = z
   .object({
@@ -398,3 +396,9 @@ export const DEFAULT_PERSONAS: Persona[] = [
     tone: 'neutral',
   },
 ];
+/** The visible prose of a message: its text parts, in order. */
+export const uiMessageText = (message: Pick<WaldenUIMessage, 'parts'>) =>
+  message.parts
+    .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+    .map((part) => part.text)
+    .join('');

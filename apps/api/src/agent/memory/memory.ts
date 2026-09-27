@@ -2,7 +2,8 @@ import type { LanguageModelV3 } from '@ai-sdk/provider';
 import { D1Store } from '@mastra/cloudflare-d1';
 import type { MastraDBMessage } from '@mastra/core/agent';
 import { Memory } from '@mastra/memory';
-import type { Conversation } from '@walden/contracts';
+import { type Conversation, uiMessageText } from '@walden/contracts';
+import { isInterrupted } from '../../chat/messages';
 
 import { D1ObservationalMemory } from './d1-observational-memory';
 import { abortableObservationModel } from './observation-model';
@@ -98,7 +99,7 @@ const toMemoryMessage = (
 ): MastraDBMessage => ({
   id: message.id,
   role: message.role,
-  createdAt: new Date(message.createdAt),
+  createdAt: new Date(message.metadata?.createdAt ?? 0),
   threadId,
   resourceId,
   content: {
@@ -107,9 +108,9 @@ const toMemoryMessage = (
       {
         type: 'text',
         text:
-          message.role === 'assistant' && message.incomplete
-            ? `${message.content}\n\n[Response interrupted]`
-            : message.content,
+          message.role === 'assistant' && isInterrupted(message)
+            ? `${uiMessageText(message)}\n\n[Response interrupted]`
+            : uiMessageText(message),
       },
     ],
   },

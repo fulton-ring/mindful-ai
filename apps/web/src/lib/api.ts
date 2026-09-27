@@ -1,11 +1,9 @@
 import type {
   AnnotationEvent,
-  ChatEvent,
   ChatRequest,
   Conversation,
   ConversationSummary,
   EditProposal,
-  Message,
   MessageFollowupRequest,
   MessageHighlight,
   Note,
@@ -14,6 +12,7 @@ import type {
   NoteState,
   Persona,
   ProvenanceSpan,
+  TurnStart,
   Usage,
 } from '@walden/contracts';
 
@@ -86,7 +85,7 @@ function sendWithProgress(
 }
 
 type UploadProgress = (percent: number) => void;
-type AttachmentMetadata = NonNullable<Message['attachments']>[number];
+export type AttachmentMetadata = { id: string; name: string; mimeType: string; size: number };
 
 async function uploadPresigned(
   base: string,
@@ -180,15 +179,9 @@ export async function uploadAttachment(
   return uploadLocal(base, file, signal, onProgress);
 }
 
-export async function fetchAttachment(
-  conversationId: string,
-  attachmentId: string,
-  signal?: AbortSignal,
-) {
-  const response = await fetchWithFreshAuth(
-    path`/api/chat/attachments/${conversationId}/${attachmentId}`,
-    { signal },
-  );
+/** Downloads an attachment by its `file` part URL, an owner-only API path. */
+export async function fetchAttachment(url: string, signal?: AbortSignal) {
+  const response = await fetchWithFreshAuth(url, { signal });
   if (!response.ok) throw new ApiError(response.status, 'Could not open this file.');
   return response.blob();
 }
@@ -207,7 +200,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return ((body as { data?: T } | undefined)?.data ?? body) as T;
 }
 
-type SseFrame = { id?: string; data: string };
+export type SseFrame = { id?: string; data: string };
 
 function parseSseFrame(frame: string): SseFrame | null {
   const lines = frame.split(/\r?\n/);
@@ -226,13 +219,17 @@ function parseSseFrame(frame: string): SseFrame | null {
 // Yields each server-sent event frame. Aborting the signal cancels the body, which ends
 // the iteration; a transport failure while reading also ends it rather than throwing, so
 // callers decide whether a stream that closed without a terminal event is an error.
-async function* readSseFrames(response: Response, signal: AbortSignal): AsyncGenerator<SseFrame> {
+export async function* readSseFrames(
+  response: Response,
+  signal: AbortSignal,
+): AsyncGenerator<SseFrame> {
   if (!response.body) return;
   const reader = response.body.getReader();
   const abort = () => {
     void reader.cancel().catch(() => undefined);
   };
   signal.addEventListener('abort', abort, { once: true });
+  if (signal.aborted) abort();
   const decoder = new TextDecoder();
   let buffer = '';
   try {
@@ -426,11 +423,31 @@ export const api = {
         editMessageId?: string;
       } | null;
     }>(path`/api/chat/turns?conversationId=${conversationId}&branchId=${branchId}`),
-  cancelTurn: (requestId: string, keepalive = false) =>
-    request<{ cancelled: boolean }>(path`/api/chat/turns/${requestId}/cancel`, {
+  startTurn: (input: ChatRequest, signal?: AbortSignal) =>
+    request<TurnStart>('/api/chat/turns', {
+      method: 'POST',
+      signal,
+      body: JSON.stringify(input),
+    }),
+  /**
+   * The turn's UI message stream after event `after`, or null (204) when the turn has ended
+   * and nothing follows the cursor. The server may end a live stream early.
+   */
+  turnEvents: async (turnId: string, after: number, signal?: AbortSignal) => {
+    const response = await fetchWithFreshAuth(
+      path`/api/chat/turns/${turnId}/events?after=${after}`,
+      { signal, headers: { accept: 'text/event-stream' } },
+    );
+    if (response.status === 204) return null;
+    if (!response.ok || !response.body)
+      await streamError(response, 'The response could not be loaded.');
+    return response;
+  },
+  /** Accepts the turn id, or the request id while the turn is still being admitted. */
+  cancelTurn: (id: string) =>
+    request<{ cancelled: boolean }>(path`/api/chat/turns/${id}/cancel`, {
       method: 'POST',
       body: '{}',
-      keepalive,
     }),
   personas: () => request<Persona[]>('/api/personas'),
   createPersona: (value: Omit<Persona, 'id'> & { replacesPersonaId?: string }) =>
@@ -443,122 +460,6 @@ export const api = {
   deletePersona: (id: string) => request<void>(path`/api/personas/${id}`, { method: 'DELETE' }),
   usage: () => request<Usage>('/api/usage'),
 };
-
-// Transport failures leave the durable turn running. Only an explicit Stop cancels it.
-function retryDelay(attempt: number, signal: AbortSignal): Promise<void> {
-  signal.throwIfAborted();
-  return new Promise((resolve, reject) => {
-    const abort = () => {
-      clearTimeout(timer);
-      reject(signal.reason);
-    };
-    const timer = setTimeout(
-      () => {
-        signal.removeEventListener('abort', abort);
-        resolve();
-      },
-      Math.min(500 * 2 ** Math.min(attempt, 4), 5_000),
-    );
-    signal.addEventListener('abort', abort, { once: true });
-  });
-}
-
-/** A 429 here is the account's message limit, which retrying cannot clear. */
-function canRetry(error: unknown) {
-  return (
-    error instanceof TypeError ||
-    (error instanceof ApiError && (error.status >= 500 || error.status === 408))
-  );
-}
-
-export async function streamChat(
-  input: ChatRequest,
-  onEvent: (event: ChatEvent) => void,
-  signal: AbortSignal,
-) {
-  let attempt = 0;
-  let turn: { turnId: string };
-  while (true) {
-    signal.throwIfAborted();
-    try {
-      turn = await request<{ turnId: string }>('/api/chat/turns', {
-        method: 'POST',
-        signal,
-        body: JSON.stringify(input),
-      });
-      if (!turn || typeof turn.turnId !== 'string')
-        throw new TypeError('The start response was incomplete.');
-      break;
-    } catch (error) {
-      signal.throwIfAborted();
-      if ((!canRetry(error) && !(error instanceof SyntaxError)) || attempt >= 5) throw error;
-      await retryDelay(attempt++, signal);
-    }
-  }
-  await attachChatTurn(turn.turnId, onEvent, signal);
-}
-
-function acceptTurnFrame(
-  frame: SseFrame,
-  cursor: { value: number },
-  onEvent: (event: ChatEvent) => void,
-): boolean {
-  const sequence = frame.id && /^\d+$/.test(frame.id) ? Number(frame.id) : undefined;
-  if (sequence !== undefined && sequence <= cursor.value) return false;
-  if (frame.data === '[DONE]') return true;
-  const event = JSON.parse(frame.data) as ChatEvent;
-  onEvent(event);
-  if (sequence !== undefined) cursor.value = sequence;
-  return event.type === 'done' || event.type === 'error';
-}
-
-async function observeTurnResponse(
-  response: Response,
-  cursor: { value: number },
-  onEvent: (event: ChatEvent) => void,
-  signal: AbortSignal,
-): Promise<boolean> {
-  for await (const frame of readSseFrames(response, signal)) {
-    signal.throwIfAborted();
-    if (acceptTurnFrame(frame, cursor, onEvent)) return true;
-  }
-  signal.throwIfAborted();
-  return false;
-}
-
-async function openTurnEvents(turnId: string, after: number, signal: AbortSignal) {
-  const response = await fetchWithFreshAuth(path`/api/chat/turns/${turnId}/events?after=${after}`, {
-    signal,
-    headers: { accept: 'text/event-stream' },
-  });
-  if (response.ok) return response;
-  const body = await response.json().catch(() => undefined);
-  throw new ApiError(response.status, body?.error ?? 'The response could not be loaded.', body);
-}
-
-export async function attachChatTurn(
-  turnId: string,
-  onEvent: (event: ChatEvent) => void,
-  signal: AbortSignal,
-) {
-  const cursor = { value: 0 };
-  let attempt = 0;
-  while (true) {
-    signal.throwIfAborted();
-    let response: Response;
-    try {
-      response = await openTurnEvents(turnId, cursor.value, signal);
-    } catch (error) {
-      signal.throwIfAborted();
-      if (!canRetry(error)) throw error;
-      await retryDelay(attempt++, signal);
-      continue;
-    }
-    if (await observeTurnResponse(response, cursor, onEvent, signal)) return;
-    if (cursor.value) attempt = 0;
-    await retryDelay(attempt++, signal);
-  }
-}
 
 export async function streamNoteProposal(
   messageId: string,

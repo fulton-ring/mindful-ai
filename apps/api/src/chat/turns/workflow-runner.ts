@@ -1,25 +1,47 @@
 import type { WorkflowStep } from 'cloudflare:workers';
-import type { ChatEvent } from '@walden/contracts';
+import type { WaldenUIMessageChunk } from '@walden/contracts';
+import type { AgentCheckpoints, ChunkPreview } from '../../agent/checkpoints';
 import { first } from '../../db/client';
 import { captureChatFailure, captureTurnLifecycle } from '../../observability';
 import { createAgentService, modelNameForPersona } from '../../services/agent/agent';
 import { aiFailureCode, aiProviderErrorMessage } from '../../services/ai-errors/ai-errors';
 import type { Bindings } from '../../types';
 import { loadAttachments } from '../attachments/attachments';
+import { transientStatus } from '../messages';
 import {
-  appendTurnEvents,
+  appendTurnChunks,
   beginTurnExecution,
   completeTurn,
   type DurableTurnInput,
   type DurableTurnRow,
   finishTurn,
+  restartTurnChunks,
   TURN_BUDGET_MS,
 } from './durable-store';
 
 type Guard = () => Promise<void>;
 type Background = (task: Promise<void>) => void;
 type Progress = { model: string; partialResponse: boolean; toolIds: Set<string> };
-type Publisher = { emit(event: ChatEvent): Promise<void>; flush(): Promise<void> };
+type Chunk = WaldenUIMessageChunk;
+type Publisher = {
+  emit(chunk: Chunk): Promise<void>;
+  flush(): Promise<void>;
+  mark(): number;
+  rewind(mark: number): Promise<void>;
+  /** Set once the model preview writes; the agent's own text chunks are then duplicates. */
+  previewed: boolean;
+};
+/** Chunk types the checkpointed model preview already wrote live. */
+const PREVIEWED_TYPES = new Set<Chunk['type']>([
+  'text-start',
+  'text-delta',
+  'text-end',
+  'reasoning-start',
+  'reasoning-delta',
+  'reasoning-end',
+  'start-step',
+  'finish-step',
+]);
 
 function activeGuard(
   env: Bindings,
@@ -55,24 +77,46 @@ function watchCancellation(assertActive: Guard, controller: AbortController) {
   }, 1000);
 }
 
-function eventPublisher(env: Bindings, turnId: string, epoch: number): Publisher {
-  let pending: ChatEvent[] = [];
+const isDelta = (chunk: Chunk): chunk is Extract<Chunk, { delta: string }> =>
+  chunk.type === 'text-delta' || chunk.type === 'reasoning-delta';
+
+/**
+ * Appends the epoch's chunks in small batches. Consecutive deltas of one part
+ * are merged; anything else is written at once. `written` mirrors the stored
+ * stream so a retried model call can rewind it.
+ */
+function chunkPublisher(env: Bindings, row: DurableTurnRow, epoch: number): Publisher {
+  const written: Chunk[] = [];
+  let pending: Chunk[] = [];
   let characters = 0;
   const flush = async () => {
     if (!pending.length) return;
-    await appendTurnEvents(env.DB, turnId, epoch, pending);
+    const batch = pending;
     pending = [];
     characters = 0;
+    await appendTurnChunks(env.DB, row.id, epoch, batch);
   };
   return {
+    previewed: false,
     flush,
-    async emit(item) {
+    mark: () => written.length,
+    async emit(chunk) {
       const last = pending.at(-1);
-      if ((item.type === 'text' || item.type === 'reasoning') && last?.type === item.type)
-        last.text += item.text;
-      else pending.push(item);
-      if (item.type === 'text' || item.type === 'reasoning') characters += item.text.length;
-      if (characters >= 1024 || (item.type !== 'text' && item.type !== 'reasoning')) await flush();
+      if (isDelta(chunk) && last?.type === chunk.type && last.id === chunk.id)
+        last.delta += chunk.delta;
+      else {
+        const copy = { ...chunk };
+        pending.push(copy);
+        written.push(copy);
+      }
+      if (isDelta(chunk)) characters += chunk.delta.length;
+      if (characters >= 1024 || !isDelta(chunk)) await flush();
+    },
+    async rewind(mark) {
+      pending = [];
+      characters = 0;
+      written.length = mark;
+      await restartTurnChunks(env.DB, row, epoch, written);
     },
   };
 }
@@ -91,19 +135,27 @@ async function loadInput(env: Bindings, row: DurableTurnRow): Promise<DurableTur
   };
 }
 
+function chunkPreview(publish: Publisher, signal: AbortSignal): ChunkPreview {
+  return {
+    mark: () => publish.mark(),
+    async write(chunks) {
+      signal.throwIfAborted();
+      publish.previewed = true;
+      for (const chunk of chunks) await publish.emit(chunk);
+      await publish.flush();
+    },
+    rewind: (mark) => publish.rewind(mark),
+  };
+}
+
 function checkpoints(
   step: WorkflowStep,
   signal: AbortSignal,
   assertActive: Guard,
   publish: Publisher,
-  preview: { used: boolean },
-) {
+): AgentCheckpoints {
   return {
-    publish: async (event: ChatEvent) => {
-      signal.throwIfAborted();
-      preview.used = true;
-      await publish.emit(event);
-    },
+    preview: chunkPreview(publish, signal),
     do: async <T>(name: string, callback: () => Promise<T>, options?: { retries?: number }) => {
       await assertActive();
       return step.do(
@@ -123,9 +175,34 @@ function checkpoints(
   };
 }
 
-function trackProgress(progress: Progress, item: ChatEvent) {
-  if (item.type === 'text') progress.partialResponse = true;
-  if (item.type === 'tool') progress.toolIds.add(item.tool.id);
+function trackProgress(progress: Progress, chunk: Chunk) {
+  if (chunk.type === 'text-delta') progress.partialResponse = true;
+  if (chunk.type === 'tool-input-available') progress.toolIds.add(chunk.toolCallId);
+}
+
+/** The epoch's opening chunks: the assistant message id is the turn id. */
+function openingChunks(row: DurableTurnRow, input: DurableTurnInput, model: string): Chunk[] {
+  return [
+    {
+      type: 'start',
+      messageId: row.id,
+      messageMetadata: {
+        createdAt: new Date().toISOString(),
+        personaName: input.persona.name,
+        model,
+      },
+    },
+    {
+      type: 'data-turn',
+      transient: true,
+      data: {
+        conversationId: row.conversation_id,
+        branchId: row.branch_id,
+        ...(row.user_message_id ? { userMessageId: row.user_message_id } : {}),
+      },
+    },
+    transientStatus('Thinking…'),
+  ];
 }
 
 async function generateTurn(
@@ -140,28 +217,18 @@ async function generateTurn(
 ) {
   const input = await loadInput(env, row);
   progress.model = modelNameForPersona(env, input.persona);
-  const preview = { used: false };
   const agent = createAgentService(env, background);
-  const turnCheckpoints = checkpoints(step, controller.signal, assertActive, publish, preview);
-  await publish.emit({ type: 'status', text: 'Thinking…' });
-  let done: Extract<ChatEvent, { type: 'done' }> | undefined;
-  let intervention: Extract<ChatEvent, { type: 'intervention' }>['intervention'] | undefined;
+  const turnCheckpoints = checkpoints(step, controller.signal, assertActive, publish);
+  for (const chunk of openingChunks(row, input, progress.model)) await publish.emit(chunk);
   // The cancellation watcher checks D1 once a second and aborts the signal;
-  // event writes are fenced by epoch and status, so no per-chunk query.
-  for await (const item of await agent.streamTurn(input, turnCheckpoints, controller.signal)) {
+  // chunk writes are fenced by epoch and status, so no per-chunk query.
+  for await (const chunk of await agent.streamTurn(input, turnCheckpoints, controller.signal)) {
     controller.signal.throwIfAborted();
-    if (preview.used && (item.type === 'text' || item.type === 'reasoning')) continue;
-    trackProgress(progress, item);
-    if (item.type === 'done') done = item;
-    else {
-      if (item.type === 'intervention') intervention = item.intervention;
-      if (item.type === 'error') throw new Error(item.message);
-      await publish.emit(item);
-    }
+    trackProgress(progress, chunk);
+    if (publish.previewed && PREVIEWED_TYPES.has(chunk.type)) continue;
+    await publish.emit(chunk);
   }
   await publish.flush();
-  if (!done) throw new Error('The model did not finish its response.');
-  return { done, intervention };
 }
 
 async function recordFailure(
@@ -230,7 +297,7 @@ export async function runChatTurn(
   );
   if (!row || row.status !== 'streaming' || !row.input_json)
     return { turnId, status: row?.status ?? 'deleted' };
-  const epoch = await beginTurnExecution(env.DB, turnId);
+  const epoch = await beginTurnExecution(env.DB, row);
   if (epoch === null) return { turnId, status: 'stopped' };
   background(
     captureTurnLifecycle(env, epoch > 1 ? 'chat_turn_recovered' : 'chat_turn_started', {
@@ -247,22 +314,13 @@ export async function runChatTurn(
   const controller = new AbortController();
   const assertActive = activeGuard(env, row, epoch, controller);
   const cancellation = watchCancellation(assertActive, controller);
-  const publish = eventPublisher(env, turnId, epoch);
+  const publish = chunkPublisher(env, row, epoch);
   const progress: Progress = { model: 'unknown', partialResponse: false, toolIds: new Set() };
   try {
-    const { done, intervention } = await generateTurn(
-      env,
-      row,
-      step,
-      controller,
-      assertActive,
-      publish,
-      progress,
-      background,
-    );
+    await generateTurn(env, row, step, controller, assertActive, publish, progress, background);
     const committed = await step.do('commit-turn', async () => {
       await assertActive();
-      return completeTurn(env.DB, turnId, epoch, done, intervention);
+      return completeTurn(env.DB, turnId, epoch);
     });
     if (!committed)
       await finishTurn(

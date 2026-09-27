@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { uiMessageText } from '@walden/contracts';
 import { expect, it, vi } from 'vitest';
 import { deleteAgentMemoryThread } from '../../../agent/memory/memory';
 import { sqliteD1Binding } from '../../../agent/memory/tests/d1-test-binding';
@@ -53,7 +54,7 @@ async function createRetentionFixture() {
       .run();
     await db
       .prepare(
-        "INSERT INTO messages (id,conversation_id,turn_id,owner_id,role,content,created_at,origin_branch_id) VALUES (?,?,?,'owner','assistant','Response','now',?)",
+        "INSERT INTO messages (id,conversation_id,turn_id,owner_id,role,ui_message,created_at,origin_branch_id) VALUES (?1,?2,?3,'owner','assistant',json_object('id',?1,'role','assistant','parts',json_array(json_object('type','text','text','Response')),'metadata',json_object('createdAt','now')),'now',?4)",
       )
       .bind(id, id, id, id)
       .run();
@@ -87,7 +88,7 @@ async function assertActiveConversation(db: D1Database) {
   });
   const current = await loadConversation(db, 'owner', 'active');
   expect(current.branchId).toBe('active');
-  expect(current.messages.map(({ content }) => content)).toEqual(['Response']);
+  expect(current.messages.map(uiMessageText)).toEqual(['Response']);
   expect(deleteAgentMemoryThread).not.toHaveBeenCalled();
 }
 
@@ -139,7 +140,7 @@ async function resumeArchivedNote(db: D1Database) {
     .run();
   await db
     .prepare(
-      "INSERT INTO messages (id,conversation_id,turn_id,owner_id,role,content,created_at,origin_branch_id) VALUES ('resumed','expired-note','resumed','owner','user','Continue from my note','now',?)",
+      "INSERT INTO messages (id,conversation_id,turn_id,owner_id,role,ui_message,created_at,origin_branch_id) VALUES ('resumed','expired-note','resumed','owner','user',json_object('id','resumed','role','user','parts',json_array(json_object('type','text','text','Continue from my note')),'metadata',json_object('createdAt','now')),'now',?)",
     )
     .bind(resumed.branchId)
     .run();
@@ -148,7 +149,7 @@ async function resumeArchivedNote(db: D1Database) {
     .bind('resumed', resumed.branchId)
     .run();
   const reopened = await loadConversation(db, 'owner', 'expired-note');
-  expect(reopened.messages.map(({ content }) => content)).toEqual(['Continue from my note']);
+  expect(reopened.messages.map(uiMessageText)).toEqual(['Continue from my note']);
   expect(await db.prepare("SELECT markdown FROM notes WHERE id='note'").first()).toEqual({
     markdown: 'Permanent note',
   });

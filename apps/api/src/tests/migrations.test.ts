@@ -26,11 +26,21 @@ it('initializes the complete application schema with current defaults and constr
       INSERT INTO users VALUES ('owner','subject','now','now',0);
       INSERT INTO notes (id,owner_id,created_at,updated_at) VALUES ('note','owner','now','now');
       INSERT INTO conversations (id,owner_id,note_id,last_user_activity_at,expires_at,created_at) VALUES ('chat','owner','note','now','2999','now');
-      INSERT INTO messages (id,conversation_id,owner_id,role,content,created_at) VALUES ('message','chat','owner','assistant','Answer','now');`);
+      INSERT INTO messages (id,conversation_id,owner_id,role,created_at,ui_message) VALUES ('message','chat','owner','assistant','now','{"id":"message","role":"assistant","parts":[]}');`);
     expect(
       query("SELECT learning_checks_enabled||':'||web_search_enabled FROM conversations"),
     ).toBe('1:1');
-    expect(query('SELECT activity_json FROM messages')).toBe('{}');
+    expect(query("SELECT json_extract(ui_message,'$.role') FROM messages")).toBe('assistant');
+    expect(() =>
+      query(
+        "INSERT INTO messages (id,conversation_id,owner_id,role,created_at,ui_message) VALUES ('m2','chat','owner','system','now','{}')",
+      ),
+    ).toThrow();
+    expect(() =>
+      query(
+        "INSERT INTO messages (id,conversation_id,owner_id,role,created_at) VALUES ('m3','chat','owner','user','now')",
+      ),
+    ).toThrow();
     expect(() => query('UPDATE conversations SET web_search_enabled=2')).toThrow();
     expect(() =>
       query(

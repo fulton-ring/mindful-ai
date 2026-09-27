@@ -1,9 +1,8 @@
 import type {
-  Annotation,
   LearningCheck,
   LearningCheckResponse,
-  Message,
   MessageHighlight,
+  WaldenUIMessage,
 } from '@walden/contracts';
 import { Pencil, RefreshCw } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -20,6 +19,14 @@ import { InterventionCard } from '../../../capture/InterventionCard';
 import { AnnotatedText } from '../../../highlights/AnnotatedText';
 import type { ContextualActionId } from '../../../highlights/contextual-actions';
 import { ContextCheckpoint } from '../../ContextCheckpoint';
+import {
+  filePartsOf,
+  isInterrupted,
+  learningCheckOf,
+  learningCheckResponseOf,
+  messageText,
+  reasoningText,
+} from '../../message-parts';
 import { ResponseActivity, ResponseSources } from '../../ResponseActivity';
 import { AttachmentBadge } from './AttachmentBadge';
 
@@ -32,21 +39,18 @@ type ActionStatus = {
 } | null;
 
 type Props = {
-  conversationId?: string;
-  message: Message;
+  message: WaldenUIMessage;
   index: number;
-  messages: Message[];
+  messages: WaldenUIMessage[];
   isLive: boolean;
   selectedPersonaName?: string;
   sending: boolean;
-  streamed: string;
   visible: boolean;
   learningCheckResponse?: LearningCheckResponse;
   answeredCheck?: LearningCheck;
   editing: boolean;
   editedMessage: string;
   input: string;
-  liveAnnotations: Annotation[];
   toolbar: ReactNode;
   messageAnimation(messageId: string): ReadonlySet<string> | undefined;
   captureStatus: ActionStatus;
@@ -64,14 +68,14 @@ type Props = {
 export function ChatMessage({ message, ...props }: Props) {
   return (
     <>
-      {message.role === 'assistant' && message.contextCompacted && <ContextCheckpoint />}
+      {message.role === 'assistant' && message.metadata?.contextCompacted && <ContextCheckpoint />}
       <article className={`message ${message.role}`}>
         {message.role === 'assistant' ? (
           <AssistantMessage message={message} {...props} />
         ) : (
           <UserMessage message={message} {...props} />
         )}
-        {message.incomplete && (
+        {isInterrupted(message) && (
           <IncompleteNotice message={message} sending={props.sending} onRetry={props.onRetry} />
         )}
       </article>
@@ -79,29 +83,36 @@ export function ChatMessage({ message, ...props }: Props) {
   );
 }
 
-function AssistantMessage({ message, ...props }: Omit<Props, 'message'> & { message: Message }) {
+type MessageProps = Omit<Props, 'message'> & { message: WaldenUIMessage };
+
+function AssistantMessage({ message, ...props }: MessageProps) {
+  const text = messageText(message);
+  const reasoning = reasoningText(message);
+  const learningCheck = learningCheckOf(message);
+  const interrupted = isInterrupted(message);
+  const annotations = message.metadata?.annotations;
   return (
     <>
       <p className="message-sender">
-        {message.personaName ?? props.selectedPersonaName ?? 'Assistant'}
+        {message.metadata?.personaName ?? props.selectedPersonaName ?? 'Assistant'}
       </p>
       <ResponseActivity
-        tools={message.tools}
-        sources={message.sources}
+        parts={message.parts}
         live={props.isLive && props.sending}
+        interrupted={interrupted}
       />
-      {message.reasoning && (
+      {reasoning && (
         <Reasoning
           className="message-reasoning"
-          isStreaming={props.isLive && props.sending && !props.streamed}
+          isStreaming={props.isLive && props.sending && !text}
         >
           <ReasoningTrigger />
-          <ReasoningContent>{message.reasoning}</ReasoningContent>
+          <ReasoningContent>{reasoning}</ReasoningContent>
         </Reasoning>
       )}
-      {message.learningCheck ? (
+      {learningCheck ? (
         <LearningCheckMessage
-          message={message}
+          check={learningCheck}
           response={props.learningCheckResponse}
           onResolve={props.onLearningCheck}
           onDismiss={props.onDismissLearningCheck}
@@ -110,39 +121,39 @@ function AssistantMessage({ message, ...props }: Omit<Props, 'message'> & { mess
         <AnnotatedText
           active={props.visible}
           actionStatus={props.captureStatus}
-          text={message.content}
-          annotations={message.annotations}
-          highlights={message.highlights}
-          onHighlight={!props.isLive && !message.incomplete ? props.onHighlight : undefined}
+          text={text}
+          annotations={annotations}
+          highlights={message.metadata?.highlights}
+          onHighlight={!props.isLive && !interrupted ? props.onHighlight : undefined}
           markdown
           animatedAnnotationIds={
             props.isLive
-              ? new Set(props.liveAnnotations.map((item) => item.id))
+              ? new Set((annotations ?? []).map((item) => item.id))
               : props.messageAnimation(message.id)
           }
           onAction={props.onAction}
         />
       )}
-      <ResponseSources sources={message.sources} />
+      <ResponseSources parts={message.parts} />
       {props.toolbar}
     </>
   );
 }
 
 function LearningCheckMessage({
-  message,
+  check,
   response,
   onResolve,
   onDismiss,
 }: {
-  message: Message;
+  check: LearningCheck;
   response?: LearningCheckResponse;
   onResolve(value: LearningCheckResponse): void;
   onDismiss(): void;
 }) {
   return (
     <InterventionCard
-      intervention={message.learningCheck!}
+      intervention={check}
       resolved={response}
       onResolve={(value) => {
         if (typeof value !== 'string') onResolve(value);
@@ -153,19 +164,19 @@ function LearningCheckMessage({
   );
 }
 
-function UserMessage({ message, ...props }: Omit<Props, 'message'> & { message: Message }) {
+function UserMessage({ message, ...props }: MessageProps) {
+  const response = learningCheckResponseOf(message);
+  const files = filePartsOf(message);
+  const next = props.messages[props.index + 1];
   return (
     <>
-      {message.learningCheckResponse && props.answeredCheck ? (
+      {response && props.answeredCheck ? (
         <div className="learning-check-response">
           <p className="eyebrow">My answers</p>
           {props.answeredCheck.questions.map((question) => (
             <div key={question.id}>
               <span>{question.header}</span>
-              <p>
-                {message.learningCheckResponse?.answers[question.id]?.answers.join('; ') ??
-                  'Skipped'}
-              </p>
+              <p>{response.answers[question.id]?.answers.join('; ') ?? 'Skipped'}</p>
             </div>
           ))}
         </div>
@@ -174,23 +185,21 @@ function UserMessage({ message, ...props }: Omit<Props, 'message'> & { message: 
       ) : (
         <div className="user-message-content">
           <Streamdown skipHtml plugins={{ math }}>
-            {message.content}
+            {messageText(message)}
           </Streamdown>
         </div>
       )}
-      {message.attachments?.length && props.conversationId ? (
+      {files.length ? (
         <Attachments variant="inline" className="message-attachments">
-          {message.attachments.map((file) => (
-            <AttachmentBadge
-              key={file.id}
-              file={{ ...file, conversationId: props.conversationId! }}
-            />
+          {files.map((file) => (
+            <AttachmentBadge key={file.url} file={file} />
           ))}
         </Attachments>
       ) : null}
-      {!message.learningCheckResponse &&
+      {!response &&
         !props.editing &&
-        props.messages[props.index + 1]?.incomplete &&
+        next &&
+        isInterrupted(next) &&
         props.index + 1 === props.messages.length - 1 && (
           <div className="message-toolbar user-message-toolbar">
             <button
@@ -252,14 +261,14 @@ function IncompleteNotice({
   sending,
   onRetry,
 }: {
-  message: Message;
+  message: WaldenUIMessage;
   sending: boolean;
   onRetry(): void;
 }) {
   return (
     <p className="action-notice__row action-notice__row--alert" role="alert">
       <span className="action-notice__message">
-        {message.content.trim() ? 'Incomplete response' : 'No response received'}
+        {messageText(message).trim() ? 'Incomplete response' : 'No response received'}
       </span>
       <button
         type="button"

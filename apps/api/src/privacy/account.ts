@@ -67,7 +67,7 @@ accountRoutes.get('/account/export', async (c) => {
         now,
       ),
       rows(
-        `SELECT id,conversation_id,role,content,reasoning,activity_json,incomplete,parent_message_id,origin_branch_id,persona_name,created_at FROM messages
+        `SELECT id,conversation_id,role,parent_message_id,origin_branch_id,created_at,ui_message FROM messages
          WHERE owner_id=? AND conversation_id IN (${LIVE_CONVERSATIONS}) ORDER BY conversation_id,created_at,rowid`,
         ownerId,
         ownerId,
@@ -96,7 +96,10 @@ accountRoutes.get('/account/export', async (c) => {
       personas,
       conversations,
       branches,
-      messages,
+      messages: messages.map(({ ui_message, ...message }) => ({
+        ...message,
+        message: JSON.parse(String(ui_message)) as unknown,
+      })),
       highlights,
       privacy,
     },

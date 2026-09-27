@@ -1,5 +1,10 @@
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { type Message, PERSONA_MODELS, type Persona } from '@walden/contracts';
+import {
+  PERSONA_MODELS,
+  type Persona,
+  uiMessageText,
+  type WaldenUIMessage,
+} from '@walden/contracts';
 import { createWorkersAI } from 'workers-ai-provider';
 import type { AgentCheckpoints } from '../../agent/checkpoints';
 import { streamNoteProposal } from '../../agent/note-proposals/note-proposal-stream';
@@ -7,7 +12,7 @@ import { agentTrace, annotateResponse, streamAnnotationResponse } from '../../ag
 import { ServiceUnavailableError } from '../../http';
 import { createApiTelemetry } from '../../observability';
 import type { AgentService, AgentTurnInput, ServiceEnv } from '../types';
-import { streamTurnEvents } from './agent-stream';
+import { streamTurnChunks } from './agent-stream';
 
 export const DEFAULT_AI_MODEL = PERSONA_MODELS[0].id;
 export const OPENROUTER_DEFAULT_MODEL = 'google/gemma-4-26b-a4b-it';
@@ -102,25 +107,29 @@ function createSecondaryOperations(
 ): Pick<AgentService, 'annotateTurn' | 'streamAnnotations' | 'streamNoteProposal'> {
   const annotationRequest = (
     input: AgentTurnInput,
-    assistantMessage: Message,
+    assistantMessage: WaldenUIMessage,
     signal: AbortSignal | undefined,
   ) => {
     const { modelName, model } = configuredModel(input.persona);
     const secondary = createSecondaryContext(env, background, input, modelName, signal);
     const request = {
-      text: assistantMessage.content,
+      text: uiMessageText(assistantMessage),
       turnId: input.turnId,
       conversationId: input.conversation.id,
       model,
       signal: secondary.signal,
       trace: secondary.trace,
-      excludedQuotes: assistantMessage.annotations?.map(({ quote }) => quote) ?? [],
+      excludedQuotes: assistantMessage.metadata?.annotations?.map(({ quote }) => quote) ?? [],
     };
     return { secondary, request };
   };
   return {
-    async annotateTurn(input: AgentTurnInput, assistantMessage: Message, signal?: AbortSignal) {
-      if (!assistantMessage.content.trim()) return [];
+    async annotateTurn(
+      input: AgentTurnInput,
+      assistantMessage: WaldenUIMessage,
+      signal?: AbortSignal,
+    ) {
+      if (!uiMessageText(assistantMessage).trim()) return [];
       const { secondary, request } = annotationRequest(input, assistantMessage, signal);
       try {
         return await annotateResponse(request);
@@ -130,7 +139,7 @@ function createSecondaryOperations(
     },
     async streamAnnotations(
       input: AgentTurnInput,
-      assistantMessage: Message,
+      assistantMessage: WaldenUIMessage,
       signal?: AbortSignal,
     ) {
       const { secondary, request } = annotationRequest(input, assistantMessage, signal);
@@ -138,7 +147,7 @@ function createSecondaryOperations(
     },
     async streamNoteProposal(
       input: AgentTurnInput,
-      assistantMessage: Message,
+      assistantMessage: WaldenUIMessage,
       signal?: AbortSignal,
     ) {
       const { modelName, model } = configuredModel(input.persona);
@@ -183,7 +192,7 @@ export function createAgentService(env: ServiceEnv, background?: Background): Ag
   return {
     async streamTurn(input: AgentTurnInput, checkpoints: AgentCheckpoints, signal?: AbortSignal) {
       const { modelName, model } = configuredModel(input.persona);
-      return streamTurnEvents({
+      return streamTurnChunks({
         env,
         input,
         modelName,

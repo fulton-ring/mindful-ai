@@ -1,9 +1,57 @@
+import type { WaldenUIMessage } from '@walden/contracts';
 import { describe, expect, it } from 'vitest';
 import { loadConversation } from '../repository';
 import { database, testApp } from './conversations.fixtures';
 
 describe('conversation note attachment', () => {
-  it('reconstructs persisted tool activity and sources', async () => {
+  it('round-trips a stored assistant message with tool and source parts', async () => {
+    const assistant: WaldenUIMessage = {
+      id: 'assistant',
+      role: 'assistant',
+      parts: [
+        { type: 'step-start' },
+        {
+          type: 'tool-readWebPage',
+          toolCallId: 'call',
+          state: 'output-available',
+          input: { query: 'https://example.com/' },
+          output: { sources: [{ url: 'https://example.com/' }] },
+        },
+        { type: 'source-url', sourceId: 'source', url: 'https://example.com/' },
+        { type: 'text', text: 'Answer', state: 'done' },
+        {
+          type: 'data-intervention',
+          id: 'check',
+          data: {
+            id: 'check',
+            kind: 'learning_check',
+            questions: [
+              {
+                id: 'location',
+                header: 'Location',
+                format: 'multiple_choice',
+                question: 'Where does the Calvin cycle occur?',
+                options: ['Stroma', 'Thylakoid'],
+              },
+            ],
+          },
+        },
+      ],
+      metadata: { createdAt: 'now', status: 'complete', contextCompacted: true },
+    };
+    const answer: WaldenUIMessage = {
+      id: 'user-answer',
+      role: 'user',
+      parts: [
+        { type: 'text', text: 'Stroma' },
+        {
+          type: 'data-learning-check-response',
+          id: 'check',
+          data: { checkId: 'check', answers: { location: { answers: ['Stroma'] } } },
+        },
+      ],
+      metadata: { createdAt: 'later' },
+    };
     const db = database({
       conversations: [
         {
@@ -17,60 +65,21 @@ describe('conversation note attachment', () => {
       messages: [
         {
           id: 'assistant',
-          role: 'assistant',
-          content: 'Answer',
-          reasoning: null,
-          created_at: 'now',
-          annotations_json: '[]',
-          activity_json: JSON.stringify({
-            tools: [{ id: 'call', name: 'readWebPage', state: 'complete', summary: 'Source read' }],
-            sources: [{ id: 'source', url: 'https://example.com/' }],
-            contextCompacted: true,
-            learningCheck: {
-              id: 'check',
-              kind: 'learning_check',
-              questions: [
-                {
-                  id: 'location',
-                  header: 'Location',
-                  format: 'multiple_choice',
-                  question: 'Where does the Calvin cycle occur?',
-                  options: ['Stroma', 'Thylakoid'],
-                },
-              ],
-            },
-          }),
-          incomplete: 0,
+          ui_message: JSON.stringify(assistant),
+          highlights_json: '[]',
+          agent_highlights_json: '[]',
         },
         {
           id: 'user-answer',
-          role: 'user',
-          content: 'Stroma',
-          reasoning: null,
-          created_at: 'later',
-          annotations_json: '[]',
-          activity_json: JSON.stringify({
-            learningCheckResponse: {
-              checkId: 'check',
-              answers: { location: { answers: ['Stroma'] } },
-            },
-          }),
-          incomplete: 0,
+          ui_message: JSON.stringify(answer),
+          highlights_json: '[]',
+          agent_highlights_json: '[]',
         },
       ],
     });
     const loaded = await loadConversation(db, 'owner', 'conversation');
 
-    expect(loaded.messages[0]).toMatchObject({
-      tools: [{ id: 'call', state: 'complete' }],
-      sources: [{ id: 'source', url: 'https://example.com/' }],
-      contextCompacted: true,
-      learningCheck: { id: 'check', questions: [{ id: 'location', format: 'multiple_choice' }] },
-    });
-    expect(loaded.messages[1]).toMatchObject({
-      role: 'user',
-      learningCheckResponse: { checkId: 'check', answers: { location: { answers: ['Stroma'] } } },
-    });
+    expect(loaded.messages).toEqual([assistant, answer]);
   });
 });
 

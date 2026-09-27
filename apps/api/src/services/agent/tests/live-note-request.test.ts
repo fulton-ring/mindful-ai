@@ -54,7 +54,7 @@ describe.skipIf(!token || !accountId)('Cloudflare explicit note requests', () =>
         signal: AbortSignal.timeout(75_000),
       });
       let text = '';
-      for await (const event of events) if (event.type === 'text') text += event.text;
+      for await (const event of events) if (event.type === 'text-delta') text += event.delta;
       for (const detail of expected) expect(text.toLowerCase()).toContain(detail);
       expect(text).not.toMatch(/\?|shall i|should i|would you like|confirm|proceed/i);
       expect(text).not.toMatch(/\b(?:saved|applied|added to your note)\b/i);

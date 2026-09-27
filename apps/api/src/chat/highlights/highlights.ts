@@ -1,8 +1,9 @@
-import { messageHighlightSchema } from '@walden/contracts';
+import { messageHighlightSchema, uiMessageText } from '@walden/contracts';
 import { Hono } from 'hono';
 import { first } from '../../db/client';
 import { HttpError, jsonBody, nowIso } from '../../http';
 import type { Bindings, Variables } from '../../types';
+import { notInterruptedSql, parseStoredMessage } from '../messages';
 
 export const highlightRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -12,19 +13,21 @@ highlightRoutes.put('/messages/:messageId/highlights', async (c) => {
   const ownerId = c.get('userId');
   const messageId = c.req.param('messageId');
   const now = nowIso();
-  const message = await first<{ content: string }>(
+  const message = await first<{ ui_message: string }>(
     c.env.DB.prepare(
-      `SELECT m.content FROM messages m
+      `SELECT m.ui_message FROM messages m
          JOIN conversations c ON c.id=m.conversation_id AND c.owner_id=m.owner_id
          JOIN conversation_branches b ON b.id=m.origin_branch_id AND b.conversation_id=c.id AND b.owner_id=c.owner_id
-         WHERE m.id=? AND m.owner_id=? AND m.role='assistant' AND m.incomplete=0
+         WHERE m.id=? AND m.owner_id=? AND m.role='assistant' AND ${notInterruptedSql('m')}
          AND c.status='active' AND c.expires_at>? AND b.status='active'`,
     ).bind(messageId, ownerId, now),
   );
   if (!message) throw new HttpError(404, 'Completed response not found');
+  // Offsets index the message's visible text: its text parts, joined.
+  const text = uiMessageText(parseStoredMessage(message.ui_message));
   if (
-    parsed.data.end > message.content.length ||
-    message.content.slice(parsed.data.start, parsed.data.end) !== parsed.data.quote
+    parsed.data.end > text.length ||
+    text.slice(parsed.data.start, parsed.data.end) !== parsed.data.quote
   )
     throw new HttpError(400, 'Highlight range does not match the response');
   const saved = await c.env.DB.prepare(
@@ -32,7 +35,7 @@ highlightRoutes.put('/messages/:messageId/highlights', async (c) => {
        SELECT m.id,m.owner_id,'user',?,?,?,?,? FROM messages m
        JOIN conversations c ON c.id=m.conversation_id AND c.owner_id=m.owner_id
        JOIN conversation_branches b ON b.id=m.origin_branch_id AND b.conversation_id=c.id AND b.owner_id=c.owner_id
-       WHERE m.id=? AND m.owner_id=? AND m.role='assistant' AND m.incomplete=0 AND m.content=?
+       WHERE m.id=? AND m.owner_id=? AND m.role='assistant' AND ${notInterruptedSql('m')} AND m.ui_message=?
        AND c.status='active' AND c.expires_at>? AND b.status='active'
        ON CONFLICT(message_id,origin,start,end) DO UPDATE SET
          quote=excluded.quote,color=excluded.color,updated_at=excluded.updated_at
@@ -46,7 +49,7 @@ highlightRoutes.put('/messages/:messageId/highlights', async (c) => {
       now,
       messageId,
       ownerId,
-      message.content,
+      message.ui_message,
       now,
     )
     .run();

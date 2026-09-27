@@ -15,17 +15,17 @@ vi.mock('@mastra/core/agent', () => ({
   },
 }));
 
-import type { Message } from '@walden/contracts';
 import type { AgentTurnInput } from '../../../services/types';
+import { textMessage } from '../../../tests/ui-messages';
 import { streamNoteProposal } from '../../note-proposals/note-proposal-stream';
 
 const model = {} as Parameters<typeof streamNoteProposal>[2];
-const assistantMessage: Message = {
-  id: 'assistant-1',
-  role: 'assistant',
-  content: 'Beta ships March 21, pilot capped at 50 users, run by Priya.',
-  createdAt: '2026-09-18T12:00:00.000Z',
-};
+const assistantMessage = textMessage(
+  'assistant-1',
+  'assistant',
+  'Beta ships March 21, pilot capped at 50 users, run by Priya.',
+  { createdAt: '2026-09-18T12:00:00.000Z' },
+);
 
 const objectStream = (...values: unknown[]) =>
   new ReadableStream({

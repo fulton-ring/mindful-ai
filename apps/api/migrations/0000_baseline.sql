@@ -94,26 +94,29 @@ CREATE TABLE `message_highlights` (
 );
 --> statement-breakpoint
 CREATE INDEX `message_highlights_owner_message` ON `message_highlights` (`owner_id`,`message_id`);--> statement-breakpoint
+CREATE TABLE `message_windows` (
+	`owner_id` text PRIMARY KEY,
+	`started_at` text NOT NULL,
+	`used` integer DEFAULT 0 NOT NULL,
+	FOREIGN KEY (`owner_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
 CREATE TABLE `messages` (
 	`id` text PRIMARY KEY,
 	`conversation_id` text NOT NULL,
 	`turn_id` text,
 	`owner_id` text NOT NULL,
 	`role` text NOT NULL,
-	`content` text NOT NULL,
-	`incomplete` integer DEFAULT 0 NOT NULL,
 	`created_at` text NOT NULL,
-	`reasoning` text,
-	`activity_json` text DEFAULT '{}' NOT NULL,
 	`parent_message_id` text,
 	`origin_branch_id` text,
-	`persona_name` text,
+	`ui_message` text NOT NULL,
 	FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`turn_id`) REFERENCES `turns`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`owner_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`parent_message_id`) REFERENCES `messages`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`origin_branch_id`) REFERENCES `conversation_branches`(`id`) ON UPDATE no action ON DELETE set null,
-	CONSTRAINT "messages_check_1" CHECK(incomplete IN (0,1))
+	CONSTRAINT "messages_check_1" CHECK(role IN ('user','assistant'))
 );
 --> statement-breakpoint
 CREATE INDEX `messages_conversation` ON `messages` (`conversation_id`);--> statement-breakpoint
@@ -238,7 +241,7 @@ CREATE TABLE `turn_cancellations` (
 CREATE TABLE `turn_events` (
 	`seq` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`turn_id` text NOT NULL,
-	`event_json` text NOT NULL,
+	`chunk_json` text NOT NULL,
 	FOREIGN KEY (`turn_id`) REFERENCES `turns`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
@@ -256,6 +259,8 @@ CREATE TABLE `turns` (
 	`input_json` text,
 	`request_json` text,
 	`user_message_id` text,
+	`model` text,
+	`weight` integer DEFAULT 1 NOT NULL,
 	`execution_epoch` integer DEFAULT 0 NOT NULL,
 	FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`owner_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,

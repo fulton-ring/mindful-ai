@@ -6,12 +6,15 @@ import {
   type Note,
   type Persona,
   type ProvenanceSpan,
+  uiMessageText,
+  type WaldenUIMessage,
 } from '@walden/contracts';
 import { conversationTitle } from '@walden/domain';
 import { first, parseJson } from '../../db/client';
 import { HttpError, newId, nowIso } from '../../http';
 import type { LoadedAttachment } from '../attachments/attachments';
 import { loadConversation, RETENTION_MS } from '../conversations/repository';
+import { attachmentPart, isInterrupted, storedMessageJson } from '../messages';
 import { chargeMessage, type MessageLimit, refundMessage } from './message-limit';
 import {
   batchIfAny,
@@ -167,7 +170,8 @@ async function reserveTurn(
   turnModel: TurnModel,
 ) {
   const { db, ownerId } = runtime;
-  const editInPlace = Boolean(input.edit?.replacedAssistant?.incomplete);
+  const replaced = input.edit?.replacedAssistant;
+  const editInPlace = Boolean(replaced && isInterrupted(replaced));
   const branchFork = Boolean(input.regeneration || (input.edit && !editInPlace));
   const branchId = branchFork ? newId() : input.conversation.branchId;
   const turnId = newId();
@@ -231,6 +235,32 @@ async function createBranch(
     .run();
 }
 
+/** The stored user message: the text, attached files, and any learning-check answers. */
+function userUIMessage(input: TurnInput, id: string, createdAt: string): WaldenUIMessage {
+  const response = input.request.learningCheckResponse;
+  return {
+    id,
+    role: 'user',
+    parts: [
+      { type: 'text', text: input.requestMessage },
+      ...input.attachments.map((attachment) => attachmentPart(input.conversation.id, attachment)),
+      ...(response
+        ? [{ type: 'data-learning-check-response' as const, id: response.checkId, data: response }]
+        : []),
+    ],
+    metadata: { createdAt },
+  };
+}
+
+/** An edit in place keeps the message's files and replaces only its text. */
+function editedUIMessage(user: WaldenUIMessage, text: string, createdAt: string): WaldenUIMessage {
+  return {
+    ...user,
+    parts: [{ type: 'text', text }, ...user.parts.filter((part) => part.type !== 'text')],
+    metadata: { ...user.metadata, createdAt },
+  };
+}
+
 function userMessageStatement(
   runtime: TurnRuntime,
   input: TurnInput,
@@ -242,10 +272,12 @@ function userMessageStatement(
   if (reservation.editInPlace)
     return db
       .prepare(
-        "UPDATE messages SET content=?,turn_id=?,created_at=? WHERE id=? AND owner_id=? AND role='user'",
+        "UPDATE messages SET ui_message=?,turn_id=?,created_at=? WHERE id=? AND owner_id=? AND role='user'",
       )
       .bind(
-        input.requestMessage,
+        storedMessageJson(
+          editedUIMessage(input.edit!.user, input.requestMessage, reservation.createdAt),
+        ),
         reservation.turnId,
         reservation.createdAt,
         input.edit!.user.id,
@@ -253,32 +285,17 @@ function userMessageStatement(
       );
   return db
     .prepare(
-      "INSERT INTO messages (id,conversation_id,turn_id,owner_id,role,content,activity_json,created_at,parent_message_id,origin_branch_id) VALUES (?,?,?,?, 'user',?,?,?,?,?)",
+      "INSERT INTO messages (id,conversation_id,turn_id,owner_id,role,created_at,parent_message_id,origin_branch_id,ui_message) VALUES (?,?,?,?, 'user',?,?,?,?)",
     )
     .bind(
       userMessageId,
       input.conversation.id,
       reservation.turnId,
       runtime.ownerId,
-      input.requestMessage,
-      JSON.stringify({
-        ...(input.request.learningCheckResponse
-          ? { learningCheckResponse: input.request.learningCheckResponse }
-          : {}),
-        ...(input.attachments.length
-          ? {
-              attachments: input.attachments.map(({ id, name, mimeType, size }) => ({
-                id,
-                name,
-                mimeType,
-                size,
-              })),
-            }
-          : {}),
-      }),
       reservation.createdAt,
       input.conversation.messages.at(-1)?.id ?? null,
       reservation.branchId,
+      storedMessageJson(userUIMessage(input, userMessageId, reservation.createdAt)),
     );
 }
 
@@ -296,7 +313,7 @@ function turnSetupStatements(
       ? [
           db
             .prepare(
-              "DELETE FROM messages WHERE id=? AND owner_id=? AND role='assistant' AND incomplete=1",
+              "DELETE FROM messages WHERE id=? AND owner_id=? AND role='assistant' AND json_extract(ui_message,'$.metadata.status')='interrupted'",
             )
             .bind(input.edit.replacedAssistant.id, ownerId),
         ]
@@ -410,7 +427,7 @@ export async function prepareTurn(
   const conversation = records.conversation;
   let requestMessage = request.message;
   if (records.regeneration) {
-    requestMessage = records.regeneration.user.content;
+    requestMessage = uiMessageText(records.regeneration.user);
     conversation.messages = records.regeneration.history;
   } else if (records.edit) {
     conversation.messages = records.edit.history;

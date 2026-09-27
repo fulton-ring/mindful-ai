@@ -1,130 +1,129 @@
 // @vitest-environment jsdom
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { Annotation, AnnotationEvent, ChatEvent, Conversation } from '@walden/contracts';
+import type { Annotation, AnnotationEvent, Conversation, LearningCheck } from '@walden/contracts';
 import { expect, it } from 'vitest';
-import { getTransport, props, setComposerValue } from '../../tests/_ChatPanel.test-helpers';
+import {
+  getTransport,
+  hang,
+  props,
+  reply,
+  replyChunks,
+  setComposerValue,
+  textChunks,
+} from '../../tests/_ChatPanel.test-helpers';
 
 const { ChatPanel } = await import('../../ChatPanel');
 
 const transport = getTransport();
+const question = 'Where does the Calvin cycle occur?';
+const check: LearningCheck = {
+  id: 'check',
+  kind: 'learning_check',
+  questions: [
+    {
+      id: 'location',
+      header: 'Location',
+      format: 'multiple_choice',
+      question,
+      options: ['Thylakoid', 'Stroma'],
+    },
+  ],
+};
 
-it('replaces a streamed multiple-choice reply with the completed learning check', async () => {
-  const question = 'Where does the Calvin cycle occur?';
-  const rawQuiz = `${question}\nA) Thylakoid\nB) Stroma`;
-  transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
-    onEvent({ type: 'text', text: rawQuiz });
-    onEvent({
-      type: 'intervention',
-      intervention: {
-        id: 'check',
-        kind: 'learning_check',
-        questions: [
-          {
-            id: 'location',
-            header: 'Location',
-            format: 'multiple_choice',
-            question,
-            options: ['Thylakoid', 'Stroma'],
-          },
-        ],
-      },
-    });
-    onEvent({
-      type: 'done',
-      annotationsHandled: true,
-      message: {
-        id: 'answer',
-        role: 'assistant',
-        content: '',
-        createdAt: '',
-        learningCheck: {
-          id: 'check',
-          kind: 'learning_check',
-          questions: [
-            {
-              id: 'location',
-              header: 'Location',
-              format: 'multiple_choice',
-              question,
-              options: ['Thylakoid', 'Stroma'],
-            },
-          ],
-        },
-      },
-      conversationId: 'conversation-1',
-      branchId: 'branch-1',
-      title: 'Conversation',
-      expiresAt: '2026-09-25T00:00:00.000Z',
-    });
-  });
+function renderSaving() {
   const values = props();
   const view = render(<ChatPanel {...values} />);
-  values.onConversation.mockImplementation((next: Conversation) => {
-    view.rerender(<ChatPanel {...values} conversation={next} />);
-  });
-  setComposerValue(screen.getByLabelText('Message'), 'Quiz me');
+  values.onConversation.mockImplementation((next: Conversation) =>
+    view.rerender(<ChatPanel {...values} conversation={next} />),
+  );
+  return values;
+}
+
+function send(text: string) {
+  setComposerValue(screen.getByLabelText('Message'), text);
   fireEvent.click(screen.getByLabelText('Send message'));
+}
+
+it('shows a learning check instead of the streamed multiple-choice text', async () => {
+  const rawQuiz = `${question}\nA) Thylakoid\nB) Stroma`;
+  reply(
+    replyChunks('answer', rawQuiz, {
+      body: [{ type: 'data-intervention', id: 'check', data: check }],
+    }),
+  );
+  const values = renderSaving();
+  send('Quiz me');
 
   await waitFor(() =>
     expect(values.onConversation).toHaveBeenCalledWith(
       expect.objectContaining({
-        messages: expect.arrayContaining([expect.objectContaining({ id: 'answer', content: '' })]),
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            id: 'answer',
+            parts: expect.arrayContaining([
+              { type: 'data-intervention', id: 'check', data: check },
+            ]),
+          }),
+        ]),
       }),
     ),
   );
   expect(screen.queryByText(rawQuiz)).toBeNull();
-  expect(screen.getByRole('button', { name: 'Capture intervention' })).not.toBeNull();
+  expect(screen.getByRole('button', { name: 'Capture intervention' })).toBeTruthy();
+  // A learning check has no response toolbar of its own.
+  expect(screen.queryByRole('button', { name: 'Regenerate response' })).toBeNull();
+});
+
+it('submits answers as a structured response and shows them as the reader’s answers', async () => {
+  reply(
+    replyChunks('answer', '', { body: [{ type: 'data-intervention', id: 'check', data: check }] }),
+  );
+  renderSaving();
+  send('Quiz me');
+  const submit = await screen.findByRole('button', { name: 'Submit answers' });
+  await waitFor(() => expect(screen.getByLabelText('Send message')).toBeTruthy());
+  hang('turn-2');
+  fireEvent.click(submit);
+  await waitFor(() => expect(transport.startTurn).toHaveBeenCalledTimes(2));
+  expect(transport.startTurn.mock.calls[1]?.[0]).toEqual(
+    expect.objectContaining({
+      action: 'feedback',
+      message: 'Stroma',
+      learningCheckResponse: { checkId: 'check', answers: { location: { answers: ['Stroma'] } } },
+    }),
+  );
+  expect(await screen.findByText('My answers')).toBeTruthy();
+  expect(screen.getByText('Location')).toBeTruthy();
 });
 
 it('shows primary-stream highlights before completion without classifying twice', async () => {
-  let emit: ((event: ChatEvent) => void) | undefined;
-  let finish: (() => void) | undefined;
-  transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
-    emit = onEvent;
-    await new Promise<void>((resolve) => {
-      finish = resolve;
-    });
-  });
+  const stream = hang();
   transport.streamNoteProposal.mockResolvedValue(undefined);
-  const values = props();
-  const rendered = render(<ChatPanel {...values} />);
-  values.onConversation.mockImplementation((next: Conversation) => {
-    rendered.rerender(<ChatPanel {...values} conversation={next} />);
-  });
-  setComposerValue(screen.getByLabelText('Message'), 'Question');
-  fireEvent.click(screen.getByLabelText('Send message'));
-  await waitFor(() => expect(emit).toBeTypeOf('function'));
+  renderSaving();
+  send('Question');
+  await waitFor(() => expect(transport.turnEvents).toHaveBeenCalled());
   const annotation: Annotation = {
     id: 'early',
     quote: 'Ice floats.',
     kind: 'fact',
     whose: 'assistant',
   };
-  act(() => {
-    emit?.({ type: 'text', text: 'Ice floats.' });
-    emit?.({ type: 'annotation', annotation });
-  });
-  expect(screen.getByText('Ice floats.').getAttribute('data-annotation-count')).toBe('1');
-  expect(transport.streamNoteProposal).not.toHaveBeenCalled();
+  act(() =>
+    stream.emit(
+      { type: 'start', messageId: 'early-answer', messageMetadata: { createdAt: '' } },
+      ...textChunks('Ice floats.'),
+      { type: 'message-metadata', messageMetadata: { annotations: [annotation] } },
+    ),
+  );
+  await waitFor(() =>
+    expect(screen.getByText('Ice floats.').getAttribute('data-annotation-count')).toBe('1'),
+  );
   await act(async () => {
-    emit?.({
-      type: 'done',
-      annotationsHandled: true,
-      message: {
-        id: 'early-answer',
-        role: 'assistant',
-        content: 'Ice floats.',
-        annotations: [annotation],
-        createdAt: new Date().toISOString(),
-      },
-      conversationId: values.conversation.id,
-      branchId: values.conversation.branchId,
-      title: values.conversation.title,
-      expiresAt: values.conversation.expiresAt,
-    });
-    finish?.();
+    stream.emit({ type: 'finish' });
+    stream.done();
   });
+  await waitFor(() => expect(screen.getByLabelText('Send message')).toBeTruthy());
   expect(screen.getByText('Ice floats.').getAttribute('data-annotation-count')).toBe('1');
   expect(transport.streamMessageAnnotations).not.toHaveBeenCalled();
   // Nothing asks for a note here, so none is proposed.
@@ -132,21 +131,7 @@ it('shows primary-stream highlights before completion without classifying twice'
 });
 
 it('keeps streamed highlights when the terminal classifier result is incomplete', async () => {
-  transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
-    onEvent({
-      type: 'done',
-      message: {
-        id: 'assistant-highlights',
-        role: 'assistant',
-        content: 'Ice floats. Water freezes.',
-        createdAt: new Date().toISOString(),
-      },
-      conversationId: 'conversation-1',
-      branchId: 'branch-1',
-      title: 'Conversation',
-      expiresAt: '2026-09-25T00:00:00.000Z',
-    });
-  });
+  reply(replyChunks('assistant-highlights', 'Ice floats. Water freezes.'));
   transport.streamNoteProposal.mockResolvedValue(undefined);
   transport.streamMessageAnnotations.mockImplementation(
     async (_id, _input, onEvent: (event: AnnotationEvent) => void) => {
@@ -160,15 +145,8 @@ it('keeps streamed highlights when the terminal classifier result is incomplete'
       });
     },
   );
-  const values = props();
-  const rendered = render(<ChatPanel {...values} />);
-  values.onConversation.mockImplementation((next: Conversation) => {
-    rendered.rerender(<ChatPanel {...values} conversation={next} />);
-  });
-
-  setComposerValue(screen.getByLabelText('Message'), 'Question');
-  fireEvent.click(screen.getByLabelText('Send message'));
-
+  renderSaving();
+  send('Question');
   await waitFor(() =>
     expect(
       screen.getByText('Ice floats. Water freezes.').getAttribute('data-annotation-count'),

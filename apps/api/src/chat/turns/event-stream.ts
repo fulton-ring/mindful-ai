@@ -1,76 +1,106 @@
-import type { ChatEvent } from '@walden/contracts';
+import type { WaldenUIMessageChunk } from '@walden/contracts';
+import { UI_MESSAGE_STREAM_HEADERS } from 'ai';
 import { first } from '../../db/client';
-import { encodeSse, sseResponse } from '../sse';
-import { type DurableTurnRow, readTurnEvents } from './durable-store';
+import {
+  type DurableTurnRow,
+  isResetChunk,
+  readTurnChunks,
+  type StoredChunk,
+} from './durable-store';
 
-type Observer = { cursor: number; detached: boolean; started: number };
-type EventRow = { seq: number; event: ChatEvent };
+type Observer = { cursor: number; started: number };
+type Output = ReadableStreamDefaultController<Uint8Array>;
 
-function sendEvents(
-  output: ReadableStreamDefaultController<Uint8Array>,
-  rows: EventRow[],
-  state: Observer,
-) {
-  for (const row of rows) {
-    state.cursor = row.seq;
-    output.enqueue(encodeSse(row.event, row.seq));
-    if (row.event.type === 'done' || row.event.type === 'error') return true;
+const encoder = new TextEncoder();
+const RECONNECT_WINDOW_MS = 25_000;
+const ENDED: WaldenUIMessageChunk = {
+  type: 'error',
+  errorText: 'Turn has ended. Reload the conversation.',
+};
+
+const frame = (chunk: WaldenUIMessageChunk, seq?: number) =>
+  encoder.encode(`${seq === undefined ? '' : `id: ${seq}\n`}data: ${JSON.stringify(chunk)}\n\n`);
+const DONE = encoder.encode('data: [DONE]\n\n');
+
+/**
+ * Sends stored chunks after the cursor; returns true once the stream is over.
+ * A reset marker reaches only a reader that already holds chunks of the
+ * discarded attempt, and ends its connection so it replays from seq 0.
+ */
+function sendChunks(output: Output, rows: StoredChunk[], state: Observer) {
+  for (const { seq, chunk } of rows) {
+    if (isResetChunk(chunk)) {
+      if (state.cursor > 0) {
+        output.enqueue(frame(chunk, seq));
+        return true;
+      }
+      state.cursor = seq;
+      continue;
+    }
+    state.cursor = seq;
+    output.enqueue(frame(chunk, seq));
+    if (chunk.type === 'finish') {
+      output.enqueue(DONE);
+      return true;
+    }
   }
   return false;
 }
 
-async function pollEvents(
-  db: D1Database,
-  row: DurableTurnRow,
-  state: Observer,
-  output: ReadableStreamDefaultController<Uint8Array>,
-) {
-  const events = await readTurnEvents(db, row.id, state.cursor);
-  if (events.length) {
-    if (sendEvents(output, events, state)) {
-      state.detached = true;
-      output.close();
-    }
-    return;
-  }
+async function turnStatus(db: D1Database, row: DurableTurnRow) {
   const active = await first<{ status: string }>(
     db.prepare('SELECT status FROM turns WHERE id=? AND owner_id=?').bind(row.id, row.owner_id),
   );
-  if (!active || active.status !== 'streaming') {
-    const tail = await readTurnEvents(db, row.id, state.cursor);
-    sendEvents(output, tail, state);
-    if (!tail.length)
-      output.enqueue(
-        encodeSse({ type: 'error', message: 'Turn has ended. Reload the conversation.' }),
-      );
-    state.detached = true;
-    output.close();
-    return;
-  }
-  if (Date.now() - state.started > 25_000) {
-    state.detached = true;
-    output.close();
-    return;
-  }
-  output.enqueue(new TextEncoder().encode(': keepalive\n\n'));
-  await new Promise((resolve) => setTimeout(resolve, 250));
+  return active?.status ?? 'deleted';
 }
 
-export function createTurnEventsResponse(db: D1Database, row: DurableTurnRow, after: number) {
-  const state: Observer = { cursor: after, detached: false, started: Date.now() };
+/** One poll: send new chunks, or detect the end, or keep the connection alive. */
+async function pollChunks(db: D1Database, row: DurableTurnRow, state: Observer, output: Output) {
+  const rows = await readTurnChunks(db, row.id, state.cursor);
+  if (rows.length) return sendChunks(output, rows, state);
+  if ((await turnStatus(db, row)) !== 'streaming') {
+    const tail = await readTurnChunks(db, row.id, state.cursor);
+    if (sendChunks(output, tail, state)) return true;
+    output.enqueue(frame(ENDED));
+    output.enqueue(DONE);
+    return true;
+  }
+  // The client reconnects after this window; it never outlives a request.
+  if (Date.now() - state.started > RECONNECT_WINDOW_MS) return true;
+  output.enqueue(encoder.encode(': keepalive\n\n'));
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  return false;
+}
+
+/**
+ * Serves a turn's UI message stream: `id: <seq>` + `data: <chunk>` frames from
+ * after the cursor, ending with `data: [DONE]` once the turn is terminal. A turn
+ * that already ended with nothing after the cursor answers 204.
+ */
+export async function createTurnEventsResponse(
+  db: D1Database,
+  row: DurableTurnRow,
+  after: number,
+): Promise<Response> {
+  if (row.status !== 'streaming' && !(await readTurnChunks(db, row.id, after, 1)).length)
+    return new Response(null, { status: 204 });
+  const state: Observer = { cursor: after, started: Date.now() };
+  let closed = false;
   const stream = new ReadableStream<Uint8Array>({
     async pull(output) {
       try {
-        await pollEvents(db, row, state, output);
+        if (!(await pollChunks(db, row, state, output)) || closed) return;
+        closed = true;
+        output.close();
       } catch (error) {
-        if (state.detached) return;
-        state.detached = true;
+        if (closed) return;
+        closed = true;
         output.error(error);
       }
     },
     cancel() {
-      state.detached = true;
+      closed = true;
     },
   });
-  return sseResponse(stream);
+  return new Response(stream, { headers: UI_MESSAGE_STREAM_HEADERS });
 }

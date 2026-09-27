@@ -1,4 +1,4 @@
-import type { MessageSource, ToolActivity } from '@walden/contracts';
+import type { WaldenUIMessage } from '@walden/contracts';
 import { CircleDashedIcon, XCircleIcon } from 'lucide-react';
 import {
   ChainOfThought,
@@ -12,6 +12,9 @@ import {
   SourcesContent,
   SourcesTrigger,
 } from '../../components/ai-elements/sources';
+import { type ActivitySource, activityTools, sourcesOf } from './message-parts';
+
+type Parts = WaldenUIMessage['parts'];
 
 function toolLabel(name: string) {
   if (name === 'readWebPage') return 'Read page';
@@ -24,7 +27,7 @@ function toolLabel(name: string) {
   return words ? words[0]!.toUpperCase() + words.slice(1) : 'Tool';
 }
 
-function safeSource(source: MessageSource): (MessageSource & { domain: string }) | null {
+function safeSource(source: ActivitySource): (ActivitySource & { domain: string }) | null {
   try {
     const url = new URL(source.url);
     if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
@@ -36,15 +39,16 @@ function safeSource(source: MessageSource): (MessageSource & { domain: string })
 }
 
 export function ResponseActivity({
-  tools = [],
+  parts,
   live = false,
-  sources = [],
+  interrupted = false,
 }: {
-  tools?: ToolActivity[];
+  parts: Parts;
   live?: boolean;
-  sources?: MessageSource[];
+  interrupted?: boolean;
 }) {
-  const visibleTools = tools.filter(
+  const sources = sourcesOf(parts);
+  const visibleTools = activityTools(parts, interrupted).filter(
     ({ name }) => name !== 'proposeAsk' && name !== 'proposeLearningCheck',
   );
   if (!visibleTools.length && !sources.length) return null;
@@ -105,8 +109,8 @@ export function ResponseActivity({
   );
 }
 
-function SearchResultLinks({ sources }: { sources: MessageSource[] }) {
-  const unique = new Map<string, MessageSource & { domain: string }>();
+function SearchResultLinks({ sources }: { sources: ActivitySource[] }) {
+  const unique = new Map<string, ActivitySource & { domain: string }>();
   for (const source of sources) {
     const result = safeSource(source);
     if (result && !unique.has(result.url)) unique.set(result.url, result);
@@ -127,13 +131,13 @@ function SearchResultLinks({ sources }: { sources: MessageSource[] }) {
   );
 }
 
-export function ResponseSources({ sources = [] }: { sources?: MessageSource[] }) {
+export function ResponseSources({ parts }: { parts: Parts }) {
   const uniqueSources = Array.from(
-    sources.reduce((result, source) => {
+    sourcesOf(parts).reduce((result, source) => {
       const safe = safeSource(source);
       if (safe && !result.has(safe.url)) result.set(safe.url, safe);
       return result;
-    }, new Map<string, MessageSource & { domain: string }>()),
+    }, new Map<string, ActivitySource & { domain: string }>()),
     ([, source]) => source,
   );
   if (!uniqueSources.length) return null;

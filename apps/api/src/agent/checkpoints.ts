@@ -1,9 +1,18 @@
 import type { LanguageModelV3, LanguageModelV3StreamPart } from '@ai-sdk/provider';
-import type { ChatEvent } from '@walden/contracts';
+import type { WaldenUIMessageChunk } from '@walden/contracts';
+
+/** Live, provisional output of a durable turn, written to the turn's chunk stream. */
+export type ChunkPreview = {
+  /** Position to rewind to; the count of chunks written so far. */
+  mark(): number;
+  write(chunks: WaldenUIMessageChunk[]): Promise<void>;
+  /** Discards everything written after `mark`, for a retried model call. */
+  rewind(mark: number): Promise<void>;
+};
 
 /** Each callback is an independently persisted operation, never an entire agent turn. */
 export type AgentCheckpoints = {
-  publish?: (event: ChatEvent) => Promise<void>;
+  preview?: ChunkPreview;
   do<T>(name: string, callback: () => Promise<T>, options?: { retries?: number }): Promise<T>;
 };
 
@@ -33,17 +42,26 @@ function decode<T>(value: string): T {
   }).value as T;
 }
 
-export type ModelProgress = (
-  step: string,
-  text: string,
-  reasoning: string,
-  complete: boolean,
-) => Promise<void>;
-
 type StreamPart = LanguageModelV3StreamPart;
 type StreamOptions = Parameters<LanguageModelV3['doStream']>[0];
 
-type StreamState = { text: string; reasoning: string; dirty: boolean; finished: boolean };
+/** Receives a model call's text and reasoning parts as they stream, keyed by call. */
+export type ModelProgress = {
+  begin(call: string): Promise<void>;
+  parts(call: string, parts: StreamPart[]): Promise<void>;
+  end(call: string): Promise<void>;
+};
+
+const PREVIEW_PARTS = new Set<StreamPart['type']>([
+  'text-start',
+  'text-delta',
+  'text-end',
+  'reasoning-start',
+  'reasoning-delta',
+  'reasoning-end',
+]);
+
+type StreamState = { pending: StreamPart[]; finished: boolean };
 
 function recordStreamPart(part: StreamPart, parts: StreamPart[], state: StreamState) {
   if (part.type === 'error')
@@ -51,13 +69,39 @@ function recordStreamPart(part: StreamPart, parts: StreamPart[], state: StreamSt
   if (part.type === 'raw') return;
   if (part.type === 'finish') state.finished = true;
   parts.push(part);
-  if (part.type === 'text-delta') {
-    state.text += part.delta;
-    state.dirty = true;
-  }
-  if (part.type === 'reasoning-delta') {
-    state.reasoning += part.delta;
-    state.dirty = true;
+  if (PREVIEW_PARTS.has(part.type)) state.pending.push(part);
+}
+
+async function readWithIdleFlush(
+  reader: ReadableStreamDefaultReader<StreamPart>,
+  onPart: (part: StreamPart) => void,
+  flush: (idle: boolean) => Promise<void>,
+  hasPending: () => boolean,
+) {
+  let nextRead = reader.read();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    while (true) {
+      const next = hasPending()
+        ? await Promise.race([
+            nextRead,
+            new Promise<null>((resolve) => {
+              timer = setTimeout(() => resolve(null), 100);
+            }),
+          ])
+        : await nextRead;
+      clearTimeout(timer);
+      if (next === null) {
+        await flush(true);
+        continue;
+      }
+      if (next.done) return;
+      nextRead = reader.read();
+      onPart(next.value);
+      await flush(false);
+    }
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -67,64 +111,45 @@ async function collectStreamParts(
   name: string,
   progress?: ModelProgress,
 ): Promise<string> {
-  await progress?.(name, '', '', false);
+  await progress?.begin(name);
   const { stream } = await model.doStream(options);
   const parts: StreamPart[] = [];
-  const state: StreamState = { text: '', reasoning: '', finished: false, dirty: false };
+  const state: StreamState = { pending: [], finished: false };
   let publishedAt = 0;
-  const publish = async () => {
-    if (!state.dirty || !progress) return;
-    await progress(name, state.text, state.reasoning, false);
-    state.dirty = false;
+  const flush = async (idle: boolean) => {
+    if (!progress || !state.pending.length || (!idle && Date.now() - publishedAt < 100)) return;
+    await progress.parts(name, state.pending.splice(0));
     publishedAt = Date.now();
   };
   const reader = stream.getReader();
-  let nextRead = reader.read();
-  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    while (true) {
-      const next =
-        state.dirty && progress
-          ? await Promise.race([
-              nextRead,
-              new Promise<null>((resolve) => {
-                timer = setTimeout(() => resolve(null), 100);
-              }),
-            ])
-          : await nextRead;
-      clearTimeout(timer);
-      if (next === null) {
-        await publish();
-        continue;
-      }
-      if (next.done) break;
-      nextRead = reader.read();
-      recordStreamPart(next.value, parts, state);
-      if (Date.now() - publishedAt >= 100) await publish();
-    }
+    await readWithIdleFlush(
+      reader,
+      (part) => recordStreamPart(part, parts, state),
+      flush,
+      () => Boolean(progress && state.pending.length),
+    );
   } finally {
-    clearTimeout(timer);
     await reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
   if (!state.finished) throw new Error('Model stream ended without a finish event.');
+  await flush(true);
+  await progress?.end(name);
   return encode(parts);
 }
 
 async function replayStreamParts(saved: string, name: string, progress?: ModelProgress) {
   const parts = decode<StreamPart[]>(saved);
-  await progress?.(
-    name,
-    parts
-      .filter((part) => part.type === 'text-delta')
-      .map((part) => part.delta)
-      .join(''),
-    parts
-      .filter((part) => part.type === 'reasoning-delta')
-      .map((part) => part.delta)
-      .join(''),
-    true,
-  );
+  if (progress) {
+    // A call restored from its checkpoint was not previewed in this execution.
+    await progress.begin(name);
+    await progress.parts(
+      name,
+      parts.filter((part) => PREVIEW_PARTS.has(part.type)),
+    );
+    await progress.end(name);
+  }
   return {
     stream: new ReadableStream<StreamPart>({
       start(controller) {
@@ -173,12 +198,17 @@ export function checkpointModel(
     },
     async doStream(options) {
       const name = `${scope}-stream-${++call}`;
+      let live = false;
       const saved = await checkpoints.do(
         name,
-        () => collectStreamParts(model, options, name, progress),
+        async () => {
+          const parts = await collectStreamParts(model, options, name, progress);
+          live = true;
+          return parts;
+        },
         checkpointOptions,
       );
-      return replayStreamParts(saved, name, progress);
+      return replayStreamParts(saved, name, live ? undefined : progress);
     },
   };
 }

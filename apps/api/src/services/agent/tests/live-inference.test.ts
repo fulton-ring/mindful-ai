@@ -44,13 +44,8 @@ it.skipIf(!token || !accountId)(
       inlineCheckpoints,
     );
     let text = '';
-    let finished = false;
-    for await (const event of events) {
-      if (event.type === 'text') text += event.text;
-      if (event.type === 'done') finished = true;
-    }
+    for await (const event of events) if (event.type === 'text-delta') text += event.delta;
     expect(text.toLowerCase()).toContain('walden live');
-    expect(finished).toBe(true);
   },
   90_000,
 );
@@ -101,8 +96,8 @@ it.skipIf(!token || !accountId)(
       {
         id: 'live-duplicate-assistant',
         role: 'assistant',
-        content: sentence,
-        createdAt: new Date().toISOString(),
+        parts: [{ type: 'text', text: sentence }],
+        metadata: { createdAt: new Date().toISOString() },
       },
     );
     const events = [];
@@ -164,8 +159,13 @@ it.skipIf(!token || !accountId)(
       {
         id: 'live-correction-assistant',
         role: 'assistant',
-        content: `I will propose an update to your note to change the opening time to one.\n\nProposed change:\n"${current}"\n\nShould I apply this change?`,
-        createdAt: new Date().toISOString(),
+        parts: [
+          {
+            type: 'text',
+            text: `I will propose an update to your note to change the opening time to one.\n\nProposed change:\n"${current}"\n\nShould I apply this change?`,
+          },
+        ],
+        metadata: { createdAt: new Date().toISOString() },
       },
     );
     const events = [];

@@ -1,6 +1,11 @@
 import type { LanguageModelV3, LanguageModelV3StreamPart } from '@ai-sdk/provider';
 import { describe, expect, it, vi } from 'vitest';
-import { type AgentCheckpoints, checkpointModel, checkpointTools } from '../checkpoints';
+import {
+  type AgentCheckpoints,
+  checkpointModel,
+  checkpointTools,
+  type ModelProgress,
+} from '../checkpoints';
 
 function checkpoints(): AgentCheckpoints {
   const saved = new Map<string, unknown>();
@@ -155,7 +160,23 @@ it('forwards the no-retry policy for bounded annotation calls', async () => {
   expect(observed).toEqual([{ retries: 0 }]);
 });
 
-it('publishes text before the provider finishes and replays snapshots from a saved step', async () => {
+function recordingProgress() {
+  const calls: Array<[string, string, unknown?]> = [];
+  const progress: ModelProgress = {
+    begin: async (call) => {
+      calls.push(['begin', call]);
+    },
+    parts: async (call, parts) => {
+      calls.push(['parts', call, parts]);
+    },
+    end: async (call) => {
+      calls.push(['end', call]);
+    },
+  };
+  return { calls, progress };
+}
+
+it('previews text parts before the provider finishes and does not preview a live step again', async () => {
   let release!: () => void;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
@@ -172,21 +193,45 @@ it('publishes text before the provider finishes and replays snapshots from a sav
       },
     }),
   }));
-  const progress = vi.fn(async () => {});
+  const { calls, progress } = recordingProgress();
+  const previewedParts = () =>
+    calls.flatMap(([kind, , parts]) =>
+      kind === 'parts' ? (parts as LanguageModelV3StreamPart[]) : [],
+    );
   const durable = checkpoints();
   const running = checkpointModel(provider, durable, 'chat', undefined, progress).doStream({
     prompt: [],
   });
   try {
-    await vi.waitFor(() =>
-      expect(progress).toHaveBeenCalledWith('chat-stream-1', 'hello', '', false),
-    );
+    await vi.waitFor(() => expect(previewedParts()).toEqual(complete.slice(0, 2)));
   } finally {
     release();
   }
   expect(await collect((await running).stream)).toEqual(complete);
-  const replay = vi.fn(async () => {});
-  await checkpointModel(provider, durable, 'chat', undefined, replay).doStream({ prompt: [] });
-  expect(replay).toHaveBeenLastCalledWith('chat-stream-1', 'hello', '', true);
+  expect(calls[0]).toEqual(['begin', 'chat-stream-1']);
+  expect(calls.at(-1)).toEqual(['end', 'chat-stream-1']);
+  expect(calls.filter(([kind]) => kind === 'begin')).toHaveLength(1);
+  expect(previewedParts()).toEqual(complete.slice(0, 3));
+  const replayed = recordingProgress();
+  await checkpointModel(provider, durable, 'chat', undefined, replayed.progress).doStream({
+    prompt: [],
+  });
+  expect(replayed.calls).toHaveLength(3);
+});
+
+it('replays a restored step preview once, as begin, its text parts, and end', async () => {
+  const provider = model(complete);
+  const durable = checkpoints();
+  await checkpointModel(provider, durable, 'chat').doStream({ prompt: [] });
+  const { calls, progress } = recordingProgress();
+  const restored = await checkpointModel(provider, durable, 'chat', undefined, progress).doStream({
+    prompt: [],
+  });
+  expect(await collect(restored.stream)).toEqual(complete);
+  expect(calls).toEqual([
+    ['begin', 'chat-stream-1'],
+    ['parts', 'chat-stream-1', complete.slice(0, 3)],
+    ['end', 'chat-stream-1'],
+  ]);
   expect(provider.doStream).toHaveBeenCalledTimes(1);
 });

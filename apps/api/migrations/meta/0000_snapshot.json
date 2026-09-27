@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "e0dd9ef6-a2c3-4b66-be41-394e7e525cf5",
+  "id": "45cb924e-2179-4c5f-9d8d-908a69a04ed5",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "account_privacy": {
@@ -702,6 +702,52 @@
         }
       }
     },
+    "message_windows": {
+      "name": "message_windows",
+      "columns": {
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "used": {
+          "name": "used",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "0"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "message_windows_owner_id_users_id_fk": {
+          "name": "message_windows_owner_id_users_id_fk",
+          "tableFrom": "message_windows",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "messages": {
       "name": "messages",
       "columns": {
@@ -740,42 +786,12 @@
           "notNull": true,
           "autoincrement": false
         },
-        "content": {
-          "name": "content",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "incomplete": {
-          "name": "incomplete",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "0"
-        },
         "created_at": {
           "name": "created_at",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "reasoning": {
-          "name": "reasoning",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "activity_json": {
-          "name": "activity_json",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'{}'"
         },
         "parent_message_id": {
           "name": "parent_message_id",
@@ -791,11 +807,11 @@
           "notNull": false,
           "autoincrement": false
         },
-        "persona_name": {
-          "name": "persona_name",
+        "ui_message": {
+          "name": "ui_message",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         }
       },
@@ -894,7 +910,7 @@
       "checkConstraints": {
         "messages_check_1": {
           "name": "messages_check_1",
-          "value": "incomplete IN (0,1)"
+          "value": "role IN ('user','assistant')"
         }
       }
     },
@@ -1750,8 +1766,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "event_json": {
-          "name": "event_json",
+        "chunk_json": {
+          "name": "chunk_json",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -1873,6 +1889,21 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "weight": {
+          "name": "weight",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "1"
         },
         "execution_epoch": {
           "name": "execution_epoch",

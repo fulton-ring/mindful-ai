@@ -88,7 +88,11 @@ describe('delayed thread rename', () => {
       learningChecksEnabled: true,
       expiresAt: '2026-09-25T00:00:00.000Z',
       messages: [
-        { id: 'new-answer', role: 'assistant' as const, content: 'Just streamed', createdAt: '' },
+        {
+          id: 'new-answer',
+          role: 'assistant' as const,
+          parts: [{ type: 'text' as const, text: 'Just streamed' }],
+        },
       ],
     } satisfies Conversation;
     client.setQueryData(['conversation', latest.id, null], latest);
@@ -187,8 +191,8 @@ it('conversation branch cache updates the mounted default-URL query after a regu
       {
         id: 'user-1',
         role: 'user' as const,
-        content: 'Question',
-        createdAt: '2026-09-18T00:00:00.000Z',
+        parts: [{ type: 'text' as const, text: 'Question' }],
+        metadata: { createdAt: '2026-09-18T00:00:00.000Z' },
       },
     ],
   };
@@ -216,8 +220,8 @@ it('conversation branch cache updates the mounted explicit-branch query after a 
       {
         id: 'assistant-2',
         role: 'assistant' as const,
-        content: 'Branch answer',
-        createdAt: '2026-09-18T00:00:00.000Z',
+        parts: [{ type: 'text' as const, text: 'Branch answer' }],
+        metadata: { createdAt: '2026-09-18T00:00:00.000Z' },
       },
     ],
     expiresAt: '2026-09-25T00:00:00.000Z',
@@ -244,8 +248,8 @@ it('conversation branch cache keeps the selected branch path when first-note cap
       {
         id: 'branch-answer',
         role: 'assistant' as const,
-        content: 'Selected path',
-        createdAt: '2026-09-18T00:00:00.000Z',
+        parts: [{ type: 'text' as const, text: 'Selected path' }],
+        metadata: { createdAt: '2026-09-18T00:00:00.000Z' },
       },
     ],
     expiresAt: '2026-09-25T00:00:00.000Z',

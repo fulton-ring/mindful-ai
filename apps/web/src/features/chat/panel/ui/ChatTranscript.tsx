@@ -1,11 +1,10 @@
-import type { Message } from '@walden/contracts';
+import type { WaldenUIMessage } from '@walden/contracts';
 import { RefreshCw, X } from 'lucide-react';
 import { Fragment, type ReactNode } from 'react';
 
 type Props = {
-  messages: Message[];
-  renderKey(message: Message): string;
-  renderMessage(message: Message, index: number): ReactNode;
+  messages: WaldenUIMessage[];
+  renderMessage(message: WaldenUIMessage, index: number): ReactNode;
 };
 
 export type MessageStatusRow = {
@@ -56,12 +55,12 @@ export function MessageStatus({ rows }: { rows: MessageStatusRow[] }) {
   );
 }
 
-/** Keeps the transcript order and stable response keys in one presentation boundary. */
-export function ChatTranscript({ messages, renderKey, renderMessage }: Props) {
+/** Keeps the transcript order in one presentation boundary; a reply keeps its turn id as key. */
+export function ChatTranscript({ messages, renderMessage }: Props) {
   return (
     <>
       {messages.map((message, index) => (
-        <Fragment key={renderKey(message)}>{renderMessage(message, index)}</Fragment>
+        <Fragment key={message.id}>{renderMessage(message, index)}</Fragment>
       ))}
     </>
   );

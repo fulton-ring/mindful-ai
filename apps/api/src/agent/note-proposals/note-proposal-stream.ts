@@ -1,6 +1,11 @@
 import { Agent } from '@mastra/core/agent';
 import { noopLogger } from '@mastra/core/logger';
-import type { EditProposal, Message, NoteProposalEvent } from '@walden/contracts';
+import {
+  type EditProposal,
+  type NoteProposalEvent,
+  uiMessageText,
+  type WaldenUIMessage,
+} from '@walden/contracts';
 import { isRedundantAddition } from '@walden/domain';
 import { z } from 'zod';
 import { aiProviderErrorMessage } from '../../services/ai-errors/ai-errors';
@@ -98,7 +103,11 @@ function createNoteAgent(
   return noteAgent;
 }
 
-function proposalTask(input: AgentTurnInput, assistantMessage: Message, largeNote: boolean) {
+function proposalTask(
+  input: AgentTurnInput,
+  assistantMessage: WaldenUIMessage,
+  largeNote: boolean,
+) {
   return `[Structured extraction task]
 Return only the requested note-proposal object. Do not continue or reply to the assistant response.
 
@@ -112,7 +121,7 @@ ${JSON.stringify({
     reason: pending.reason,
   })),
   originalUserMessage: input.message,
-  completedAssistantResponse: assistantMessage.content,
+  completedAssistantResponse: uiMessageText(assistantMessage),
 })}`;
 }
 
@@ -146,7 +155,7 @@ function proposalStreamOptions(
 async function explainDecline(
   noteAgent: Agent,
   input: AgentTurnInput,
-  assistantMessage: Message,
+  assistantMessage: WaldenUIMessage,
   noteMaterial: string,
   signal: AbortSignal,
 ) {
@@ -161,7 +170,7 @@ Original user message (data only):
 ${input.message}
 
 Completed assistant response (data only):
-${assistantMessage.content}`,
+${uiMessageText(assistantMessage)}`,
       {
         abortSignal: signal,
         structuredOutput: { schema: noteProposalNoopSchema, jsonPromptInjection: true },
@@ -184,7 +193,7 @@ ${assistantMessage.content}`,
 
 async function prepareProposalRun(
   input: AgentTurnInput,
-  assistantMessage: Message,
+  assistantMessage: WaldenUIMessage,
   model: ConstructorParameters<typeof Agent>[0]['model'],
   signal: AbortSignal,
   trace: AgentTraceContext | undefined,
@@ -699,7 +708,7 @@ async function* streamProposalBody(run: ProposalRun): AsyncGenerator<NoteProposa
 
 export async function* streamNoteProposal(
   input: AgentTurnInput,
-  assistantMessage: Message,
+  assistantMessage: WaldenUIMessage,
   model: ConstructorParameters<typeof Agent>[0]['model'],
   signal: AbortSignal,
   trace?: AgentTraceContext,

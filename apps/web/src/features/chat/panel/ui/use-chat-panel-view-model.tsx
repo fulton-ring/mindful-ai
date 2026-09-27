@@ -1,8 +1,8 @@
 import type {
   LearningCheck,
   LearningCheckResponse,
-  Message,
   MessageFollowupRequest,
+  WaldenUIMessage,
 } from '@walden/contracts';
 import type { ReactNode } from 'react';
 
@@ -10,7 +10,13 @@ import {
   type ContextualActionId,
   contextualActionRequest,
 } from '../../../highlights/contextual-actions';
-import type { ChatPanelProps } from '../chat-panel-types';
+import {
+  isInterrupted,
+  learningCheckOf,
+  learningCheckResponseOf,
+  messageText,
+  reasoningText,
+} from '../../message-parts';
 import type { ChatPanelController } from '../hooks/controller/use-chat-panel-controller';
 import { MessageToolbar } from './MessageToolbar';
 
@@ -33,47 +39,24 @@ function learningCheckResponseText(check: LearningCheck, response: LearningCheck
     .join('\n\n');
 }
 
-function learningResponse(messages: Message[], index: number) {
-  const check = messages[index].learningCheck;
+function learningResponse(messages: WaldenUIMessage[], index: number) {
+  const check = learningCheckOf(messages[index]!);
   if (!check) return undefined;
-  return messages
-    .slice(index + 1)
-    .find(
-      (candidate) =>
-        candidate.role === 'user' && candidate.learningCheckResponse?.checkId === check.id,
-    )?.learningCheckResponse;
+  for (const candidate of messages.slice(index + 1)) {
+    const response = candidate.role === 'user' ? learningCheckResponseOf(candidate) : undefined;
+    if (response?.checkId === check.id) return response;
+  }
+  return undefined;
 }
 
-function answeredLearningCheck(messages: Message[], index: number) {
-  const response = messages[index].learningCheckResponse;
+function answeredLearningCheck(messages: WaldenUIMessage[], index: number) {
+  const response = learningCheckResponseOf(messages[index]!);
   if (!response) return undefined;
-  return [...messages.slice(0, index)]
+  return messages
+    .slice(0, index)
     .reverse()
-    .find((candidate) => candidate.learningCheck?.id === response.checkId)?.learningCheck;
-}
-
-function buildRenderedMessages(
-  messages: Message[],
-  regenerationIndex: number,
-  streamCompletionId: string | null,
-  optimisticMessage: Message | null,
-  pendingEdit: { id: string; content: string } | null,
-  liveResponse: Message | null,
-) {
-  const visible = regenerationIndex >= 0 ? messages.slice(0, regenerationIndex) : messages;
-  const rendered = visible.filter(
-    (message) => message.id !== streamCompletionId && message.id !== optimisticMessage?.id,
-  );
-  if (pendingEdit) {
-    const editIndex = rendered.findIndex(({ id }) => id === pendingEdit.id);
-    if (editIndex >= 0)
-      rendered.splice(editIndex, rendered.length - editIndex, {
-        ...rendered[editIndex],
-        content: pendingEdit.content,
-      });
-  } else if (optimisticMessage) rendered.push(optimisticMessage);
-  if (liveResponse) rendered.push(liveResponse);
-  return rendered;
+    .map(learningCheckOf)
+    .find((check) => check?.id === response.checkId);
 }
 
 function captureStatus(controller: ChatPanelController, messageId: string): CaptureStatus {
@@ -130,7 +113,7 @@ function highlightMessage(controller: ChatPanelController, messageId: string) {
   controller.retryAnnotations(messageId, input);
 }
 
-function messageToolbar(controller: ChatPanelController, message: Message) {
+function messageToolbar(controller: ChatPanelController, message: WaldenUIMessage) {
   const failure = controller.annotationFailures.get(message.id);
   const notice = controller.proposalNotices.get(message.id);
   return (
@@ -174,55 +157,28 @@ function messageToolbar(controller: ChatPanelController, message: Message) {
   );
 }
 
-export function useChatPanelViewModel(props: ChatPanelProps, controller: ChatPanelController) {
-  const conversationMessages = props.conversation?.messages ?? [];
-  const regenerationIndex = controller.regeneratingMessageId
-    ? conversationMessages.findIndex(({ id }) => id === controller.regeneratingMessageId)
-    : -1;
-  const hasLiveResponse = Boolean(
-    controller.streamed ||
-      controller.reasoning ||
-      controller.liveTools.length ||
-      controller.liveSources.length ||
-      controller.liveContextCompacted,
-  );
-  const liveResponseId = controller.activeRequestId.current ?? 'streaming-response';
-  const liveResponse = hasLiveResponse
-    ? {
-        id: liveResponseId,
-        role: 'assistant' as const,
-        content: controller.streamed,
-        reasoning: controller.reasoning,
-        annotations: controller.liveAnnotations,
-        tools: controller.liveTools,
-        sources: controller.liveSources,
-        contextCompacted: controller.liveContextCompacted,
-        incomplete: controller.interrupted,
-        createdAt: '',
-      }
-    : null;
-  const renderedMessages = buildRenderedMessages(
-    conversationMessages,
-    regenerationIndex,
-    controller.streamCompletionId.current,
-    controller.optimisticMessage,
-    controller.pendingEdit,
-    liveResponse,
-  );
-  const latestCompletedAssistantId = [...conversationMessages]
+export function useChatPanelViewModel(controller: ChatPanelController) {
+  const messages = controller.messages;
+  const last = messages.at(-1);
+  const liveResponseId = controller.sending && last?.role === 'assistant' ? last.id : null;
+  const liveResponse = liveResponseId ? last : undefined;
+  const latestCompletedAssistantId = [...messages]
     .reverse()
-    .find((message) => message.role === 'assistant' && !message.incomplete)?.id;
-  const hasConversationActivity =
-    conversationMessages.length > 0 || Boolean(controller.optimisticMessage) || controller.sending;
+    .find(
+      (message) =>
+        message.role === 'assistant' && !isInterrupted(message) && message.id !== liveResponseId,
+    )?.id;
   return {
-    conversationMessages,
-    hasConversationActivity,
-    hasLiveResponse,
+    renderedMessages: messages,
+    hasConversationActivity: messages.length > 0 || controller.sending,
     liveResponseId,
-    renderedMessages,
+    /** The indicator stays until the live reply has something to read. */
+    thinking:
+      controller.sending &&
+      !(liveResponse && (messageText(liveResponse) || reasoningText(liveResponse))),
     latestCompletedAssistantId,
     captureStatus: (messageId: string) => captureStatus(controller, messageId),
-    messageToolbar: (message: Message): ReactNode => messageToolbar(controller, message),
+    messageToolbar: (message: WaldenUIMessage): ReactNode => messageToolbar(controller, message),
     contextual: (messageId: string | null, action: ContextualActionId, quote: string) =>
       contextual(controller, messageId, action, quote),
     highlightMessage: (messageId: string) => highlightMessage(controller, messageId),

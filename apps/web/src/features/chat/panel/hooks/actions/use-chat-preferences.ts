@@ -15,11 +15,11 @@ async function changeChatPreference(
   setting: 'learningChecks' | 'webSearch',
   enabled: boolean,
 ) {
-  if (args.display.sendingRef.current || args.display.savingChatPreference) {
+  if (args.runtime.live.current || args.display.savingChatPreference) {
     track('action_blocked', {
       action: 'change_chat_preference',
       setting,
-      failure_code: args.display.sendingRef.current ? 'response_in_progress' : 'preference_saving',
+      failure_code: args.runtime.live.current ? 'response_in_progress' : 'preference_saving',
     });
     return;
   }

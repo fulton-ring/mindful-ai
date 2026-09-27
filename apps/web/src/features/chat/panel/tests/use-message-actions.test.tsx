@@ -1,16 +1,20 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import type { Message } from '@walden/contracts';
+import type { WaldenUIMessage } from '@walden/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { useMessageActions } from '../hooks/actions/use-message-actions';
 
-const message: Message = {
+const message: WaldenUIMessage = {
   id: 'assistant-1',
   role: 'assistant',
-  content: 'Copied text',
-  createdAt: '2026-09-21T00:00:00.000Z',
+  parts: [
+    { type: 'reasoning', text: 'Not copied' },
+    { type: 'text', text: 'Copied ' },
+    { type: 'text', text: 'text' },
+  ],
+  metadata: { createdAt: '2026-09-21T00:00:00.000Z' },
 };
 
 function Harness({ onFailure }: { onFailure: (value: string) => void }) {
@@ -35,6 +39,14 @@ describe('useMessageActions', () => {
     await vi.waitFor(() =>
       expect(onFailure).toHaveBeenCalledWith('The response could not be copied.'),
     );
+  });
+
+  it('copies only the visible text parts', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    render(<Harness onFailure={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith('Copied text'));
   });
 
   it('clears the copied-message timer on unmount', async () => {

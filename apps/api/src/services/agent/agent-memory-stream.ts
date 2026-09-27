@@ -1,10 +1,11 @@
-import type { ChatEvent } from '@walden/contracts';
+import type { WaldenUIMessageChunk } from '@walden/contracts';
 import type { MemoryLifecycleEvent } from '../../agent/memory/memory';
+import { metadataPatch, transientStatus } from '../../chat/messages';
 
 export async function* streamMemoryPreparation<T>(
   prepare: (emit: (event: MemoryLifecycleEvent) => void) => Promise<T>,
-): AsyncGenerator<ChatEvent, T> {
-  const queue: ChatEvent[] = [];
+): AsyncGenerator<WaldenUIMessageChunk, T> {
+  const queue: WaldenUIMessageChunk[] = [];
   let wake: (() => void) | undefined;
   let settled = false;
   let result: T | undefined;
@@ -12,13 +13,16 @@ export async function* streamMemoryPreparation<T>(
   const emit = (event: MemoryLifecycleEvent) => {
     if (event.phase !== 'observation') return;
     if (event.state === 'start') {
-      queue.push({ type: 'status', text: 'Compacting conversation context…' });
+      queue.push(transientStatus('Compacting conversation context…'));
     } else if (!event.error) {
       if (event.observed) {
-        queue.push({ type: 'status', text: 'Context compacted. Thinking…' });
-        queue.push({ type: 'context-compacted' });
+        queue.push(transientStatus('Context compacted. Thinking…'));
+        queue.push({
+          type: 'message-metadata',
+          messageMetadata: metadataPatch({ contextCompacted: true }),
+        });
       } else {
-        queue.push({ type: 'status', text: 'Thinking…' });
+        queue.push(transientStatus('Thinking…'));
       }
     }
     wake?.();

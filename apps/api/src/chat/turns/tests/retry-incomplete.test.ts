@@ -1,10 +1,13 @@
 import type { Conversation } from '@walden/contracts';
 import { describe, expect, it } from 'vitest';
+import { textMessage } from '../../../tests/ui-messages';
 import { editContext, regenerationContext } from '../turn-support';
 
 const messages = (incomplete: boolean): Conversation['messages'] => [
-  { id: 'user-1', role: 'user', content: 'Explain tides.', createdAt: '1' },
-  { id: 'assistant-1', role: 'assistant', content: 'Tides are', createdAt: '2', incomplete },
+  textMessage('user-1', 'user', 'Explain tides.'),
+  textMessage('assistant-1', 'assistant', 'Tides are', {
+    status: incomplete ? 'interrupted' : 'complete',
+  }),
 ];
 
 describe('retrying a response that never completed', () => {

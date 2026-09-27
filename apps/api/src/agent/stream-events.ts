@@ -1,7 +1,7 @@
 import { Agent } from '@mastra/core/agent';
 import { noopLogger } from '@mastra/core/logger';
 import type { ChunkType } from '@mastra/core/stream';
-import type { Annotation, AnnotationEvent, ChatEvent } from '@walden/contracts';
+import type { Annotation, AnnotationEvent } from '@walden/contracts';
 import type { ApiTelemetry } from '../observability';
 import { aiProviderErrorMessage } from '../services/ai-errors/ai-errors';
 import { annotationBudget } from '../services/annotations/annotations';
@@ -46,22 +46,6 @@ export class AnnotationGenerationError extends Error {
   constructor() {
     super('Highlights could not be generated.');
   }
-}
-
-export function visibleStreamEvent(chunk: {
-  type: string;
-  payload?: unknown;
-}): Extract<ChatEvent, { type: 'text' | 'reasoning' }> | null {
-  const text =
-    typeof chunk.payload === 'object' &&
-    chunk.payload !== null &&
-    'text' in chunk.payload &&
-    typeof chunk.payload.text === 'string'
-      ? chunk.payload.text
-      : '';
-  if (chunk.type === 'text-delta' && text) return { type: 'text', text };
-  if (chunk.type === 'reasoning-delta' && text) return { type: 'reasoning', text };
-  return null;
 }
 
 type TerminalChunk = Extract<ChunkType, { type: 'finish' | 'step-finish' }>;

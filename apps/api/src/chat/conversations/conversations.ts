@@ -55,7 +55,10 @@ conversationRoutes.get('/conversations', async (c) => {
         OR EXISTS (
           SELECT 1 FROM messages searched
           WHERE searched.conversation_id=c.id AND searched.owner_id=c.owner_id
-            AND instr(lower(searched.content),lower(?))>0
+            AND EXISTS (
+              SELECT 1 FROM json_each(searched.ui_message,'$.parts') part
+              WHERE json_extract(part.value,'$.type')='text'
+                AND instr(lower(json_extract(part.value,'$.text')),lower(?))>0)
         )
       )`,
     )

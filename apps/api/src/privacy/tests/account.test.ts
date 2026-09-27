@@ -101,7 +101,7 @@ it('exports only current owned transcripts even before cleanup, while preserving
         .run();
       await db
         .prepare(
-          "INSERT INTO messages (id,conversation_id,owner_id,role,content,created_at,origin_branch_id) VALUES (?,?,?,'assistant','Transcript','now',?)",
+          "INSERT INTO messages (id,conversation_id,owner_id,role,ui_message,created_at,origin_branch_id) VALUES (?1,?2,?3,'assistant',json_object('id',?1,'role','assistant','parts',json_array(json_object('type','text','text','Transcript')),'metadata',json_object('createdAt','now')),'now',?4)",
         )
         .bind(id, id, owner, id)
         .run();

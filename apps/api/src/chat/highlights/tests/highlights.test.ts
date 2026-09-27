@@ -58,7 +58,7 @@ async function createHighlightsDatabase(): Promise<D1Database> {
     .run();
   await database
     .prepare(
-      "INSERT INTO messages (id,conversation_id,owner_id,role,content,created_at,origin_branch_id) VALUES ('message','conversation','owner','assistant','A😀B answer','now','branch')",
+      "INSERT INTO messages (id,conversation_id,owner_id,role,ui_message,created_at,origin_branch_id) VALUES ('message','conversation','owner','assistant',json_object('id','message','role','assistant','parts',json_array(json_object('type','text','text','A😀B answer')),'metadata',json_object('createdAt','now')),'now','branch')",
     )
     .run();
   await database
@@ -97,10 +97,10 @@ describe('saved message highlights', () => {
       branchId: 'branch',
     });
     // The user tombstone hydrates; the agent row is surfaced as an annotation.
-    expect(conversation.messages[0]?.highlights).toEqual([
+    expect(conversation.messages[0]?.metadata?.highlights).toEqual([
       { start: 5, end: 11, quote: 'answer', color: null, origin: 'user' },
     ]);
-    expect(conversation.messages[0]?.annotations).toEqual([
+    expect(conversation.messages[0]?.metadata?.annotations).toEqual([
       { id: 'agent:message:0', quote: 'The ', kind: 'fact', whose: 'assistant' },
     ]);
     expect(
@@ -131,7 +131,7 @@ describe('saved message highlights', () => {
       branchId: 'branch',
     });
 
-    expect(conversation.messages[0]?.highlights).toEqual([
+    expect(conversation.messages[0]?.metadata?.highlights).toEqual([
       { start: 0, end: 4, quote: 'A😀B', color: 'blue', origin: 'user' },
       { start: 1, end: 3, quote: '😀', color: null, origin: 'user' },
     ]);

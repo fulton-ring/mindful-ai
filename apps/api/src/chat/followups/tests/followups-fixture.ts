@@ -2,6 +2,7 @@ import type { Conversation, EditProposal } from '@walden/contracts';
 import { Hono } from 'hono';
 import { beforeEach, vi } from 'vitest';
 import { HttpError } from '../../../http';
+import { textMessage } from '../../../tests/ui-messages';
 import type { Bindings, Variables } from '../../../types';
 
 const mocks = vi.hoisted(() => ({
@@ -47,18 +48,15 @@ vi.mock('../../../notes/history/history', () => ({ loadNoteState: mocks.loadNote
 
 import { followupRoutes } from '../followups';
 
-export const userMessage = {
-  id: 'user-message',
-  role: 'user' as const,
-  content: 'Capture the deployment decision.',
+export const userMessage = textMessage('user-message', 'user', 'Capture the deployment decision.', {
   createdAt: '2026-09-18T12:00:00.000Z',
-};
-export const assistantMessage = {
-  id: 'assistant-message',
-  role: 'assistant' as const,
-  content: 'Use the smaller deployment for the first release.',
-  createdAt: '2026-09-18T12:00:01.000Z',
-};
+});
+export const assistantMessage = textMessage(
+  'assistant-message',
+  'assistant',
+  'Use the smaller deployment for the first release.',
+  { createdAt: '2026-09-18T12:00:01.000Z' },
+);
 
 export function conversation(
   messages: Conversation['messages'] = [userMessage, assistantMessage],

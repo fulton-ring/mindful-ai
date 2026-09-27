@@ -6,6 +6,7 @@ import {
   attachmentWorkspacePath,
   DOCUMENT_TYPES,
 } from '../chat/attachments/attachments';
+import { messageAttachments } from '../chat/messages';
 import type { McpTools } from '../services/mcp';
 import type { AgentTurnInput, ServiceEnv } from '../services/types';
 
@@ -47,7 +48,7 @@ async function extractDocumentMarkdown(
 export function createDocumentTools(env: ServiceEnv, input: AgentTurnInput): McpTools {
   if (!env.FILES || !input.ownerId) return {};
   const files = [
-    ...input.conversation.messages.flatMap((message) => message.attachments ?? []),
+    ...input.conversation.messages.flatMap(messageAttachments),
     ...(input.attachments ?? []),
   ];
   const documents = new Map(

@@ -4,7 +4,7 @@ import type {
   LanguageModelV3StreamPart,
   LanguageModelV3Usage,
 } from '@ai-sdk/provider';
-import { DEFAULT_PERSONAS } from '@walden/contracts';
+import { DEFAULT_PERSONAS, type WaldenUIMessageChunk } from '@walden/contracts';
 import { vi } from 'vitest';
 
 import { createResearchTools, type ResearchEnv } from '../../../services/research/research';
@@ -181,3 +181,7 @@ export const turnInput = (): AgentTurnInput => ({
   message: 'Read https://example.com/research, search the saved source, and cite the answer.',
   action: 'message',
 });
+
+/** The visible text a chunk stream spells out. */
+export const chunkText = (chunks: WaldenUIMessageChunk[]) =>
+  chunks.map((chunk) => (chunk.type === 'text-delta' ? chunk.delta : '')).join('');

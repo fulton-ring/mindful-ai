@@ -1,21 +1,12 @@
-import type { ChatEvent } from '@walden/contracts';
-import { DEFAULT_PERSONAS } from '@walden/contracts';
+import { DEFAULT_PERSONAS, type WaldenUIMessageChunk } from '@walden/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import type { AgentCheckpoints } from '../../../agent/checkpoints';
 
-const done: Extract<ChatEvent, { type: 'done' }> = {
-  type: 'done',
-  message: { id: 'turn', role: 'assistant', content: 'Answer', createdAt: 'now' },
-  conversationId: 'conversation',
-  branchId: 'branch',
-  title: 'Title',
-  expiresAt: '2999-01-01',
-};
-
 vi.mock('../../../agent/mastra-turn', () => ({
   async *streamMastraTurn() {
-    yield { type: 'text', text: 'Answer' } satisfies ChatEvent;
-    yield done;
+    yield { type: 'text-start', id: 't' } satisfies WaldenUIMessageChunk;
+    yield { type: 'text-delta', id: 't', delta: 'Answer' } satisfies WaldenUIMessageChunk;
+    yield { type: 'text-end', id: 't' } satisfies WaldenUIMessageChunk;
   },
 }));
 vi.mock('../../mcp', () => ({ createMcpService: () => ({ tools: async () => ({}) }) }));
@@ -26,15 +17,15 @@ vi.mock('../../research/research', () => ({
 }));
 vi.mock('../../research/web-search', () => ({ createWebSearchTools: () => ({}) }));
 
-import { streamTurnEvents } from '../agent-stream';
+import { streamTurnChunks } from '../agent-stream';
 
 const checkpoints: AgentCheckpoints = { do: (_name, callback) => callback() };
 
 describe('turn stream completion', () => {
   it('completes without waiting for highlights or telemetry', async () => {
     const background = vi.fn();
-    const events: ChatEvent[] = [];
-    for await (const event of streamTurnEvents({
+    const events: WaldenUIMessageChunk[] = [];
+    for await (const event of streamTurnChunks({
       env: {},
       input: {
         turnId: 'turn',
@@ -61,8 +52,9 @@ describe('turn stream completion', () => {
     }))
       events.push(event);
 
-    expect(events.at(-1)).toMatchObject({ type: 'done', annotationsHandled: false });
-    expect(events.some((event) => event.type === 'annotation')).toBe(false);
+    expect(events.at(-1)).toEqual({ type: 'text-end', id: 't' });
+    // Highlights are follow-ups; the turn stream carries no annotation data.
+    expect(JSON.stringify(events)).not.toContain('annotation');
     expect(background).toHaveBeenCalledOnce();
   });
 });

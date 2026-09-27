@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { streamMemoryPreparation } from '../agent-memory-stream';
 
+const status = (text: string) => ({ type: 'data-status', data: { text }, transient: true });
+
 describe('memory preparation status', () => {
   it('streams native compaction start before preparation completes', async () => {
     let finish!: () => void;
@@ -17,16 +19,16 @@ describe('memory preparation status', () => {
 
     await expect(stream.next()).resolves.toEqual({
       done: false,
-      value: { type: 'status', text: 'Compacting conversation context…' },
+      value: status('Compacting conversation context…'),
     });
     finish();
     await expect(stream.next()).resolves.toEqual({
       done: false,
-      value: { type: 'status', text: 'Context compacted. Thinking…' },
+      value: status('Context compacted. Thinking…'),
     });
     await expect(stream.next()).resolves.toEqual({
       done: false,
-      value: { type: 'context-compacted' },
+      value: { type: 'message-metadata', messageMetadata: { contextCompacted: true } },
     });
     await expect(stream.next()).resolves.toEqual({ done: true, value: 42 });
   });
@@ -45,7 +47,7 @@ describe('memory preparation status', () => {
 
     await expect(stream.next()).resolves.toEqual({
       done: false,
-      value: { type: 'status', text: 'Compacting conversation context…' },
+      value: status('Compacting conversation context…'),
     });
     await expect(stream.next()).rejects.toThrow('private provider error');
   });
@@ -59,11 +61,11 @@ describe('memory preparation status', () => {
 
     await expect(stream.next()).resolves.toEqual({
       done: false,
-      value: { type: 'status', text: 'Compacting conversation context…' },
+      value: status('Compacting conversation context…'),
     });
     await expect(stream.next()).resolves.toEqual({
       done: false,
-      value: { type: 'status', text: 'Thinking…' },
+      value: status('Thinking…'),
     });
     await expect(stream.next()).resolves.toEqual({ done: true, value: 42 });
   });

@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { TurnStart } from '@walden/contracts';
 import { Hono } from 'hono';
 import { expect, it } from 'vitest';
 import { sqliteD1Binding } from '../../../agent/memory/tests/d1-test-binding';
@@ -76,7 +77,10 @@ it('admits one immutable turn, protects replay, and persists Stop', async () => 
   const [a, b] = await Promise.all([start('same'), start('same')]);
   expect(a.status).toBe(200);
   expect(b.status).toBe(200);
-  const { turnId } = (await a.json()) as { turnId: string };
+  const { turnId, userMessageId } = (await a.json()) as TurnStart;
+  expect(
+    await DB.prepare('SELECT user_message_id FROM turns WHERE id=?').bind(turnId).first(),
+  ).toEqual({ user_message_id: userMessageId });
   expect(((await b.json()) as { turnId: string }).turnId).toBe(turnId);
   expect(
     (await DB.prepare('SELECT COUNT(*) AS count FROM turns').first<{ count: number }>())?.count,
@@ -84,6 +88,16 @@ it('admits one immutable turn, protects replay, and persists Stop', async () => 
   expect(await DB.prepare('SELECT model,weight FROM turns').first()).toEqual({
     model: '@cf/zai-org/glm-5.3-flash',
     weight: 1,
+  });
+  const user = await DB.prepare("SELECT id,ui_message FROM messages WHERE role='user'").first<{
+    id: string;
+    ui_message: string;
+  }>();
+  expect(JSON.parse(user!.ui_message)).toEqual({
+    id: user!.id,
+    role: 'user',
+    parts: [{ type: 'text', text: 'Question' }],
+    metadata: { createdAt: expect.any(String) },
   });
   expect((await start('same', 'Changed')).status).toBe(409);
   expect((await start('another')).status).toBe(409);
@@ -108,4 +122,8 @@ it('admits one immutable turn, protects replay, and persists Stop', async () => 
     (await DB.prepare('SELECT request_id FROM turn_cancellations').first<{ request_id: string }>())
       ?.request_id,
   ).toBe('same');
+  // Stop leaves an interrupted reply, and its stream replays to a terminal [DONE].
+  const events = await (await app.request(`/api/chat/turns/${turnId}/events`, {}, env)).text();
+  expect(events).toContain('"type":"error"');
+  expect(events.trimEnd().endsWith('data: [DONE]')).toBe(true);
 });

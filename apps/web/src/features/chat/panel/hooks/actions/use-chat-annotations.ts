@@ -1,19 +1,27 @@
 import type { Annotation, MessageFollowupRequest, MessageHighlight } from '@walden/contracts';
-import { useEffect } from 'react';
 
 import { api, streamMessageAnnotations } from '../../../../../lib/api';
 import type { ChatPanelProps } from '../../chat-panel-types';
+import { updateMessage, type WaldenChat, withMetadata } from '../session/turn-args';
 import type { ChatDisplayState } from '../state/use-chat-display-state';
 import type { ChatRuntimeState } from '../state/use-chat-runtime-state';
-import type { ChatTurnState } from '../state/use-chat-turn';
 
 type AnnotationArgs = {
   props: ChatPanelProps;
   display: ChatDisplayState;
   runtime: ChatRuntimeState;
+  chat: WaldenChat;
   effectivePersonaId: string;
   proposeNote(messageId: string, capture?: { text: string }): Promise<void>;
 };
+
+/** Saved messages first: the transcript snapshot in `args` can trail a just-finished reply. */
+function annotationsOf(args: AnnotationArgs, messageId: string) {
+  const find = (messages: typeof args.chat.messages = []) =>
+    messages.find((message) => message.id === messageId);
+  return (find(args.runtime.latestConversation.current?.messages) ?? find(args.chat.messages))
+    ?.metadata?.annotations;
+}
 
 function animateAnnotations(args: AnnotationArgs, messageId: string, values: Annotation[]) {
   args.display.setRecentAnimation({
@@ -34,23 +42,9 @@ function mergeAnnotations(
   values: Annotation[],
   animate = true,
 ) {
-  const current = args.runtime.latestConversation.current;
-  if (!current?.messages.some((message) => message.id === messageId)) {
-    args.runtime.pendingAnnotations.current.set(messageId, values);
-    return;
-  }
-  const previous = current.messages.find((message) => message.id === messageId)?.annotations ?? [];
-  const previousIds = new Set(previous.map((annotation) => annotation.id));
+  const previousIds = new Set((annotationsOf(args, messageId) ?? []).map(({ id }) => id));
   const arrivals = values.filter((annotation) => !previousIds.has(annotation.id));
-  args.runtime.pendingAnnotations.current.set(messageId, values);
-  const next = {
-    ...current,
-    messages: current.messages.map((message) =>
-      message.id === messageId ? { ...message, annotations: values } : message,
-    ),
-  };
-  args.runtime.latestConversation.current = next;
-  void args.props.onConversation(next);
+  void updateMessage(args, messageId, (message) => withMetadata(message, { annotations: values }));
   if (animate && arrivals.length) animateAnnotations(args, messageId, arrivals);
 }
 
@@ -65,71 +59,16 @@ async function saveHighlight(args: AnnotationArgs, messageId: string, value: Mes
   const saved = await api.saveHighlight(messageId, value);
   const current = args.runtime.latestConversation.current;
   if (!current || current.id !== scope.id || current.branchId !== scope.branchId) return;
-  const next = {
-    ...current,
-    messages: current.messages.map((message) =>
-      message.id === messageId
-        ? {
-            ...message,
-            highlights: [
-              ...(message.highlights ?? []).filter(
-                (item) => item.start !== saved.start || item.end !== saved.end,
-              ),
-              saved,
-            ],
-          }
-        : message,
-    ),
-  };
-  args.runtime.latestConversation.current = next;
-  await args.props.onConversation(next);
-}
-
-function usePendingAnnotationsEffect(args: AnnotationArgs) {
-  const { props, runtime } = args;
-  useEffect(() => {
-    const current = props.conversation;
-    if (!current) return;
-    let next = current;
-    let changed = false;
-    const arrivals: Array<{ messageId: string; values: Annotation[] }> = [];
-    for (const [messageId, values] of runtime.pendingAnnotations.current) {
-      const target = next.messages.find((message) => message.id === messageId);
-      if (!target || annotationsMatch(target.annotations, values)) continue;
-      next = {
-        ...next,
-        messages: next.messages.map((message) =>
-          message.id === messageId ? { ...message, annotations: values } : message,
+  await updateMessage(args, messageId, (message) =>
+    withMetadata(message, {
+      highlights: [
+        ...(message.metadata?.highlights ?? []).filter(
+          (item) => item.start !== saved.start || item.end !== saved.end,
         ),
-      };
-      arrivals.push({ messageId, values });
-      changed = true;
-    }
-    if (!changed) return;
-    runtime.latestConversation.current = next;
-    void props.onConversation(next);
-    for (const arrival of arrivals) animateAnnotations(args, arrival.messageId, arrival.values);
-  }, [props.conversation]);
-}
-
-function annotationsMatch(current: Annotation[] | undefined, next: Annotation[]) {
-  return (
-    current?.length === next.length &&
-    current.every((annotation, index) => annotation.id === next[index]?.id)
+        saved,
+      ],
+    }),
   );
-}
-
-function useCompletedStreamEffect(args: AnnotationArgs, turn: ChatTurnState) {
-  const { display, props } = args;
-  useEffect(() => {
-    const messageId = turn.streamCompletionId.current;
-    if (!messageId || !props.conversation?.messages.some((message) => message.id === messageId))
-      return;
-    turn.streamCompletionId.current = null;
-    display.dispatchLiveTurn({ type: 'reset' });
-    turn.displayedStream.current = '';
-    turn.streamTarget.current = '';
-  }, [props.conversation]);
 }
 
 function clearAnnotationFailure(display: ChatDisplayState, messageId: string) {
@@ -174,9 +113,7 @@ async function runAnnotationStream(
   controller: AbortController,
   conversationId: string | null,
 ) {
-  const baseline =
-    args.runtime.latestConversation.current?.messages.find((message) => message.id === messageId)
-      ?.annotations ?? [];
+  const baseline = annotationsOf(args, messageId) ?? [];
   let partial = baseline;
   try {
     await streamMessageAnnotations(
@@ -247,7 +184,6 @@ function startAutomaticAnnotations(
   conversationId: string,
 ) {
   const controller = new AbortController();
-  args.runtime.pendingAnnotations.current.delete(messageId);
   args.runtime.annotationControllers.current.set(messageId, controller);
   args.display.setBackgroundAnnotations((current) => new Set(current).add(messageId));
   void runAnnotationStream(args, messageId, input, controller, conversationId)
@@ -287,9 +223,7 @@ function launchFollowups(
   if (record) void args.proposeNote(messageId, { text: record });
 }
 
-export function useChatAnnotations(args: AnnotationArgs, turn: ChatTurnState) {
-  usePendingAnnotationsEffect(args);
-  useCompletedStreamEffect(args, turn);
+export function useChatAnnotations(args: AnnotationArgs) {
   return {
     animateAnnotations: (messageId: string, values: Annotation[]) =>
       animateAnnotations(args, messageId, values),

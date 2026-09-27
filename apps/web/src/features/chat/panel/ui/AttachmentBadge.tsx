@@ -1,4 +1,3 @@
-import type { Message } from '@walden/contracts';
 import { X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -8,8 +7,10 @@ import {
   AttachmentRemove,
 } from '../../../../components/ai-elements/attachments';
 import { fetchAttachment } from '../../../../lib/api';
+import type { FilePart } from '../../message-parts';
 
-type StoredFile = NonNullable<Message['attachments']>[number] & { conversationId: string };
+/** A sent attachment: a `file` part whose URL is an authenticated API path. */
+type StoredFile = FilePart;
 type Props = { file: File | StoredFile; disabled?: boolean; onRemove?(): void };
 type Preview =
   | { kind: 'image' | 'pdf' | 'download'; url: string }
@@ -67,15 +68,19 @@ function downloadBlob(blob: Blob, name: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function fileName(file: File | StoredFile) {
+  return file instanceof File ? file.name : (file.filename ?? 'Attachment');
+}
+
 async function prepareAttachment(file: File | StoredFile, signal: AbortSignal) {
-  const blob =
-    file instanceof File ? file : await fetchAttachment(file.conversationId, file.id, signal);
+  const blob = file instanceof File ? file : await fetchAttachment(file.url, signal);
   signal.throwIfAborted();
-  if (/\.docx$/i.test(file.name)) {
-    downloadBlob(blob, file.name);
+  const name = fileName(file);
+  if (/\.docx$/i.test(name)) {
+    downloadBlob(blob, name);
     return null;
   }
-  return preparePreview(blob, file.name, file instanceof File ? file.type : file.mimeType);
+  return preparePreview(blob, name, file instanceof File ? file.type : file.mediaType);
 }
 
 function usePreview(file: File | StoredFile) {
@@ -109,7 +114,7 @@ function usePreview(file: File | StoredFile) {
   async function open() {
     const request = new AbortController();
     controller.current = request;
-    const download = /\.docx$/i.test(file.name);
+    const download = /\.docx$/i.test(fileName(file));
     if (!download) {
       setPreview(null);
       dialog.current?.showModal();
@@ -134,14 +139,14 @@ function usePreview(file: File | StoredFile) {
 export function AttachmentBadge({ file, disabled, onRemove }: Props) {
   const { dialog, preview, open, close } = usePreview(file);
   const isLocal = file instanceof File;
-  const name = file.name;
+  const name = fileName(file);
   return (
     <>
       <Attachment
         data={{
-          id: isLocal ? name : file.id,
+          id: isLocal ? name : file.url,
           type: 'file',
-          mediaType: isLocal ? file.type : file.mimeType,
+          mediaType: isLocal ? file.type : file.mediaType,
           filename: name,
           url: '',
         }}

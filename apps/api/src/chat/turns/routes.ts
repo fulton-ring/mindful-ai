@@ -1,4 +1,4 @@
-import { type ChatRequest, chatRequestSchema } from '@walden/contracts';
+import { type ChatRequest, chatRequestSchema, type TurnStart } from '@walden/contracts';
 import { Hono } from 'hono';
 import { first, parseJson } from '../../db/client';
 import { HttpError, jsonBody, nowIso } from '../../http';
@@ -166,7 +166,10 @@ chatRoutes.post('/turns', async (c) => {
     if (previous.request_json !== requestJson)
       throw new HttpError(409, 'Request ID was already used for a different turn.');
     await ensureTurnScheduled(c.env, previous);
-    return c.json({ turnId: previous.id });
+    return c.json({
+      turnId: previous.id,
+      userMessageId: previous.user_message_id,
+    } satisfies TurnStart);
   }
   const attachments = request.attachmentIds?.length
     ? await loadAttachments(
@@ -195,12 +198,15 @@ chatRoutes.post('/turns', async (c) => {
     const concurrent = await findOwnedTurn(c.env.DB, ownerId, request.requestId);
     if (!concurrent || concurrent.request_json !== requestJson) throw error;
     await ensureTurnScheduled(c.env, concurrent);
-    return c.json({ turnId: concurrent.id });
+    return c.json({
+      turnId: concurrent.id,
+      userMessageId: concurrent.user_message_id,
+    } satisfies TurnStart);
   }
   if (result.kind === 'replay') {
     const replay = await findOwnedTurn(c.env.DB, ownerId, request.requestId);
     if (!replay) throw new HttpError(409, 'The previous turn is unavailable.');
-    return c.json({ turnId: replay.id });
+    return c.json({ turnId: replay.id, userMessageId: replay.user_message_id } satisfies TurnStart);
   }
   const turn = result.turn;
   const input = durableInput(ownerId, c.get('authSubject'), request, turn);
@@ -215,7 +221,7 @@ chatRoutes.post('/turns', async (c) => {
   } catch {
     /* Minute reconciliation retries an admitted turn. */
   }
-  return c.json({ turnId: turn.turnId });
+  return c.json({ turnId: turn.turnId, userMessageId: turn.userMessageId } satisfies TurnStart);
 });
 
 chatRoutes.get('/turns', async (c) => {

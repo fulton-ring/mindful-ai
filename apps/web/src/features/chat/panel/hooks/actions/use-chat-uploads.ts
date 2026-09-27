@@ -1,12 +1,12 @@
-import type { Message } from '@walden/contracts';
 import { type RefObject, useEffect, useRef, useState } from 'react';
-import { uploadAttachment } from '../../../../../lib/api';
+import { type AttachmentMetadata, uploadAttachment } from '../../../../../lib/api';
 import { failureDetails, fileAnalytics, track } from '../../../../../lib/telemetry';
 import type { ChatPanelProps } from '../../chat-panel-types';
 import type { ChatDisplayState } from '../state/use-chat-display-state';
 import type { ChatRuntimeState } from '../state/use-chat-runtime-state';
 
-type UploadedFile = NonNullable<Message['attachments']>[number];
+/** An uploaded file and the conversation its attachment URL lives under. */
+export type UploadedFile = AttachmentMetadata & { conversationId: string };
 type Upload = { progress: number; metadata?: UploadedFile; controller: AbortController };
 
 function useUploadConversationId(props: ChatPanelProps, runtime: ChatRuntimeState) {
@@ -86,10 +86,11 @@ export function useChatUploads(
         try {
           const id = await conversationId();
           if (upload.controller.signal.aborted) return;
-          upload.metadata = await uploadAttachment(id, file, upload.controller.signal, (value) => {
+          const metadata = await uploadAttachment(id, file, upload.controller.signal, (value) => {
             upload.progress = value;
             publishProgress();
           });
+          upload.metadata = { ...metadata, conversationId: id };
           upload.progress = 100;
           publishProgress();
           track('file_upload_completed', fileAnalytics(file));

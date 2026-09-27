@@ -41,7 +41,7 @@ const INSERT_SUGGESTION = `INSERT INTO note_suggestions (id,note_id,owner_id,con
        WHERE n.id=? AND n.owner_id=? AND n.revision=? AND n.markdown=? AND c.id=?
        AND b.id=? AND b.status='active' AND c.expires_at>?
        AND EXISTS (SELECT 1 FROM messages m WHERE m.id=? AND m.conversation_id=c.id
-         AND m.owner_id=c.owner_id AND m.role='assistant' AND m.incomplete=0)
+         AND m.owner_id=c.owner_id AND m.role='assistant' AND json_extract(m.ui_message,'$.metadata.status') IS NOT 'interrupted')
      )`;
 
 // A proposal on a conversation without a note creates the note, titled after the conversation.
@@ -52,7 +52,7 @@ const NEW_NOTE_GUARD = `NOT EXISTS (
            WHERE c.id=? AND c.owner_id=? AND c.note_id IS NULL AND b.id=?
            AND b.status='active' AND c.expires_at>?
            AND EXISTS (SELECT 1 FROM messages m WHERE m.id=? AND m.conversation_id=c.id
-             AND m.owner_id=c.owner_id AND m.role='assistant' AND m.incomplete=0)
+             AND m.owner_id=c.owner_id AND m.role='assistant' AND json_extract(m.ui_message,'$.metadata.status') IS NOT 'interrupted')
          )`;
 
 type SuggestionInsertContext = {
@@ -74,7 +74,7 @@ async function loadSuggestionBaseline(
          LEFT JOIN notes n ON n.id=c.note_id AND n.owner_id=c.owner_id
          WHERE c.id=? AND c.owner_id=? AND b.id=? AND b.status='active' AND c.expires_at>?
          AND EXISTS (SELECT 1 FROM messages m WHERE m.id=? AND m.conversation_id=c.id
-           AND m.owner_id=c.owner_id AND m.role='assistant' AND m.incomplete=0)`,
+           AND m.owner_id=c.owner_id AND m.role='assistant' AND json_extract(m.ui_message,'$.metadata.status') IS NOT 'interrupted')`,
       )
       .bind(input.conversationId, input.ownerId, input.branchId, nowIso(), input.sourceMessageId),
   );

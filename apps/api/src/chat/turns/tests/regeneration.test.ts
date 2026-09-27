@@ -1,13 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { textMessage } from '../../../tests/ui-messages';
 import { batchIfAny, editContext, regenerationContext } from '../turn-support';
 
-const message = (id: string, role: 'user' | 'assistant', content: string, incomplete = false) => ({
-  id,
-  role,
-  content,
-  incomplete,
-  createdAt: '2026-01-01',
-});
+const message = (id: string, role: 'user' | 'assistant', text: string, incomplete = false) =>
+  textMessage(id, role, text, incomplete ? { status: 'interrupted' } : {});
 
 describe('assistant response regeneration', () => {
   it('does not call D1 batch when regeneration has no pre-stream statements', async () => {

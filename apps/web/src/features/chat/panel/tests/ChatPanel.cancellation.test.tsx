@@ -1,14 +1,23 @@
 // @vitest-environment jsdom
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import type { AnnotationEvent, ChatEvent, Conversation } from '@walden/contracts';
+import type { AnnotationEvent, Conversation } from '@walden/contracts';
 import { expect, it, vi } from 'vitest';
 import {
+  assistantMessage,
   composerValue,
   conversation,
   getTransport,
+  hang,
+  openTurn,
   props,
+  reply,
+  replyChunks,
   setComposerValue,
+  textChunks,
+  textOf,
+  turnData,
+  userMessage,
 } from '../../tests/_ChatPanel.test-helpers';
 
 const { track } = await import('../../../../lib/telemetry');
@@ -16,77 +25,87 @@ const { ChatPanel } = await import('../../ChatPanel');
 
 const transport = getTransport();
 
+function send(text: string) {
+  setComposerValue(screen.getByLabelText('Message'), text);
+  fireEvent.click(screen.getByLabelText('Send message'));
+}
+
+function renderSaving(values = props()) {
+  const view = render(<ChatPanel {...values} />);
+  values.onConversation.mockImplementation((next: Conversation) =>
+    view.rerender(<ChatPanel {...values} conversation={next} />),
+  );
+  return { values, view };
+}
+
 it('detaches on unmount without cancelling a running turn', async () => {
-  const schedule = vi.spyOn(window, 'setTimeout');
-  const clear = vi.spyOn(window, 'clearTimeout');
-  transport.streamChat.mockImplementation(() => new Promise(() => {}));
-  try {
-    const rendered = render(<ChatPanel {...props()} />);
-    setComposerValue(screen.getByLabelText('Message'), 'Question');
-    fireEvent.click(screen.getByLabelText('Send message'));
-    await waitFor(() => expect(transport.streamChat).toHaveBeenCalled());
-    rendered.unmount();
-    expect(schedule.mock.calls.some((call) => call[1] === 315_000)).toBe(false);
-    expect(transport.cancelTurn).not.toHaveBeenCalled();
-  } finally {
-    schedule.mockRestore();
-    clear.mockRestore();
-  }
+  hang();
+  const rendered = render(<ChatPanel {...props()} />);
+  send('Question');
+  await waitFor(() => expect(transport.turnEvents).toHaveBeenCalled());
+  rendered.unmount();
+  expect(transport.cancelTurn).not.toHaveBeenCalled();
 });
 
-it('replaces replayed live text with the saved answer after reconnecting', async () => {
-  const initial = conversation('conversation-1');
-  const user = {
-    id: 'user-1',
-    role: 'user' as const,
-    content: 'Question',
-    createdAt: new Date().toISOString(),
+it('resumes a running turn on mount and saves the replayed answer once', async () => {
+  const initial = {
+    ...conversation('conversation-1'),
+    messages: [userMessage('user-1', 'Question')],
   };
-  const answer = {
-    id: 'turn-1',
-    role: 'assistant' as const,
-    content: 'A saved answer',
-    createdAt: new Date().toISOString(),
-  };
-  const values = props({ ...initial, messages: [user] });
   transport.activeTurn.mockResolvedValue({
-    turn: { id: 'turn-1', requestId: 'request-1' },
-  });
-  transport.conversation.mockResolvedValue({ ...initial, messages: [user, answer] });
-  let deliver: ((event: ChatEvent) => void) | undefined;
-  transport.attachChatTurn.mockImplementation((_id, onEvent) => {
-    deliver = onEvent;
-    return new Promise<void>(() => undefined);
-  });
-  const view = render(<ChatPanel {...values} />);
-  values.onConversation.mockImplementation((next: Conversation) => {
-    view.rerender(<ChatPanel {...values} conversation={next} />);
-  });
-  await waitFor(() => expect(deliver).toBeDefined());
-  await act(async () => {
-    deliver?.({ type: 'text-snapshot', text: answer.content, reasoning: '' });
-    deliver?.({
-      type: 'done',
-      message: answer,
-      conversationId: initial.id,
+    turn: {
+      id: 'turn-1',
+      requestId: 'request-1',
+      conversationId: 'conversation-1',
       branchId: 'branch-1',
-      title: initial.title,
-      expiresAt: initial.expiresAt,
-    });
+      userMessageId: 'user-1',
+    },
+  });
+  const stream = openTurn('turn-1', { admit: false });
+  const { values } = renderSaving(props(initial));
+  expect(await screen.findByText('Reconnecting…')).toBeTruthy();
+  expect(transport.turnEvents).toHaveBeenCalledWith('turn-1', 0, expect.any(AbortSignal));
+  act(() => {
+    stream.emit(...replyChunks('turn-1', 'A saved answer'));
+    stream.done();
   });
   await waitFor(() => expect(values.onConversation).toHaveBeenCalled());
-  await waitFor(() => expect(screen.getAllByText(answer.content)).toHaveLength(1));
+  const saved = values.onConversation.mock.calls.at(-1)?.[0] as Conversation;
+  expect(saved.messages.map(({ id }) => id)).toEqual(['user-1', 'turn-1']);
+  expect(screen.getAllByText('A saved answer')).toHaveLength(1);
+  expect(transport.startTurn).not.toHaveBeenCalled();
+});
+
+it('drops the partial reply and replays the new attempt when the server resets the turn', async () => {
+  const stream = hang();
+  const { values } = renderSaving();
+  send('Question');
+  await waitFor(() => expect(transport.turnEvents).toHaveBeenCalledTimes(1));
+  const retry = openTurn('turn-1', { admit: false });
+  act(() =>
+    stream.emit(
+      { type: 'start', messageId: 'turn-1', messageMetadata: { createdAt: '' } },
+      ...textChunks('Abandoned attempt'),
+    ),
+  );
+  expect(await screen.findByText('Abandoned attempt')).toBeTruthy();
+  act(() => stream.emit(turnData({ reset: true })));
+  await waitFor(() => expect(transport.turnEvents).toHaveBeenCalledTimes(2));
+  expect(transport.turnEvents).toHaveBeenLastCalledWith('turn-1', 0, expect.any(AbortSignal));
+  act(() => {
+    retry.emit(...replyChunks('turn-1', 'Second attempt'));
+    retry.done();
+  });
+  await waitFor(() => expect(values.onConversation).toHaveBeenCalled());
+  expect(screen.queryByText('Abandoned attempt')).toBeNull();
+  expect(screen.getAllByText('Second attempt')).toHaveLength(1);
+  const saved = values.onConversation.mock.calls.at(-1)?.[0] as Conversation;
+  expect(saved.messages.map((message) => textOf(message))).toEqual(['Question', 'Second attempt']);
 });
 
 it('preserves a saved removal when a late classifier result updates the message', async () => {
-  const message = {
-    id: 'highlight-source',
-    role: 'assistant' as const,
-    content: 'Ice floats.',
-    createdAt: new Date().toISOString(),
-  };
-  const history = { ...conversation('conversation-1'), messages: [message] };
-  const values = props(history);
+  const message = assistantMessage('highlight-source', 'Ice floats.');
+  const values = props({ ...conversation('conversation-1'), messages: [message] });
   let emit: ((event: AnnotationEvent) => void) | undefined;
   let finish: (() => void) | undefined;
   transport.streamMessageAnnotations.mockImplementation((_id, _input, onEvent) => {
@@ -104,26 +123,28 @@ it('preserves a saved removal when a late classifier result updates the message'
   await act(async () => {
     emit?.({
       type: 'done',
-      annotations: [{ id: 'late', quote: message.content, kind: 'fact', whose: 'assistant' }],
+      annotations: [{ id: 'late', quote: 'Ice floats.', kind: 'fact', whose: 'assistant' }],
     });
     finish?.();
   });
   const updated = values.onConversation.mock.calls.at(-1)?.[0].messages[0];
-  expect(updated?.annotations).toHaveLength(1);
-  expect(updated?.highlights).toEqual([
-    { start: 0, end: 11, quote: message.content, color: null, origin: 'user' },
+  expect(updated?.metadata?.annotations).toHaveLength(1);
+  expect(updated?.metadata?.highlights).toEqual([
+    { start: 0, end: 11, quote: 'Ice floats.', color: null, origin: 'user' },
   ]);
 });
+
 it('stops following when the reader scrolls slightly up and resumes only at the bottom', async () => {
-  let emit: ((event: ChatEvent) => void) | undefined;
-  transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
-    emit = onEvent;
-    return new Promise<void>(() => undefined);
-  });
+  const stream = hang();
   const view = render(<ChatPanel {...props()} />);
-  setComposerValue(screen.getByLabelText('Message'), 'Question');
-  fireEvent.click(screen.getByLabelText('Send message'));
-  await waitFor(() => expect(emit).toBeTypeOf('function'));
+  send('Question');
+  await waitFor(() => expect(transport.turnEvents).toHaveBeenCalled());
+  act(() =>
+    stream.emit(
+      { type: 'start', messageId: 'turn-1', messageMetadata: { createdAt: '' } },
+      { type: 'text-start', id: 'text' },
+    ),
+  );
   const scroll = view.container.querySelector('.chat-scroll')!;
   Object.defineProperties(scroll, {
     scrollHeight: { configurable: true, value: 1000 },
@@ -133,141 +154,18 @@ it('stops following when the reader scrolls slightly up and resumes only at the 
   fireEvent.wheel(scroll, { deltaY: -40 });
   fireEvent.scroll(scroll);
   vi.mocked(HTMLElement.prototype.scrollTo).mockClear();
-  act(() => emit?.({ type: 'text', text: 'More text' }));
+  act(() => stream.emit({ type: 'text-delta', id: 'text', delta: 'More text' }));
+  await screen.findByText('More text');
   expect(HTMLElement.prototype.scrollTo).not.toHaveBeenCalled();
   scroll.scrollTop = 800;
   fireEvent.scroll(scroll);
-  act(() => emit?.({ type: 'text', text: ' continues' }));
-  expect(HTMLElement.prototype.scrollTo).toHaveBeenCalledWith({
-    top: 1000,
-    behavior: 'instant',
-  });
+  act(() => stream.emit({ type: 'text-delta', id: 'text', delta: ' continues' }));
+  await screen.findByText('More text continues');
+  expect(HTMLElement.prototype.scrollTo).toHaveBeenCalledWith({ top: 1000, behavior: 'instant' });
 });
 
-it('catches up a long streamed response without waiting on the old speed cap', async () => {
-  const frames: FrameRequestCallback[] = [];
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn().mockReturnValue({ matches: false, addListener: vi.fn(), removeListener: vi.fn() }),
-  );
-  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-    frames.push(callback);
-    return frames.length;
-  });
-  vi.stubGlobal('cancelAnimationFrame', vi.fn());
-  let emit: ((event: ChatEvent) => void) | undefined;
-  const text = 'x'.repeat(5000);
-  transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
-    emit = onEvent;
-    return new Promise<void>(() => undefined);
-  });
-  const view = render(<ChatPanel {...props()} />);
-  setComposerValue(screen.getByLabelText('Message'), 'Question');
-  fireEvent.click(screen.getByLabelText('Send message'));
-  await waitFor(() => expect(emit).toBeTypeOf('function'));
-  frames.length = 0;
-  act(() => emit?.({ type: 'text', text }));
-  expect(frames).toHaveLength(1);
-  act(() => frames.shift()?.(0));
-  const firstFrame =
-    view.container.querySelector('[data-annotation-count]')?.firstChild?.textContent ?? '';
-  expect(firstFrame.length).toBeGreaterThan(0);
-  expect(firstFrame.length).toBeLessThan(text.length);
-  for (let timestamp = 16; timestamp <= 1000 && frames.length; timestamp += 16)
-    act(() => frames.shift()?.(timestamp));
-  const oneSecond =
-    view.container.querySelector('[data-annotation-count]')?.firstChild?.textContent ?? '';
-  expect(oneSecond.length).toBeGreaterThan(text.length * 0.99);
-  for (let timestamp = 1016; timestamp <= 2000 && frames.length; timestamp += 16)
-    act(() => frames.shift()?.(timestamp));
-  expect(view.container.querySelector('[data-annotation-count]')?.firstChild?.textContent).toBe(
-    text,
-  );
-});
-
-it('finalizes buffered response text before allowing the next message', async () => {
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn().mockReturnValue({ matches: false, addListener: vi.fn(), removeListener: vi.fn() }),
-  );
-  vi.stubGlobal('requestAnimationFrame', vi.fn().mockReturnValue(1));
-  vi.stubGlobal('cancelAnimationFrame', vi.fn());
-  const text = 'A completed answer. '.repeat(100);
-  transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
-    onEvent({ type: 'text', text });
-    onEvent({
-      type: 'done',
-      message: {
-        id: 'buffered-answer',
-        role: 'assistant',
-        content: text,
-        createdAt: new Date().toISOString(),
-      },
-      title: 'Conversation',
-      conversationId: 'conversation-1',
-      branchId: 'branch-1',
-      expiresAt: '2026-09-25T00:00:00.000Z',
-      annotationsHandled: true,
-    });
-  });
-  const values = props();
-  render(<ChatPanel {...values} />);
-  setComposerValue(screen.getByLabelText('Message'), 'Question');
-  fireEvent.click(screen.getByLabelText('Send message'));
-  await waitFor(() => expect(screen.queryByLabelText('Stop response')).toBeNull());
-  expect(values.onConversation).toHaveBeenCalledWith(
-    expect.objectContaining({
-      messages: expect.arrayContaining([
-        expect.objectContaining({ id: 'buffered-answer', content: text }),
-      ]),
-    }),
-  );
-});
-
-it('does not persist a buffered completion when stop wins before drain', async () => {
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn().mockReturnValue({ matches: false, addListener: vi.fn(), removeListener: vi.fn() }),
-  );
-  vi.stubGlobal('requestAnimationFrame', vi.fn().mockReturnValue(1));
-  vi.stubGlobal('cancelAnimationFrame', vi.fn());
-  transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
-    onEvent({ type: 'text', text: 'Partial answer' });
-    onEvent({
-      type: 'done',
-      message: {
-        id: 'buffered-done',
-        role: 'assistant',
-        content: 'Completed answer',
-        createdAt: new Date().toISOString(),
-      },
-      conversationId: 'conversation-1',
-      branchId: 'branch-1',
-      title: 'Conversation',
-      expiresAt: '2026-09-25T00:00:00.000Z',
-    });
-    return new Promise<void>(() => undefined);
-  });
-  const values = props();
-  const rendered = render(<ChatPanel {...values} />);
-  values.onConversation.mockImplementation((next: Conversation) => {
-    rendered.rerender(<ChatPanel {...values} conversation={next} />);
-  });
-
-  setComposerValue(screen.getByLabelText('Message'), 'Question');
-  fireEvent.click(screen.getByLabelText('Send message'));
-  await waitFor(() => expect(screen.getByLabelText('Stop response')).toBeTruthy());
-  fireEvent.click(screen.getByLabelText('Stop response'));
-
-  expect(values.onConversation).toHaveBeenCalledTimes(1);
-  expect(values.onConversation.mock.calls[0]?.[0].messages).not.toEqual(
-    expect.arrayContaining([expect.objectContaining({ id: 'buffered-done' })]),
-  );
-  expect(screen.getByText('Incomplete response')).toBeTruthy();
-});
 it('uses the first available persona when the built-in default is unavailable', async () => {
-  transport.streamChat.mockReturnValue(new Promise(() => undefined));
-  const values = props();
+  hang();
   const custom = {
     id: 'custom-only',
     name: 'Custom coach',
@@ -275,26 +173,19 @@ it('uses the first available persona when the built-in default is unavailable', 
     brevity: 'brief' as const,
     challenge: 'balanced' as const,
     tone: 'neutral' as const,
-    revision: 1,
   };
-  render(<ChatPanel {...values} personas={[custom]} />);
-
-  setComposerValue(screen.getByLabelText('Message'), 'Question');
-  fireEvent.click(screen.getByLabelText('Send message'));
-
-  await waitFor(() => expect(transport.streamChat).toHaveBeenCalledTimes(1));
-  expect(transport.streamChat.mock.calls[0]?.[0]).toEqual(
+  render(<ChatPanel {...props()} personas={[custom]} />);
+  send('Question');
+  await waitFor(() => expect(transport.startTurn).toHaveBeenCalledTimes(1));
+  expect(transport.startTurn.mock.calls[0]?.[0]).toEqual(
     expect.objectContaining({ personaId: 'custom-only' }),
   );
 });
 
 it('keeps the first turn alive when its newly created conversation route is adopted', async () => {
   let finishEnsure: ((value: Conversation) => void) | undefined;
-  transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
-    onEvent({ type: 'text', text: 'Visible first token' });
-    return new Promise<void>(() => undefined);
-  });
-  const created = conversation('conversation-created');
+  const stream = hang();
+  const created = { ...conversation('conversation-created'), title: 'New thread' };
   const values = props(created);
   values.onEnsureConversation.mockReturnValue(
     new Promise<Conversation>((resolve) => {
@@ -302,14 +193,26 @@ it('keeps the first turn alive when its newly created conversation route is adop
     }),
   );
   const rendered = render(<ChatPanel {...values} conversation={null} scopeId={null} />);
-
-  setComposerValue(screen.getByLabelText('Message'), 'First question');
-  fireEvent.click(screen.getByLabelText('Send message'));
+  send('First question');
   await waitFor(() => expect(values.onEnsureConversation).toHaveBeenCalledTimes(1));
   rendered.rerender(<ChatPanel {...values} conversation={created} scopeId={created.id} />);
   finishEnsure?.(created);
-
+  await waitFor(() => expect(transport.turnEvents).toHaveBeenCalled());
+  expect(transport.startTurn.mock.calls[0]?.[0]).toEqual(
+    expect.objectContaining({ conversationId: 'conversation-created' }),
+  );
+  // An untitled thread is named after its first message.
+  expect(values.onConversation).toHaveBeenCalledWith(
+    expect.objectContaining({ title: 'First question' }),
+  );
+  act(() =>
+    stream.emit(
+      { type: 'start', messageId: 'turn-1', messageMetadata: { createdAt: '' } },
+      ...textChunks('Visible first token'),
+    ),
+  );
   expect(await screen.findByText('Visible first token')).toBeTruthy();
+  expect(screen.getByText('First question')).toBeTruthy();
   expect(transport.cancelTurn).not.toHaveBeenCalled();
 });
 
@@ -317,68 +220,64 @@ it('switches to the full-height conversation layout as soon as submit begins', a
   const values = props();
   values.onFlush.mockReturnValue(new Promise<null>(() => undefined));
   render(<ChatPanel {...values} />);
-
   expect(screen.getByLabelText('Thread').classList).toContain('empty-conversation');
-  setComposerValue(screen.getByLabelText('Message'), 'Question');
-  fireEvent.click(screen.getByLabelText('Send message'));
-
+  send('Question');
   expect(screen.getByLabelText('Thread').classList).not.toContain('empty-conversation');
   expect(screen.getByText('Question')).toBeTruthy();
-  expect(screen.getByText('Preparing…')).toBeTruthy();
-  expect(transport.streamChat).not.toHaveBeenCalled();
+  expect(await screen.findByText('Thinking…')).toBeTruthy();
+  expect(transport.startTurn).not.toHaveBeenCalled();
 });
 
-it('keeps interrupted text visible, unlocks the composer, and ignores late completion', async () => {
-  let emit: ((event: ChatEvent) => void) | undefined;
-  let finishFirst: (() => void) | undefined;
-  let call = 0;
-  transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
-    call += 1;
-    if (call > 1) return new Promise<void>(() => undefined);
-    emit = onEvent;
-    onEvent({ type: 'text', text: 'Partial answer' });
-    await new Promise<void>((resolve) => {
-      finishFirst = resolve;
-    });
-  });
-  const values = props();
-  const rendered = render(<ChatPanel {...values} />);
-  values.onConversation.mockImplementation((next: Conversation) => {
-    rendered.rerender(<ChatPanel {...values} conversation={next} />);
-  });
-
-  setComposerValue(screen.getByLabelText('Message'), 'Question');
-  fireEvent.click(screen.getByLabelText('Send message'));
+it('stops durably, keeps interrupted text, unlocks the composer, and retries by editing', async () => {
+  const stream = hang();
+  const { values } = renderSaving();
+  send('Question');
+  await waitFor(() => expect(transport.turnEvents).toHaveBeenCalled());
+  act(() =>
+    stream.emit(
+      { type: 'start', messageId: 'turn-1', messageMetadata: { createdAt: '' } },
+      turnData({ userMessageId: 'user-saved' }),
+      ...textChunks('Partial answer'),
+    ),
+  );
   await screen.findByText('Partial answer');
   fireEvent.click(screen.getByLabelText('Stop response'));
-
+  expect(transport.cancelTurn).toHaveBeenCalledWith('turn-1');
   expect(await screen.findByText('Incomplete response')).toBeTruthy();
   expect(screen.getByLabelText('Send message')).toBeTruthy();
-  emit?.({
-    type: 'done',
-    message: {
-      id: 'late',
-      role: 'assistant',
-      content: 'Late answer',
-      createdAt: new Date().toISOString(),
-    },
-    conversationId: 'conversation-1',
-    branchId: 'branch-1',
-    title: 'Conversation',
-    expiresAt: '2026-09-25T00:00:00.000Z',
+  const saved = values.onConversation.mock.calls.at(-1)?.[0] as Conversation;
+  expect(saved.messages.at(-1)).toMatchObject({
+    id: 'turn-1',
+    metadata: expect.objectContaining({ status: 'interrupted' }),
   });
+  // A late event on the detached stream changes nothing.
+  act(() => stream.emit(...textChunks(' and more', 'late')));
   expect(values.onConversation).toHaveBeenCalledTimes(1);
   expect(transport.streamMessageAnnotations).not.toHaveBeenCalled();
   expect(transport.streamNoteProposal).not.toHaveBeenCalled();
 
-  setComposerValue(screen.getByLabelText('Message'), 'Next question');
-  fireEvent.click(screen.getByLabelText('Send message'));
-  await waitFor(() => expect(transport.streamChat).toHaveBeenCalledTimes(2));
-  expect(screen.getByText('Question')).toBeTruthy();
-  expect(screen.getByText('Partial answer')).toBeTruthy();
-  expect(screen.getByText('Incomplete response')).toBeTruthy();
-  finishFirst?.();
-  await waitFor(() => expect(screen.getByLabelText('Stop response')).toBeTruthy());
+  hang('turn-2');
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  await waitFor(() => expect(transport.startTurn).toHaveBeenCalledTimes(2));
+  expect(transport.startTurn.mock.calls[1]?.[0]).toEqual(
+    expect.objectContaining({ message: 'Question', editMessageId: 'user-saved' }),
+  );
+  expect(screen.queryByText('Partial answer')).toBeNull();
+});
+
+it('retries a turn stopped before its first event under the server user message id', async () => {
+  openTurn('turn-1', { userMessageId: 'user-saved' });
+  renderSaving();
+  send('Question');
+  await waitFor(() => expect(transport.turnEvents).toHaveBeenCalled());
+  fireEvent.click(screen.getByLabelText('Stop response'));
+  expect(transport.cancelTurn).toHaveBeenCalledWith('turn-1');
+  hang('turn-2');
+  fireEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+  await waitFor(() => expect(transport.startTurn).toHaveBeenCalledTimes(2));
+  expect(transport.startTurn.mock.calls[1]?.[0]).toEqual(
+    expect.objectContaining({ message: 'Question', editMessageId: 'user-saved' }),
+  );
 });
 
 it('waits for stop acknowledgement before starting another turn', async () => {
@@ -389,44 +288,57 @@ it('waits for stop acknowledgement before starting another turn', async () => {
         acknowledge = () => resolve({ cancelled: true });
       }),
   );
-  transport.streamChat.mockImplementation(() => new Promise(() => {}));
+  hang();
   render(<ChatPanel {...props()} />);
-  setComposerValue(screen.getByLabelText('Message'), 'First');
-  fireEvent.click(screen.getByLabelText('Send message'));
-  await waitFor(() => expect(transport.streamChat).toHaveBeenCalledTimes(1));
+  send('First');
+  await waitFor(() => expect(transport.turnEvents).toHaveBeenCalledTimes(1));
   fireEvent.click(screen.getByLabelText('Stop response'));
+  await screen.findByText('No response received');
+  hang('turn-2');
   setComposerValue(screen.getByLabelText('Message'), 'Second');
   await act(async () => fireEvent.click(screen.getByLabelText('Send message')));
-  expect(transport.streamChat).toHaveBeenCalledTimes(1);
+  expect(transport.startTurn).toHaveBeenCalledTimes(1);
   await act(async () => acknowledge?.());
-  await waitFor(() => expect(transport.streamChat).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(transport.startTurn).toHaveBeenCalledTimes(2));
 });
 
 it('offers recovery immediately when stopped before the first token', async () => {
-  transport.streamChat.mockImplementation(() => new Promise<void>(() => undefined));
-  const values = props();
-  const rendered = render(<ChatPanel {...values} />);
-  values.onConversation.mockImplementation((next: Conversation) => {
-    rendered.rerender(<ChatPanel {...values} conversation={next} />);
-  });
-  setComposerValue(screen.getByLabelText('Message'), 'Keep this question');
-  fireEvent.click(screen.getByLabelText('Send message'));
-  await waitFor(() => expect(transport.streamChat).toHaveBeenCalledTimes(1));
+  hang();
+  renderSaving();
+  send('Keep this question');
+  await waitFor(() => expect(transport.turnEvents).toHaveBeenCalledTimes(1));
   fireEvent.click(screen.getByLabelText('Stop response'));
   expect(await screen.findByText('No response received')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Edit message' }));
   expect((screen.getByRole('textbox', { name: 'Edit message' }) as HTMLTextAreaElement).value).toBe(
     'Keep this question',
   );
-  expect(transport.streamChat).toHaveBeenCalledTimes(1);
+  expect(transport.startTurn).toHaveBeenCalledTimes(1);
   expect(transport.cancelTurn).toHaveBeenCalledTimes(1);
+});
+
+it('cancels by request id and restores the draft when stopped before the turn is admitted', async () => {
+  transport.startTurn.mockImplementationOnce(
+    (_request, signal: AbortSignal) =>
+      new Promise((_resolve, reject) =>
+        signal.addEventListener('abort', () => reject(signal.reason)),
+      ),
+  );
+  render(<ChatPanel {...props()} />);
+  send('Not yet sent');
+  await waitFor(() => expect(transport.startTurn).toHaveBeenCalledTimes(1));
+  fireEvent.click(screen.getByLabelText('Stop response'));
+  const requestId = transport.startTurn.mock.calls[0]?.[0].requestId;
+  expect(transport.cancelTurn).toHaveBeenCalledWith(requestId);
+  await waitFor(() => expect(composerValue(screen.getByLabelText('Message'))).toBe('Not yet sent'));
+  expect(document.querySelector('article.message.user')).toBeNull();
 });
 
 it('restores the latest failed question without sending or overwriting a draft', () => {
   const values = props();
   values.conversation.messages = [
-    { id: 'question', role: 'user', content: 'Original question', createdAt: '' },
-    { id: 'failed', role: 'assistant', content: '', incomplete: true, createdAt: '' },
+    userMessage('question', 'Original question'),
+    assistantMessage('failed', '', { status: 'interrupted' }),
   ];
   render(<ChatPanel {...values} />);
   expect(screen.getByText('No response received')).toBeTruthy();
@@ -441,67 +353,42 @@ it('restores the latest failed question without sending or overwriting a draft',
   expect((screen.getByRole('textbox', { name: 'Edit message' }) as HTMLTextAreaElement).value).toBe(
     'Original question',
   );
-  expect(transport.streamChat).not.toHaveBeenCalled();
+  expect(transport.startTurn).not.toHaveBeenCalled();
 });
 
-it('adopts a partial response as incomplete when the stream reports an error', async () => {
-  transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
-    onEvent({ type: 'text', text: 'Partial output' });
-    onEvent({ type: 'reasoning', text: 'Reasoning retained' });
-    onEvent({
-      type: 'tool',
-      tool: {
-        id: 'tool-1',
-        name: 'searchSources',
-        state: 'complete',
-        summary: 'Sources searched',
-      },
-    });
-    onEvent({
-      type: 'source',
-      source: { id: 'source-1', url: 'https://example.com/source' },
-    });
-    onEvent({
-      type: 'error',
-      message: 'The response reached its output limit. Please try again.',
-      partialMessage: {
-        id: 'persisted-partial',
-        role: 'assistant',
-        content: 'Full persisted partial output',
-        reasoning: 'Reasoning retained',
-        tools: [
-          { id: 'tool-1', name: 'searchSources', state: 'complete', summary: 'Sources searched' },
-        ],
-        sources: [{ id: 'source-1', url: 'https://example.com/source' }],
-        contextCompacted: true,
-        createdAt: new Date().toISOString(),
-        incomplete: true,
-      },
-    });
-  });
-  const values = props();
-  const rendered = render(<ChatPanel {...values} />);
-  values.onConversation.mockImplementation((next: Conversation) => {
-    rendered.rerender(<ChatPanel {...values} conversation={next} />);
-  });
-  setComposerValue(screen.getByLabelText('Message'), 'Question');
-  fireEvent.click(screen.getByLabelText('Send message'));
+it('keeps a partial reply as interrupted when the stream reports an error', async () => {
+  reply([
+    {
+      type: 'start',
+      messageId: 'turn-1',
+      messageMetadata: { createdAt: '', contextCompacted: true },
+    },
+    { type: 'reasoning-start', id: 'reasoning' },
+    { type: 'reasoning-delta', id: 'reasoning', delta: 'Reasoning retained' },
+    { type: 'reasoning-end', id: 'reasoning' },
+    ...textChunks('Partial output'),
+    turnData({ failureCode: 'output_limit' }),
+    { type: 'message-metadata', messageMetadata: { status: 'interrupted' } },
+    { type: 'error', errorText: 'The response reached its output limit. Please try again.' },
+  ]);
+  const { values } = renderSaving();
+  send('Question');
+  expect(await screen.findByText(/reached its output limit/)).toBeTruthy();
   await waitFor(() => expect(values.onConversation).toHaveBeenCalledTimes(1));
   const adopted = values.onConversation.mock.calls[0]?.[0] as Conversation;
   expect(adopted.messages.at(-1)).toMatchObject({
-    id: 'persisted-partial',
-    role: 'assistant',
-    content: 'Full persisted partial output',
-    incomplete: true,
-    reasoning: 'Reasoning retained',
-    contextCompacted: true,
-    tools: [{ id: 'tool-1' }],
-    sources: [{ id: 'source-1' }],
+    id: 'turn-1',
+    metadata: expect.objectContaining({ status: 'interrupted', contextCompacted: true }),
   });
-  expect(screen.getByText('Full persisted partial output')).toBeTruthy();
-  expect(screen.getAllByText('Full persisted partial output')).toHaveLength(1);
+  expect(screen.getAllByText('Partial output')).toHaveLength(1);
+  expect(screen.getByText('Reasoning retained')).toBeTruthy();
   expect(screen.getByText('Incomplete response')).toBeTruthy();
+  expect(screen.getByLabelText('Context compacted')).toBeTruthy();
   expect(transport.streamNoteProposal).not.toHaveBeenCalled();
+  expect(track).toHaveBeenCalledWith(
+    'chat_failed',
+    expect.objectContaining({ failure_code: 'output_limit' }),
+  );
 });
 
 it('does not start a turn when navigation happens during preflight', async () => {
@@ -513,51 +400,31 @@ it('does not start a turn when navigation happens during preflight', async () =>
     }),
   );
   const rendered = render(<ChatPanel {...first} />);
-  setComposerValue(screen.getByLabelText('Message'), 'Question');
-  fireEvent.click(screen.getByLabelText('Send message'));
-
-  const second = props(conversation('conversation-2'));
-  rendered.rerender(<ChatPanel {...second} />);
-  finishFlush?.(null);
-
-  await waitFor(() => expect(transport.streamChat).not.toHaveBeenCalled());
+  send('Question');
+  rendered.rerender(<ChatPanel {...props(conversation('conversation-2'))} />);
+  await act(async () => finishFlush?.(null));
+  expect(transport.startTurn).not.toHaveBeenCalled();
   expect(screen.getByLabelText('Send message')).toBeTruthy();
+  expect(screen.queryByText('Question')).toBeNull();
 });
 
-it('keeps the streamed response visible until saved message adoption', async () => {
-  transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
-    onEvent({
-      type: 'done',
-      message: {
-        id: 'assistant-complete',
-        role: 'assistant',
-        content: 'Completed answer',
-        createdAt: new Date().toISOString(),
-      },
-      conversationId: 'conversation-1',
-      branchId: 'branch-1',
-      title: 'Conversation',
-      expiresAt: '2026-09-25T00:00:00.000Z',
-    });
-  });
+it('keeps the streamed response element when the saved conversation arrives', async () => {
+  reply(replyChunks('turn-1', 'Completed answer'));
   const values = props();
   const rendered = render(<ChatPanel {...values} />);
-  setComposerValue(screen.getByLabelText('Message'), 'Question');
-  fireEvent.click(screen.getByLabelText('Send message'));
-
-  const liveArticle = await waitFor(() => screen.getByText('Completed answer').closest('article'));
-  expect(liveArticle).not.toBeNull();
+  send('Question');
+  await waitFor(() => expect(values.onConversation).toHaveBeenCalled());
+  const liveArticle = screen.getByText('Completed answer').closest('article');
   const finalized = values.onConversation.mock.calls.at(-1)?.[0] as Conversation;
   rendered.rerender(<ChatPanel {...values} conversation={finalized} />);
-
   expect(screen.getAllByText('Completed answer')).toHaveLength(1);
   expect(screen.getByText('Completed answer').closest('article')).toBe(liveArticle);
   rendered.unmount();
   expect(transport.cancelTurn).not.toHaveBeenCalled();
 });
 
-it('clears an attached file when sending starts, before the response finishes', async () => {
-  transport.streamChat.mockImplementation(() => new Promise(() => {}));
+it('sends uploaded files as attachments and clears them when sending starts', async () => {
+  hang();
   const view = render(<ChatPanel {...props()} />);
   const composer = view.container.querySelector<HTMLElement>('.composer');
   if (!composer) throw new Error('Composer missing');
@@ -573,8 +440,14 @@ it('clears an attached file when sending starts, before the response finishes', 
     ),
   );
   fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
-  await waitFor(() => expect(transport.streamChat).toHaveBeenCalledOnce());
+  await waitFor(() => expect(transport.startTurn).toHaveBeenCalledOnce());
+  expect(transport.startTurn.mock.calls[0]?.[0]).toEqual(
+    expect.objectContaining({ attachmentIds: ['uploaded'], message: '' }),
+  );
   expect(within(composer).queryByRole('button', { name: 'Download paper.docx' })).toBeNull();
+  // The sent message shows the attachment from its `file` part.
+  const sent = document.querySelector<HTMLElement>('article.message.user');
+  expect(within(sent!).getByRole('button', { name: 'Download paper.docx' })).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Stop response' })).toBeTruthy();
 });
 
@@ -590,7 +463,7 @@ it('removes a failed attachment, shows an error, and does not send it', async ()
   await waitFor(() =>
     expect(within(composer).queryByRole('button', { name: 'Download paper.docx' })).toBeNull(),
   );
-  expect(transport.streamChat).not.toHaveBeenCalled();
+  expect(transport.startTurn).not.toHaveBeenCalled();
   expect(screen.getByText(/Could not upload paper\.docx: Upload failed/)).toBeTruthy();
 });
 
@@ -616,7 +489,7 @@ it('shows upload progress and blocks sending until the attachment is ready', asy
     'true',
   );
   fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
-  expect(transport.streamChat).not.toHaveBeenCalled();
+  expect(transport.startTurn).not.toHaveBeenCalled();
   expect(track).toHaveBeenCalledWith('action_blocked', {
     action: 'send_message',
     failure_code: 'upload_in_progress',

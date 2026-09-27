@@ -1,4 +1,9 @@
-import type { Annotation, AnnotationEvent, Message } from '@walden/contracts';
+import {
+  type Annotation,
+  type AnnotationEvent,
+  uiMessageText,
+  type WaldenUIMessage,
+} from '@walden/contracts';
 import { nowIso } from '../../http';
 import { mergeAnnotationsPreservingExisting } from '../../services/annotations/annotations';
 import type { AgentService, AgentTurnInput } from '../../services/types';
@@ -9,7 +14,7 @@ type AnnotationGeneration = {
   db: D1Database;
   ownerId: string;
   input: AgentTurnInput;
-  assistantMessage: Message;
+  assistantMessage: WaldenUIMessage;
   agent: AgentService;
 };
 
@@ -28,7 +33,7 @@ async function persistAnnotations(
     agentHighlightStatements(db, {
       messageId: assistantMessage.id,
       ownerId,
-      content: assistantMessage.content,
+      content: uiMessageText(assistantMessage),
       annotations,
       updatedAt: nowIso(),
     }),
@@ -47,9 +52,9 @@ export async function generateAnnotations(
     throw new AnnotationGenerationError();
   }
   const annotations = mergeAnnotationsPreservingExisting(
-    assistantMessage.annotations ?? [],
+    assistantMessage.metadata?.annotations ?? [],
     additions,
-    assistantMessage.content,
+    uiMessageText(assistantMessage),
   );
   await persistAnnotations(generation, annotations);
   return annotations;
@@ -70,12 +75,13 @@ async function runAnnotationStream(
   emit: (event: AnnotationEvent) => void,
 ) {
   const { agent, input, assistantMessage } = generation;
-  let provisional = assistantMessage.annotations ?? [];
+  let provisional = assistantMessage.metadata?.annotations ?? [];
+  const text = uiMessageText(assistantMessage);
   const events = await agent.streamAnnotations(input, assistantMessage, signal);
   for await (const event of events) {
     if (signal.aborted) return;
     if (event.type === 'annotation') {
-      const merged = mergeStreamedAnnotation(provisional, event, assistantMessage.content);
+      const merged = mergeStreamedAnnotation(provisional, event, text);
       if (!merged) continue;
       provisional = merged;
       emit(event);
@@ -85,11 +91,7 @@ async function runAnnotationStream(
       emit(event);
       continue;
     }
-    const annotations = mergeAnnotationsPreservingExisting(
-      provisional,
-      event.annotations,
-      assistantMessage.content,
-    );
+    const annotations = mergeAnnotationsPreservingExisting(provisional, event.annotations, text);
     await persistAnnotations(generation, annotations);
     emit({ type: 'done', annotations });
     return;

@@ -1,14 +1,13 @@
 import type {
   Annotation,
   Conversation,
-  Message,
   MessageHighlight,
-  MessageSource,
-  ToolActivity,
+  WaldenUIMessage,
 } from '@walden/contracts';
 import { deleteAgentMemoryThread } from '../../agent/memory/memory';
 import { all, first, parseJson } from '../../db/client';
 import { HttpError, newId, nowIso } from '../../http';
+import { parseStoredMessage } from '../messages';
 
 export const RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -30,15 +29,9 @@ type BranchRow = {
 };
 type MessageRow = {
   id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  reasoning: string | null;
-  created_at: string;
+  ui_message: string;
   agent_highlights_json: string;
-  activity_json: string;
-  incomplete: number;
   highlights_json: string;
-  persona_name: string | null;
 };
 
 async function purgeConversationState(
@@ -173,41 +166,29 @@ async function resolveConversationBranch(
   return renewConversation(db, ownerId, id, branch, branches);
 }
 
-function mapConversationMessage(message: MessageRow): Message {
-  const activity = parseJson<{
-    tools?: ToolActivity[];
-    sources?: MessageSource[];
-    contextCompacted?: boolean;
-    learningCheck?: Message['learningCheck'];
-    learningCheckResponse?: Message['learningCheckResponse'];
-    attachments?: Message['attachments'];
-  }>(message.activity_json, {});
+/** The stored message with its user highlights and agent annotations attached. */
+function mapConversationMessage(row: MessageRow): WaldenUIMessage {
+  const message = parseStoredMessage(row.ui_message);
+  const highlights = parseJson<MessageHighlight[]>(row.highlights_json, []);
+  const annotations = parseJson<Array<{ quote: string; kind: string; start: number }>>(
+    row.agent_highlights_json,
+    [],
+  ).map(
+    (item): Annotation => ({
+      id: `agent:${row.id}:${item.start}`,
+      quote: item.quote,
+      kind: item.kind as Annotation['kind'],
+      whose: 'assistant',
+    }),
+  );
   return {
-    id: message.id,
-    role: message.role,
-    content: message.content,
-    ...(message.reasoning ? { reasoning: message.reasoning } : {}),
-    createdAt: message.created_at,
-    ...(message.persona_name ? { personaName: message.persona_name } : {}),
-    annotations: parseJson<Array<{ quote: string; kind: string; start: number }>>(
-      message.agent_highlights_json,
-      [],
-    ).map((row) => ({
-      id: `agent:${message.id}:${row.start}`,
-      quote: row.quote,
-      kind: row.kind as Annotation['kind'],
-      whose: 'assistant' as const,
-    })),
-    highlights: parseJson<MessageHighlight[]>(message.highlights_json, []),
-    ...(activity.tools?.length ? { tools: activity.tools } : {}),
-    ...(activity.sources?.length ? { sources: activity.sources } : {}),
-    ...(activity.contextCompacted ? { contextCompacted: true } : {}),
-    ...(activity.learningCheck ? { learningCheck: activity.learningCheck } : {}),
-    ...(activity.learningCheckResponse
-      ? { learningCheckResponse: activity.learningCheckResponse }
-      : {}),
-    ...(activity.attachments?.length ? { attachments: activity.attachments } : {}),
-    incomplete: Boolean(message.incomplete),
+    ...message,
+    metadata: {
+      createdAt: '',
+      ...message.metadata,
+      ...(highlights.length ? { highlights } : {}),
+      ...(annotations.length ? { annotations } : {}),
+    },
   };
 }
 
@@ -216,7 +197,7 @@ async function loadConversationMessages(
   ownerId: string,
   id: string,
   headMessageId: string | null,
-): Promise<Message[]> {
+): Promise<WaldenUIMessage[]> {
   const rows = await all<MessageRow>(
     db
       .prepare(
@@ -226,7 +207,7 @@ async function loadConversationMessages(
            SELECT m.id,m.parent_message_id,path.depth+1 FROM messages m JOIN path ON m.id=path.parent_message_id
            WHERE m.conversation_id=? AND m.owner_id=?
          )
-         SELECT m.id,m.role,m.content,m.reasoning,m.created_at,m.activity_json,m.incomplete,m.persona_name,
+         SELECT m.id,m.ui_message,
            COALESCE((SELECT json_group_array(json_object('start',ordered.start,'end',ordered.end,'quote',ordered.quote,'color',ordered.color,'origin',ordered.origin))
              FROM (SELECT h.start,h.end,h.quote,h.color,h.origin FROM message_highlights h
                WHERE h.message_id=m.id AND h.owner_id=m.owner_id AND h.origin='user'
@@ -246,7 +227,7 @@ function buildConversation(
   row: ConversationRow,
   branch: BranchRow,
   branches: BranchRow[],
-  messages: Message[],
+  messages: WaldenUIMessage[],
 ): Conversation {
   return {
     id: row.id,

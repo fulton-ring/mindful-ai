@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { ChatEvent, Conversation, NoteProposalEvent } from '@walden/contracts';
+import type { Conversation, NoteProposalEvent } from '@walden/contracts';
 import { expect, it, vi } from 'vitest';
 import {
+  assistantMessage,
   conversation,
   getTransport,
+  hang,
   props,
+  reply,
+  replyChunks,
   setComposerValue,
 } from '../../tests/_ChatPanel.test-helpers';
 
@@ -25,21 +29,7 @@ function configureProposalAbort() {
       return new Promise<void>(() => undefined);
     },
   );
-  transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
-    onEvent({
-      type: 'done',
-      message: {
-        id: 'assistant-proposal',
-        role: 'assistant',
-        content: 'Response',
-        createdAt: new Date().toISOString(),
-      },
-      conversationId: 'conversation-1',
-      branchId: 'branch-1',
-      title: 'Thread',
-      expiresAt: '2026-09-25T00:00:00.000Z',
-    });
-  });
+  reply(replyChunks('assistant-proposal', 'Response'));
   return {
     ready: () => emitProposal !== undefined,
     emit: (event: unknown) => emitProposal?.(event),
@@ -119,14 +109,7 @@ it.each(['event', 'transport'])('reports a failed note proposal via %s', async (
   });
   const values = props({
     ...conversation('conversation-1'),
-    messages: [
-      {
-        id: 'reply',
-        role: 'assistant',
-        content: 'An answer',
-        createdAt: new Date().toISOString(),
-      },
-    ],
+    messages: [assistantMessage('reply', 'An answer')],
   });
   render(<ChatPanel {...values} />);
   fireEvent.click(screen.getByRole('button', { name: 'Add selection to note' }));
@@ -146,14 +129,7 @@ it('retries a failed note proposal from the response that owns the error', async
     });
   const values = props({
     ...conversation('conversation-1'),
-    messages: [
-      {
-        id: 'reply',
-        role: 'assistant',
-        content: 'An answer',
-        createdAt: new Date().toISOString(),
-      },
-    ],
+    messages: [assistantMessage('reply', 'An answer')],
   });
   render(<ChatPanel {...values} />);
   fireEvent.click(screen.getByRole('button', { name: 'Add selection to note' }));
@@ -176,21 +152,7 @@ it('never proposes a note on its own when a response completes', async () => {
       onEvent({ type: 'done', proposal: null });
     },
   );
-  transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
-    onEvent({
-      type: 'done',
-      message: {
-        id: 'assistant-auto-proposal',
-        role: 'assistant',
-        content: 'Completed answer',
-        createdAt: new Date().toISOString(),
-      },
-      conversationId: 'conversation-1',
-      branchId: 'branch-1',
-      title: 'Conversation',
-      expiresAt: '2026-09-25T00:00:00.000Z',
-    });
-  });
+  reply(replyChunks('assistant-auto-proposal', 'Completed answer'));
   const values = props();
   const rendered = render(<ChatPanel {...values} />);
   values.onConversation.mockImplementation((next: Conversation) => {
@@ -209,27 +171,8 @@ it('never proposes a note on its own when a response completes', async () => {
 
 it('keeps a visible note suggestion alive while the next message starts', async () => {
   let proposalSignal: AbortSignal | undefined;
-  let call = 0;
-  transport.streamChat.mockImplementation(async (_input, onEvent: (event: ChatEvent) => void) => {
-    call += 1;
-    if (call === 1) {
-      onEvent({
-        type: 'done',
-        message: {
-          id: 'assistant-first-note',
-          role: 'assistant',
-          content: 'First answer',
-          createdAt: new Date().toISOString(),
-        },
-        conversationId: 'conversation-1',
-        branchId: 'branch-1',
-        title: 'Conversation',
-        expiresAt: '2026-09-25T00:00:00.000Z',
-      });
-      return;
-    }
-    return new Promise<void>(() => undefined);
-  });
+  reply(replyChunks('assistant-first-note', 'First answer'), 'turn-first');
+  hang('turn-second');
   transport.streamNoteProposal.mockImplementation(
     async (_id, _input, _onEvent, signal: AbortSignal) => {
       proposalSignal = signal;
@@ -257,18 +200,8 @@ it('offers a selection capture on any completed response while keeping other res
   const history = {
     ...conversation('conversation-1'),
     messages: [
-      {
-        id: 'assistant-old',
-        role: 'assistant' as const,
-        content: 'Old response',
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: 'assistant-latest',
-        role: 'assistant' as const,
-        content: '**Latest response**',
-        createdAt: new Date().toISOString(),
-      },
+      assistantMessage('assistant-old', 'Old response'),
+      assistantMessage('assistant-latest', '**Latest response**'),
     ],
   };
   render(<ChatPanel {...props(history)} />);
@@ -313,14 +246,7 @@ it('finishes a note proposal whose stream ends without a terminal event', async 
   const onGhostBatch = vi.fn();
   const values = props({
     ...conversation('conversation-1'),
-    messages: [
-      {
-        id: 'assistant-stranded',
-        role: 'assistant' as const,
-        content: 'Selected exact text',
-        createdAt: new Date().toISOString(),
-      },
-    ],
+    messages: [assistantMessage('assistant-stranded', 'Selected exact text')],
   });
   render(<ChatPanel {...values} onGhostBatch={onGhostBatch} />);
 
@@ -337,14 +263,7 @@ it('finishes a note proposal whose stream ends having produced nothing', async (
   });
   const values = props({
     ...conversation('conversation-1'),
-    messages: [
-      {
-        id: 'assistant-empty',
-        role: 'assistant' as const,
-        content: 'Selected exact text',
-        createdAt: new Date().toISOString(),
-      },
-    ],
+    messages: [assistantMessage('assistant-empty', 'Selected exact text')],
   });
   render(<ChatPanel {...values} />);
 
@@ -366,14 +285,7 @@ it('reports a declined Add to note in the selection menu, not under the response
   });
   const values = props({
     ...conversation('conversation-1'),
-    messages: [
-      {
-        id: 'assistant-declined',
-        role: 'assistant' as const,
-        content: 'Selected exact text',
-        createdAt: new Date().toISOString(),
-      },
-    ],
+    messages: [assistantMessage('assistant-declined', 'Selected exact text')],
   });
   render(<ChatPanel {...values} />);
 
@@ -389,14 +301,7 @@ it('routes Add to note through the streamed proposal pipeline, leaving it pendin
   transport.streamNoteProposal.mockResolvedValue(undefined);
   const history = {
     ...conversation('conversation-1'),
-    messages: [
-      {
-        id: 'assistant-1',
-        role: 'assistant' as const,
-        content: 'Selected exact text',
-        createdAt: new Date().toISOString(),
-      },
-    ],
+    messages: [assistantMessage('assistant-1', 'Selected exact text')],
   };
   const values = props(history);
   render(<ChatPanel {...values} />);
@@ -425,14 +330,7 @@ it('offers a manual note proposal for a completed reply', async () => {
   transport.streamNoteProposal.mockResolvedValue(undefined);
   const history = {
     ...conversation('conversation-1'),
-    messages: [
-      {
-        id: 'assistant-1',
-        role: 'assistant' as const,
-        content: 'Change the term in the note.',
-        createdAt: new Date().toISOString(),
-      },
-    ],
+    messages: [assistantMessage('assistant-1', 'Change the term in the note.')],
   };
   render(<ChatPanel {...props(history)} />);
 
@@ -466,14 +364,7 @@ it('delivers every streamed preview and hydrates a terminal proposal batch once'
   const onGhostBatch = vi.fn();
   const values = props({
     ...conversation('conversation-1'),
-    messages: [
-      {
-        id: 'assistant-batch-source',
-        role: 'assistant' as const,
-        content: 'A C',
-        createdAt: new Date().toISOString(),
-      },
-    ],
+    messages: [assistantMessage('assistant-batch-source', 'A C')],
   });
   render(<ChatPanel {...values} onGhostBatch={onGhostBatch} />);
 
@@ -496,14 +387,7 @@ it('preserves capture text when retrying a failed Add to note', async () => {
     });
   const values = props({
     ...conversation('conversation-1'),
-    messages: [
-      {
-        id: 'assistant-capture-retry',
-        role: 'assistant' as const,
-        content: 'Selected exact text',
-        createdAt: new Date().toISOString(),
-      },
-    ],
+    messages: [assistantMessage('assistant-capture-retry', 'Selected exact text')],
   });
   render(<ChatPanel {...values} />);
 
@@ -522,28 +406,24 @@ it('preserves capture text when retrying a failed Add to note', async () => {
 });
 
 it('routes intervention capture through the same streamed proposal pipeline', async () => {
-  transport.streamChat.mockImplementation(async (_input, onEvent) => {
-    onEvent({
-      type: 'intervention',
-      intervention: {
+  // The turn is still running: the card captures into the latest finished reply.
+  hang().emit(
+    { type: 'start', messageId: 'turn-1', messageMetadata: { createdAt: '' } },
+    {
+      type: 'data-intervention',
+      id: 'intervention-1',
+      data: {
         id: 'intervention-1',
         kind: 'ask',
         question: 'Keep this?',
         options: ['Intervention exact text'],
       },
-    });
-  });
+    },
+  );
   transport.streamNoteProposal.mockResolvedValue(undefined);
   const history = {
     ...conversation('conversation-1'),
-    messages: [
-      {
-        id: 'assistant-source',
-        role: 'assistant' as const,
-        content: 'Earlier completed response',
-        createdAt: new Date().toISOString(),
-      },
-    ],
+    messages: [assistantMessage('assistant-source', 'Earlier completed response')],
   };
   const values = props(history);
   render(<ChatPanel {...values} />);
@@ -569,4 +449,41 @@ it('routes intervention capture through the same streamed proposal pipeline', as
     expect.any(String),
     'Intervention exact text',
   );
+});
+
+it('proposes a recorded note once the reply that recorded it finishes', async () => {
+  transport.annotationResults.mockResolvedValue([]);
+  transport.streamNoteProposal.mockResolvedValue(undefined);
+  reply(
+    replyChunks('assistant-record', 'Worth keeping.', {
+      body: [
+        {
+          type: 'data-intervention',
+          id: 'record-1',
+          data: { id: 'record-1', kind: 'record', text: 'Keep this line.', reason: 'Useful' },
+        },
+      ],
+    }),
+  );
+  const values = props();
+  const rendered = render(<ChatPanel {...values} />);
+  values.onConversation.mockImplementation((next: Conversation) => {
+    rendered.rerender(<ChatPanel {...values} conversation={next} />);
+  });
+  setComposerValue(screen.getByLabelText('Message'), 'Remember this');
+  fireEvent.click(screen.getByLabelText('Send message'));
+
+  await waitFor(() => expect(transport.streamNoteProposal).toHaveBeenCalledTimes(1));
+  expect(transport.streamNoteProposal).toHaveBeenCalledWith(
+    'assistant-record',
+    expect.objectContaining({
+      action: 'capture',
+      captureText: 'Keep this line.',
+      noteRevision: null,
+    }),
+    expect.any(Function),
+    expect.any(AbortSignal),
+  );
+  // Automatic highlights run for the finished reply too.
+  expect(transport.annotationResults.mock.calls[0]?.[0]).toBe('assistant-record');
 });
