@@ -112,14 +112,9 @@ function AssistantMessage({ message, ...props }: MessageProps) {
           <ReasoningContent>{reasoning}</ReasoningContent>
         </Reasoning>
       )}
-      {learningCheck ? (
-        <LearningCheckMessage
-          check={learningCheck}
-          response={props.learningCheckResponse}
-          onResolve={props.onLearningCheck}
-          onDismiss={props.onDismissLearningCheck}
-        />
-      ) : (
+      {/* A reply can answer and then quiz: its text stays above the card, unless the
+          text was only the quiz itself. */}
+      {(!learningCheck || (text && !message.metadata?.quizOnly)) && (
         <AnnotatedText
           active={props.visible}
           actionStatus={props.captureStatus}
@@ -135,6 +130,14 @@ function AssistantMessage({ message, ...props }: MessageProps) {
               : props.messageAnimation(message.id)
           }
           onAction={props.onAction}
+        />
+      )}
+      {learningCheck && (
+        <LearningCheckMessage
+          check={learningCheck}
+          response={props.learningCheckResponse}
+          onResolve={props.onLearningCheck}
+          onDismiss={props.onDismissLearningCheck}
         />
       )}
       <ResponseSources parts={message.parts} />

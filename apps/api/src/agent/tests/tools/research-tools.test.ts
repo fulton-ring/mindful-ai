@@ -393,7 +393,12 @@ it.each(['study-partner', 'account-override'])(
         }),
       }),
     );
-    expect(events.at(-1)?.type).toBe('data-intervention');
+    // The reply was only the quiz: the card replaces its text.
+    expect(events.slice(-2).map(({ type }) => type)).toEqual([
+      'data-intervention',
+      'message-metadata',
+    ]);
+    expect(events.at(-1)).toMatchObject({ messageMetadata: { quizOnly: true } });
   },
 );
 
@@ -427,7 +432,12 @@ it('turns an introduced, numbered multiple-choice reply into a learning-check ca
       }),
     }),
   );
-  expect(events.at(-1)?.type).toBe('data-intervention');
+  // The reply was only the quiz: the card replaces its text.
+  expect(events.slice(-2).map(({ type }) => type)).toEqual([
+    'data-intervention',
+    'message-metadata',
+  ]);
+  expect(events.at(-1)).toMatchObject({ messageMetadata: { quizOnly: true } });
 });
 
 it('recovers a short-answer card when Gemma calls the quiz tool with empty arguments then writes its question', async () => {
@@ -502,7 +512,12 @@ it('recovers a short-answer card when Gemma calls the quiz tool with empty argum
   expect(events).not.toContainEqual(
     expect.objectContaining({ type: 'tool-input-available', toolName: 'proposeLearningCheck' }),
   );
-  expect(events.at(-1)?.type).toBe('data-intervention');
+  // The reply was only the quiz: the card replaces its text.
+  expect(events.slice(-2).map(({ type }) => type)).toEqual([
+    'data-intervention',
+    'message-metadata',
+  ]);
+  expect(events.at(-1)).toMatchObject({ messageMetadata: { quizOnly: true } });
 });
 
 it('removes web search from the model tools when disabled for the conversation', async () => {

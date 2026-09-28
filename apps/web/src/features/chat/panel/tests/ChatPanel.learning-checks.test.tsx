@@ -49,7 +49,11 @@ it('shows a learning check instead of the streamed multiple-choice text', async 
   const rawQuiz = `${question}\nA) Thylakoid\nB) Stroma`;
   reply(
     replyChunks('answer', rawQuiz, {
-      body: [{ type: 'data-intervention', id: 'check', data: check }],
+      body: [
+        { type: 'data-intervention', id: 'check', data: check },
+        // The server marks a reply whose text was only the quiz.
+        { type: 'message-metadata', messageMetadata: { quizOnly: true } },
+      ],
     }),
   );
   const values = renderSaving();
@@ -69,10 +73,25 @@ it('shows a learning check instead of the streamed multiple-choice text', async 
       }),
     ),
   );
-  expect(screen.queryByText(rawQuiz)).toBeNull();
+  expect(screen.queryByText(/A\) Thylakoid/)).toBeNull();
   expect(screen.getByRole('button', { name: 'Capture intervention' })).toBeTruthy();
   // A learning check has no response toolbar of its own.
   expect(screen.queryByRole('button', { name: 'Regenerate response' })).toBeNull();
+});
+
+it('keeps an answer on screen when the reply goes on to quiz about it', async () => {
+  const answer = 'The Calvin cycle builds sugar from carbon dioxide inside the chloroplast.';
+  reply(
+    replyChunks('answer', answer, {
+      body: [{ type: 'data-intervention', id: 'check', data: check }],
+    }),
+  );
+  const values = renderSaving();
+  send('Explain the Calvin cycle, then quiz me');
+
+  await waitFor(() => expect(values.onConversation).toHaveBeenCalled());
+  expect(await screen.findByText(answer)).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Capture intervention' })).toBeTruthy();
 });
 
 it('submits answers as a structured response and shows them as the reader’s answers', async () => {

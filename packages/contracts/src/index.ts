@@ -183,6 +183,8 @@ export const messageMetadataSchema = z.object({
   /** `interrupted`: the reply stopped early (Stop, failure, or timeout) and keeps its partial parts. */
   status: z.enum(['complete', 'interrupted']).optional(),
   contextCompacted: z.boolean().optional(),
+  /** The reply's text was only the quiz its learning check shows, so the text is not shown. */
+  quizOnly: z.boolean().optional(),
   highlights: z.array(messageHighlightSchema).optional(),
   annotations: z.array(annotationSchema).optional(),
 });

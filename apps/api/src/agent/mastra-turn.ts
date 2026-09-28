@@ -3,11 +3,13 @@ import { ToolCallFilter } from '@mastra/core/processors';
 import { createTool } from '@mastra/core/tools';
 import type { Workspace } from '@mastra/core/workspace';
 import type { Intervention, WaldenUIMessageChunk } from '@walden/contracts';
+import { metadataPatch } from '../chat/messages';
 import type { McpTools } from '../services/mcp';
 import type { AgentTurnInput } from '../services/types';
 import { buildTurnContext, contextBudgetProcessor } from './context';
 import { stableId, TurnProposals } from './interventions';
 import {
+  isQuizOnlyText,
   learningCheckIntervention,
   recoveredFrontendIntervention,
   standaloneLearningCheck,
@@ -262,4 +264,10 @@ export async function* streamMastraTurn({
   const intervention = finalIntervention(input, state, proposals);
   assertCompleted(state, intervention);
   if (intervention) yield { type: 'data-intervention', id: intervention.id, data: intervention };
+  // A reply that was only its quiz shows just the card; any other text stays with it.
+  if (
+    intervention?.kind === 'learning_check' &&
+    isQuizOnlyText(state.text, intervention.id, input.turnId)
+  )
+    yield { type: 'message-metadata', messageMetadata: metadataPatch({ quizOnly: true }) };
 }

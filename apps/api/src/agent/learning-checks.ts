@@ -204,9 +204,13 @@ export function withoutQuizText(message: WaldenUIMessage): WaldenUIMessage {
     (part) => part.type === 'data-intervention' && part.data.kind === 'learning_check',
   );
   if (check?.type !== 'data-intervention') return message;
-  const text = uiMessageText(message);
-  const recovered =
-    standaloneLearningCheck(text, message.id) ?? standaloneShortAnswerCheck(text, message.id);
-  if (recovered?.id !== check.data.id) return message;
+  if (!isQuizOnlyText(uiMessageText(message), check.data.id, message.id)) return message;
   return { ...message, parts: message.parts.filter((part) => part.type !== 'text') };
+}
+
+/** Whether a reply's text is nothing but the quiz its learning check `checkId` shows. */
+export function isQuizOnlyText(text: string, checkId: string, turnId: string): boolean {
+  const recovered =
+    standaloneLearningCheck(text, turnId) ?? standaloneShortAnswerCheck(text, turnId);
+  return recovered?.id === checkId;
 }
