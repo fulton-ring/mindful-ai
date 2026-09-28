@@ -1,4 +1,4 @@
-import type { Intervention, WaldenDataParts, WaldenUIMessage } from '@walden/contracts';
+import type { WaldenDataParts, WaldenUIMessage } from '@walden/contracts';
 import type { ChatOnFinishCallback, DataUIPart } from 'ai';
 
 import { ApiError } from '../../../../../lib/api';
@@ -46,16 +46,9 @@ function handleTurnData(args: TurnArgs, data: WaldenDataParts['turn']) {
   if (data.userMessageId && live.kind === 'send') adoptUserMessageId(args, data.userMessageId);
 }
 
-function handleIntervention(args: TurnArgs, intervention: Intervention) {
-  if (intervention.kind === 'record') args.runtime.pendingRecord.current = intervention.text;
-  else if (intervention.kind !== 'ghost' && intervention.kind !== 'learning_check')
-    args.display.setIntervention(intervention);
-}
-
 export function handleData(args: TurnArgs, part: DataUIPart<WaldenDataParts>) {
   if (part.type === 'data-status') args.display.setStatus(part.data.text);
   else if (part.type === 'data-turn') handleTurnData(args, part.data);
-  else if (part.type === 'data-intervention') handleIntervention(args, part.data);
 }
 
 /** The transcript with this turn's reply marked interrupted (or a placeholder when none came). */

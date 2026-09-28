@@ -23,7 +23,6 @@ it('accepts a typed answer for a learning check without choices', () => {
         ],
       }}
       onResolve={onResolve}
-      onCapture={vi.fn()}
       onDismiss={vi.fn()}
     />,
   );
@@ -60,7 +59,6 @@ it('keeps a multiple-choice answer editable until the check is submitted', () =>
         ],
       }}
       onResolve={onResolve}
-      onCapture={vi.fn()}
       onDismiss={vi.fn()}
     />,
   );
@@ -100,7 +98,6 @@ it('collects several visible questions before submitting one structured response
         ],
       }}
       onResolve={onResolve}
-      onCapture={vi.fn()}
       onDismiss={vi.fn()}
     />,
   );

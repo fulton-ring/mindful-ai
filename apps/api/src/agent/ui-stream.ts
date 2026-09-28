@@ -25,7 +25,7 @@ type OnRecoveredCall = (call: RecoveredFrontendToolCall) => void;
 
 const MAX_TOOLS = 20;
 const MAX_SOURCES = 20;
-const FRONTEND_TOOLS = new Set(['proposeAsk', 'proposeLearningCheck']);
+const FRONTEND_TOOLS = new Set(['proposeLearningCheck']);
 const TOOL_STATUS: Record<string, string> = {
   readWebPage: 'Reading source…',
   searchSources: 'Searching sources…',

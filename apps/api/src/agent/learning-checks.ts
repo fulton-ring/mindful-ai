@@ -1,11 +1,7 @@
 import { type Intervention, uiMessageText, type WaldenUIMessage } from '@walden/contracts';
 import { z } from 'zod';
 import { stableId } from './interventions';
-import {
-  askInputSchema,
-  learningCheckInputSchema,
-  singleLearningCheckInputSchema,
-} from './tool-schemas';
+import { learningCheckInputSchema, singleLearningCheckInputSchema } from './tool-schemas';
 
 export function normalizeLearningCheck(
   input: z.infer<typeof learningCheckInputSchema> | z.infer<typeof singleLearningCheckInputSchema>,
@@ -36,16 +32,12 @@ export function normalizeLearningCheck(
 
 export const learningCheckIntervention = normalizeLearningCheck;
 
-export type RecoveredFrontendToolCall =
-  | { name: 'proposeAsk'; input: z.infer<typeof askInputSchema> }
-  | {
-      name: 'proposeLearningCheck';
-      input:
-        | z.infer<typeof learningCheckInputSchema>
-        | z.infer<typeof singleLearningCheckInputSchema>;
-    };
+export type RecoveredFrontendToolCall = {
+  name: 'proposeLearningCheck';
+  input: z.infer<typeof learningCheckInputSchema> | z.infer<typeof singleLearningCheckInputSchema>;
+};
 
-const GEMMA_TOOL_MARKERS = ['proposeAsk{', 'proposeLearningCheck{'] as const;
+const GEMMA_TOOL_MARKERS = ['proposeLearningCheck{'] as const;
 const SENTINEL_QUOTE = '<|"|>';
 
 function completeObjectEnd(value: string, openingBrace: number): number | null {
@@ -83,10 +75,6 @@ function parseGemmaToolLeak(value: string): RecoveredFrontendToolCall | null {
       .replaceAll(SENTINEL_QUOTE, '"')
       .replace(/([{,]\s*)(id|header|question|questions|options)\s*:/gu, '$1"$2":');
     const parsed = JSON.parse(json) as unknown;
-    if (name === 'proposeAsk') {
-      const input = askInputSchema.safeParse(parsed);
-      return input.success ? { name, input: input.data } : null;
-    }
     const batch = learningCheckInputSchema.safeParse(parsed);
     if (batch.success) return { name, input: batch.data };
     const single = singleLearningCheckInputSchema.safeParse(parsed);
@@ -151,12 +139,6 @@ export function recoveredFrontendIntervention(
   turnId: string,
   learningChecksEnabled: boolean,
 ): Intervention | null {
-  if (call.name === 'proposeAsk')
-    return {
-      id: stableId('ask', turnId, call.input.question),
-      kind: 'ask',
-      ...call.input,
-    };
   if (!learningChecksEnabled) return null;
   return normalizeLearningCheck(call.input, turnId);
 }

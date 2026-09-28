@@ -147,17 +147,13 @@ vi.mock('../../personas/PersonaPicker', () => ({
 vi.mock('../../capture/InterventionCard', () => ({
   InterventionCard: ({
     intervention,
-    onCapture,
     onResolve,
   }: {
     intervention: { kind: string; id: string; questions?: Array<{ id: string }> };
-    onCapture(value: string, verbatim: boolean): void;
     onResolve(value: unknown): void;
   }) => (
     <div>
-      <button type="button" onClick={() => onCapture('Intervention exact text', true)}>
-        Capture intervention
-      </button>
+      <p>Learning check card</p>
       {intervention.kind === 'learning_check' && (
         <button
           type="button"

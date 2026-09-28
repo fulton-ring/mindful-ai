@@ -169,11 +169,7 @@ export type LearningCheckResponse = {
   checkId: string;
   answers: Record<string, { answers: string[] }>;
 };
-export type Intervention =
-  | { id: string; kind: 'ghost'; proposal: EditProposal }
-  | { id: string; kind: 'ask'; question: string; options: string[] }
-  | { id: string; kind: 'record'; text: string; reason: string }
-  | LearningCheck;
+export type Intervention = { id: string; kind: 'ghost'; proposal: EditProposal } | LearningCheck;
 /** Message-level facts that are not content. Highlights and annotations are attached on load from their own tables. */
 export const messageMetadataSchema = z.object({
   createdAt: z.string(),

@@ -14,7 +14,7 @@ it('acknowledges note requests without claiming a saved edit', () => {
   );
   expect(CORE_INSTRUCTIONS).toContain('Never claim that an edit was saved or applied');
   expect(CORE_INSTRUCTIONS).toContain('one to three short questions');
-  expect(CORE_INSTRUCTIONS).toContain('at most one ask or learning-check request');
+  expect(CORE_INSTRUCTIONS).toContain('at most one learning-check request');
   expect(CORE_INSTRUCTIONS).not.toContain('proposeRecord');
   expect(CORE_INSTRUCTIONS).not.toContain('proposeGhost');
 });

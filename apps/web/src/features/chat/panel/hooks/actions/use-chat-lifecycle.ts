@@ -27,7 +27,6 @@ function resetDisplay(args: TurnArgs) {
   display.setStatus('');
   display.setError('');
   display.setProposalNotices(new Map());
-  display.setIntervention(null);
   display.setRecentAnimation(null);
   display.setAnnotationFailures(new Map());
   display.setBackgroundAnnotations(new Set());
@@ -134,7 +133,7 @@ function useScrollEffect(args: TurnArgs) {
         top: runtime.scroller.current.scrollHeight,
         behavior: 'instant',
       });
-  }, [chat.messages, display.intervention, display.status]);
+  }, [chat.messages, display.status]);
 }
 
 function useCleanupEffect(args: TurnArgs) {

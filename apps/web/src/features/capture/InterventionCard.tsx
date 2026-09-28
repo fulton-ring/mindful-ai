@@ -1,17 +1,15 @@
-import type { Intervention, LearningCheck, LearningCheckResponse } from '@walden/contracts';
+import type { LearningCheck, LearningCheckResponse } from '@walden/contracts';
 import { useState } from 'react';
 
 type Props = {
-  intervention: Exclude<Intervention, { kind: 'ghost' }>;
-  onResolve(value: string | LearningCheckResponse): void;
-  onCapture(value: string, verbatim: boolean): void;
+  intervention: LearningCheck;
+  onResolve(value: LearningCheckResponse): void;
   onDismiss(): void;
   resolved?: LearningCheckResponse;
 };
 
+/** The only card the agent can put in chat: a learning check (quiz). */
 export function InterventionCard(props: Props) {
-  if (props.intervention.kind === 'record') return <RecordCard {...props} />;
-  if (props.intervention.kind === 'ask') return <AskCard {...props} />;
   if (props.resolved) return <ResolvedLearningCheck check={props.intervention} />;
   return (
     <LearningCheckCard
@@ -19,68 +17,6 @@ export function InterventionCard(props: Props) {
       onResolve={props.onResolve}
       onDismiss={props.onDismiss}
     />
-  );
-}
-
-function RecordCard({ intervention, onResolve, onCapture, onDismiss }: Props) {
-  if (intervention.kind !== 'record') return null;
-  return (
-    <section className="intervention" aria-label="Capture suggestion">
-      <p className="eyebrow">A thought worth keeping</p>
-      <blockquote>{intervention.text}</blockquote>
-      <p className="muted">{intervention.reason}</p>
-      <div className="button-row">
-        <button
-          className="primary"
-          onClick={() => onResolve(`Help me put this in my own words: ${intervention.text}`)}
-        >
-          Put it in my words
-        </button>
-        <button onClick={() => onCapture(intervention.text, true)}>Record as-is</button>
-        <button
-          onClick={() => onResolve(`Ask me about this before we record it: ${intervention.text}`)}
-        >
-          Ask about this
-        </button>
-        <button onClick={onDismiss}>Dismiss</button>
-      </div>
-    </section>
-  );
-}
-
-function AskCard({ intervention, onCapture, onDismiss }: Props) {
-  const [writingAnswer, setWritingAnswer] = useState(false);
-  const [answer, setAnswer] = useState('');
-  if (intervention.kind !== 'ask') return null;
-  const submitAnswer = () => {
-    const value = answer.trim();
-    if (value) onCapture(value, true);
-  };
-  return (
-    <section className="intervention" aria-label="Clarifying question">
-      <p className="eyebrow">Clarify the note</p>
-      <p>{intervention.question}</p>
-      <div className="choice-list">
-        {intervention.options.map((choice) => (
-          <button key={choice} onClick={() => onCapture(choice, true)}>
-            {choice}
-          </button>
-        ))}
-      </div>
-      {writingAnswer && (
-        <AnswerForm
-          id={`intervention-answer-${intervention.id}`}
-          value={answer}
-          onChange={setAnswer}
-          onSubmit={submitAnswer}
-          label="Your answer"
-        />
-      )}
-      <div className="button-row">
-        {!writingAnswer && <button onClick={() => setWritingAnswer(true)}>Other</button>}
-        <button onClick={onDismiss}>Skip</button>
-      </div>
-    </section>
   );
 }
 
@@ -233,37 +169,5 @@ function LearningCheckQuestionCard({
         ))}
       </div>
     </fieldset>
-  );
-}
-
-function AnswerForm({
-  id,
-  value,
-  onChange,
-  onSubmit,
-  label,
-  submitLabel = 'Submit answer',
-}: {
-  id: string;
-  value: string;
-  onChange(value: string): void;
-  onSubmit(): void;
-  label: string;
-  submitLabel?: string;
-}) {
-  return (
-    <form
-      className="intervention-answer"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (value.trim()) onSubmit();
-      }}
-    >
-      <label htmlFor={id}>{label}</label>
-      <input id={id} value={value} onChange={(event) => onChange(event.target.value)} />
-      <button type="submit" className="primary" disabled={!value.trim()}>
-        {submitLabel}
-      </button>
-    </form>
   );
 }

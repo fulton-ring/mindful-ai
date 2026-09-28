@@ -13,10 +13,18 @@ describe('agent policy', () => {
   it('allows only one intervention per turn', () => {
     const proposals = new TurnProposals();
     expect(
-      proposals.propose({ id: 'one', kind: 'record', text: 'A', reason: 'requested' }).accepted,
+      proposals.propose({
+        id: 'one',
+        kind: 'learning_check',
+        questions: [{ id: 'q', header: 'Q', format: 'short_answer', question: 'Why A?' }],
+      }).accepted,
     ).toBe(true);
     expect(
-      proposals.propose({ id: 'two', kind: 'record', text: 'B', reason: 'requested' }).accepted,
+      proposals.propose({
+        id: 'two',
+        kind: 'learning_check',
+        questions: [{ id: 'q', header: 'Q', format: 'short_answer', question: 'Why B?' }],
+      }).accepted,
     ).toBe(false);
   });
 

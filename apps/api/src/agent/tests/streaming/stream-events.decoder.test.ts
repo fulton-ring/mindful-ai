@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { GemmaToolLeakDecoder, recoveredFrontendIntervention } from '../../learning-checks';
 
 const leaked =
-  'proposeAsk{options:[<|"|>Focus on the \'common driver\' mechanism<|"|>,<|"|>Focus on the conditions for decoupling<|"|>,<|"|>Focus on the lag between instruments<|"|>,<|"|>Other<|"|>],question:<|"|>Which aspect of the challenge best serves your current thinking?<|"|>}';
+  'proposeLearningCheck{options:[<|"|>The \'common driver\' mechanism<|"|>,<|"|>The conditions for decoupling<|"|>,<|"|>The lag between instruments<|"|>],question:<|"|>Which aspect explains the correlation?<|"|>}';
 
 it('recovers the leaked Gemma tool syntax without exposing it as text', () => {
   const decoder = new GemmaToolLeakDecoder();
@@ -11,14 +11,13 @@ it('recovers the leaked Gemma tool syntax without exposing it as text', () => {
   expect(result.text).toBe('');
   expect(result.calls).toEqual([
     {
-      name: 'proposeAsk',
+      name: 'proposeLearningCheck',
       input: {
-        question: 'Which aspect of the challenge best serves your current thinking?',
+        question: 'Which aspect explains the correlation?',
         options: [
-          "Focus on the 'common driver' mechanism",
-          'Focus on the conditions for decoupling',
-          'Focus on the lag between instruments',
-          'Other',
+          "The 'common driver' mechanism",
+          'The conditions for decoupling',
+          'The lag between instruments',
         ],
       },
     },
@@ -43,7 +42,8 @@ it('handles one-character chunks while preserving prose around a recovered call'
 
 it('does not swallow ordinary prose that only resembles a tool call', () => {
   const decoder = new GemmaToolLeakDecoder();
-  const prose = 'The literal string proposeAsk{not a valid call} can appear in documentation.';
+  const prose =
+    'The literal string proposeLearningCheck{not a valid call} can appear in documentation.';
   const result = decoder.push(prose);
 
   expect(result.text + decoder.finish()).toBe(prose);

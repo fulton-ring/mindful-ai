@@ -7,7 +7,7 @@ import { metadataPatch } from '../chat/messages';
 import type { McpTools } from '../services/mcp';
 import type { AgentTurnInput } from '../services/types';
 import { buildTurnContext, contextBudgetProcessor } from './context';
-import { stableId, TurnProposals } from './interventions';
+import { TurnProposals } from './interventions';
 import {
   isQuizOnlyText,
   learningCheckIntervention,
@@ -26,7 +26,7 @@ import {
   WEB_SEARCH_INSTRUCTIONS,
 } from './prompts';
 import type { AgentTraceContext } from './stream-events';
-import { askInputSchema, learningCheckInputSchema } from './tool-schemas';
+import { learningCheckInputSchema } from './tool-schemas';
 import { agentUIChunks, newUIStreamState, type UIStreamState } from './ui-stream';
 
 export type AgentRuntime = {
@@ -71,19 +71,6 @@ function createMastraTools(input: AgentTurnInput, tools: McpTools, proposals: Tu
   return {
     ...tools,
     ...(input.note ? noteTools(input.note) : {}),
-    proposeAsk: createTool({
-      id: 'propose_ask',
-      description:
-        'Offer 2–4 concrete choices plus an implicit Other choice. This never writes notes.',
-      inputSchema: askInputSchema,
-      execute: async (context) =>
-        proposals.propose({
-          id: stableId('ask', input.turnId, context.question),
-          kind: 'ask',
-          question: context.question,
-          options: context.options,
-        }),
-    }),
     proposeLearningCheck: createTool({
       id: 'propose_learning_check',
       description:

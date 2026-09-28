@@ -37,7 +37,6 @@ async function changeChatPreference(
     )
       return;
     await args.props.onConversation({ ...conversation, ...result });
-    if (setting === 'learningChecks' && !enabled) args.display.setIntervention(null);
     track('chat_preference_changed', { conversation_id: conversation.id, setting, enabled });
   } catch (cause) {
     track('chat_preference_failed', { setting, enabled, ...failureDetails(cause) });

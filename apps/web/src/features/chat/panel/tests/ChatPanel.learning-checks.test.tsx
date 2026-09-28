@@ -74,7 +74,7 @@ it('shows a learning check instead of the streamed multiple-choice text', async 
     ),
   );
   expect(screen.queryByText(/A\) Thylakoid/)).toBeNull();
-  expect(screen.getByRole('button', { name: 'Capture intervention' })).toBeTruthy();
+  expect(screen.getByText('Learning check card')).toBeTruthy();
   // A learning check has no response toolbar of its own.
   expect(screen.queryByRole('button', { name: 'Regenerate response' })).toBeNull();
 });
@@ -91,7 +91,7 @@ it('keeps an answer on screen when the reply goes on to quiz about it', async ()
 
   await waitFor(() => expect(values.onConversation).toHaveBeenCalled());
   expect(await screen.findByText(answer)).toBeTruthy();
-  expect(screen.getByRole('button', { name: 'Capture intervention' })).toBeTruthy();
+  expect(screen.getByText('Learning check card')).toBeTruthy();
 });
 
 it('submits answers as a structured response and shows them as the reader’s answers', async () => {

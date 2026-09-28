@@ -161,10 +161,7 @@ function LearningCheckMessage({
     <InterventionCard
       intervention={check}
       resolved={response}
-      onResolve={(value) => {
-        if (typeof value !== 'string') onResolve(value);
-      }}
-      onCapture={() => undefined}
+      onResolve={onResolve}
       onDismiss={onDismiss}
     />
   );

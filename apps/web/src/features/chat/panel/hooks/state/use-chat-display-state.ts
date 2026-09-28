@@ -1,4 +1,4 @@
-import type { Intervention, MessageFollowupRequest } from '@walden/contracts';
+import type { MessageFollowupRequest } from '@walden/contracts';
 import { useRef, useState } from 'react';
 
 export type ProposalNotice = {
@@ -40,10 +40,6 @@ function useResponseCoreState() {
 function useResponseActionState() {
   const [proposalMessageId, setProposalMessageId] = useState<string | null>(null);
   const [proposalNotices, setProposalNotices] = useState(new Map<string, ProposalNotice>());
-  const [intervention, setIntervention] = useState<Exclude<
-    Intervention,
-    { kind: 'ghost' } | { kind: 'learning_check' }
-  > | null>(null);
   const [savingChatPreference, setSavingChatPreference] = useState(false);
   const [recentAnimation, setRecentAnimation] = useState<{
     messageId: string;
@@ -61,8 +57,6 @@ function useResponseActionState() {
     setProposalMessageId,
     proposalNotices,
     setProposalNotices,
-    intervention,
-    setIntervention,
     savingChatPreference,
     setSavingChatPreference,
     recentAnimation,

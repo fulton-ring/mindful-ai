@@ -1,6 +1,5 @@
 import { FileText, X } from 'lucide-react';
 
-import { InterventionCard } from '../../../capture/InterventionCard';
 import { BranchSelector } from '../../BranchSelector';
 import { isInterrupted, learningCheckOf, messageText } from '../../message-parts';
 import type { ChatPanelProps } from '../chat-panel-types';
@@ -52,29 +51,6 @@ function ErrorNotice({ message, onDismiss }: { message: string; onDismiss(): voi
         <X size={14} aria-hidden />
       </button>
     </div>
-  );
-}
-
-function InterventionPanel({ controller, model }: ViewProps) {
-  const intervention = controller.intervention;
-  if (!intervention) return null;
-  return (
-    <InterventionCard
-      intervention={intervention}
-      onResolve={(value) => {
-        controller.setIntervention(null);
-        if (typeof value === 'string') void controller.send(value, 'feedback');
-      }}
-      onCapture={(value) => {
-        if (!model.latestCompletedAssistantId) {
-          controller.setError('Finish a response before adding this to your note.');
-          return;
-        }
-        void controller.proposeNote(model.latestCompletedAssistantId, { text: value });
-        controller.setIntervention(null);
-      }}
-      onDismiss={() => controller.setIntervention(null)}
-    />
   );
 }
 
@@ -185,7 +161,6 @@ function TranscriptArea({ props, controller, model }: ViewProps) {
           )}
         />
         {model.thinking && <ThinkingIndicator status={controller.status} />}
-        <InterventionPanel props={props} controller={controller} model={model} />
       </div>
     </div>
   );

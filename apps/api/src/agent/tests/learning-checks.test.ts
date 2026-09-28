@@ -38,14 +38,6 @@ describe('the learning-check off switch', () => {
       ],
     });
   });
-
-  it('never suppresses a plain ask, which is not a quiz', () => {
-    const ask = {
-      name: 'proposeAsk' as const,
-      input: { question: 'Which draft should I edit?', options: ['First', 'Second'] },
-    };
-    expect(recoveredFrontendIntervention(ask, 'turn', false)).toMatchObject({ kind: 'ask' });
-  });
 });
 
 describe('learning-check normalization', () => {

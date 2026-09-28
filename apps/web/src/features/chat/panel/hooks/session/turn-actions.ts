@@ -31,7 +31,6 @@ function clearForTurn(args: TurnArgs, files: File[], status: string) {
   args.uploads.clearSent(files);
   display.setStatus(status);
   display.setError('');
-  display.setIntervention(null);
   display.setRecentAnimation(null);
   if (display.recentAnimationTimeout.current !== undefined) {
     window.clearTimeout(display.recentAnimationTimeout.current);

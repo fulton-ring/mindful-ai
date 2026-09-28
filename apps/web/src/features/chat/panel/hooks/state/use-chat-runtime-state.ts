@@ -47,7 +47,6 @@ export function useChatRuntimeState(conversation: Conversation | null, scopeId: 
     mounted: useRef(true),
     latestConversation: useRef(conversation),
     lastConversationProp: useRef(conversation),
-    pendingRecord: useRef<string | null>(null),
     activeConversationId: useRef(scopeId),
     previousConversationId: useRef(scopeId),
     activeBranchId: useRef(conversation?.branchId ?? null),

@@ -38,10 +38,6 @@ export const noteProposalBatchOutputSchema = z.object({
   reason: z.string().optional(),
 });
 export const noteProposalNoopSchema = z.object({ reason: z.string().min(1).max(240) });
-export const askInputSchema = z.object({
-  question: z.string().min(1).max(400),
-  options: z.array(z.string().min(1).max(240)).min(2).max(4),
-});
 const learningCheckQuestionSchema = z
   .string()
   .min(1)

@@ -218,9 +218,6 @@ function launchFollowups(
   };
   if (args.display.autoHighlights && !annotationsHandled)
     startAutomaticAnnotations(args, messageId, input, conversationId);
-  const record = args.runtime.pendingRecord.current;
-  args.runtime.pendingRecord.current = null;
-  if (record) void args.proposeNote(messageId, { text: record });
 }
 
 export function useChatAnnotations(args: AnnotationArgs) {
