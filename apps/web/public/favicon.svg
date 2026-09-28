@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="8 8 84 84">
+  <style>
+    .mark { stroke: #2d2c2b; fill: none; }
+    .dot { fill: #2d2c2b; }
+    @media (prefers-color-scheme: dark) {
+      .mark { stroke: #f6efe9; }
+      .dot { fill: #f6efe9; }
+    }
+  </style>
+  <!-- The Walden mark (AppSidebar), with a heavier stroke to read at tab size. -->
+  <g class="mark" stroke-linecap="round" stroke-linejoin="round" stroke-width="8" transform="rotate(-90 50 50)">
+    <path d="M18 36 C25 22 37 16 51 17 C68 16 82 28 84 45 C88 62 76 79 59 83 C42 88 27 79 21 66" />
+    <path d="M34 39 C39 32 45 30 52 31 C64 31 70 40 70 51 C69 62 60 69 49 68 C42 68 37 64 34 59" />
+  </g>
+  <path class="dot" d="M48 48 C50 46 53 47 54 50 C54 53 52 54 49 54 C46 53 46 50 48 48Z" transform="rotate(-90 50 50)" />
+</svg>

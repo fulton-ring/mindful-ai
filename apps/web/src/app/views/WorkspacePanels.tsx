@@ -1,11 +1,29 @@
 import { Menu } from 'lucide-react';
+import { useEffect } from 'react';
 import { ResizablePanel } from '../../components/ui/resizable';
 import { useNoteDocument, useWorkspaceShell } from '../data/workspace-context';
 import { ConversationPanels } from './ConversationPanels';
 import { WorkspaceOverlays } from './WorkspaceOverlays';
 
+/** The open thread's name, as the mobile header and the browser tab show it. */
+function useThreadTitle() {
+  const { conversation } = useWorkspaceShell();
+  const { draft } = useNoteDocument();
+  return conversation?.title || draft?.title || 'New thread';
+}
+
+function useDocumentTitle(title: string) {
+  useEffect(() => {
+    document.title = `Walden - ${title}`;
+    return () => {
+      document.title = 'Walden';
+    };
+  }, [title]);
+}
+
 export function WorkspacePanel() {
   const { noteOpen, mobilePane } = useWorkspaceShell();
+  useDocumentTitle(useThreadTitle());
   return (
     <ResizablePanel className="workspace-panel" minSize="420px">
       <div
@@ -20,15 +38,15 @@ export function WorkspacePanel() {
 }
 
 function MobileHeader() {
-  const { setSidebar, conversation, noteOnly, startChatFromNote, mobilePane, closeNote, showNote } =
+  const { setSidebar, noteOnly, startChatFromNote, mobilePane, closeNote, showNote } =
     useWorkspaceShell();
-  const { draft } = useNoteDocument();
+  const title = useThreadTitle();
   return (
     <header className="mobile-header">
       <button className="icon-button" aria-label="Open sidebar" onClick={() => setSidebar(true)}>
         <Menu />
       </button>
-      <span>{conversation?.title || draft?.title || 'New thread'}</span>
+      <span>{title}</span>
       <button
         className="text-button"
         onClick={noteOnly ? startChatFromNote : mobilePane === 'note' ? closeNote : showNote}
