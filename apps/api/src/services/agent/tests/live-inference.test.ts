@@ -102,7 +102,7 @@ it.skipIf(!token || !accountId)(
     if (done?.type === 'done') {
       expect(done.proposal).toBeNull();
       expect(done.reason?.toLowerCase()).toMatch(/already|duplicat|existing|covered|no new/);
-      expect(done.reason?.toLowerCase()).not.toMatch(/requested.*not|no.note preference/);
+      expect(done.reason?.toLowerCase()).not.toMatch(/\brequested\b.*\bnot\b|no.note preference/);
     }
   },
   90_000,

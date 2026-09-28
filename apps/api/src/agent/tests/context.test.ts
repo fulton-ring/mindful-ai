@@ -337,3 +337,22 @@ function processorArgs(messageList: MessageList): ProcessInputStepArgs {
     },
   };
 }
+
+it('tells the model how much conversation is in context and how to compact it', () => {
+  const context = (contextUsage?: { tokens?: number; summarizeAt: number }) =>
+    buildTurnContext({
+      note: null,
+      messages: [],
+      currentMessage: 'Next question',
+      requestId: 'current',
+      dynamicContext: '',
+      memoryManaged: true,
+      ...(contextUsage ? { contextUsage } : {}),
+    }).context[1]?.content;
+  expect(context({ tokens: 23_456, summarizeAt: 48_000 })).toContain(
+    'About 23,456 tokens of conversation are in context.',
+  );
+  expect(context({ tokens: 23_456, summarizeAt: 48_000 })).toContain('compactConversation');
+  // Without the tool (no memory store), the model is not pointed at it.
+  expect(context()).not.toContain('compactConversation');
+});

@@ -223,3 +223,43 @@ it('does not submit the draft when stopping changes the button back to Send', ()
   expect(send.getAttribute('type')).toBe('button');
   expect(onSend).not.toHaveBeenCalled();
 });
+
+it('explains a used-up message budget and disables the input once no reply is running', () => {
+  const onSend = vi.fn();
+  const budget = {
+    used: 20,
+    limit: 20,
+    windowHours: 4,
+    resetsAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+  };
+  const composer = (sending: boolean) => (
+    <ChatComposer
+      input="one more"
+      sending={sending}
+      savingChatPreference={false}
+      webSearch
+      learningChecks
+      autoHighlights
+      personas={[]}
+      personaId="thinking-partner"
+      budget={budget}
+      messageInput={{ current: null }}
+      onInput={vi.fn()}
+      onSend={onSend}
+      onStop={vi.fn()}
+      onPersona={vi.fn()}
+      onPreference={vi.fn()}
+      onAutoHighlights={vi.fn()}
+    />
+  );
+  const view = render(composer(true));
+  const scope = within(view.container);
+  // The reply that used the last of the budget is still coming in.
+  expect(scope.queryByRole('status')).toBeNull();
+  view.rerender(composer(false));
+  expect(scope.getByRole('status').textContent).toMatch(/reached your message limit/);
+  expect(scope.getByLabelText('Message').getAttribute('contenteditable')).toBe('false');
+  fireEvent.click(scope.getByRole('button', { name: 'Send message' }));
+  expect(onSend).not.toHaveBeenCalled();
+  view.unmount();
+});

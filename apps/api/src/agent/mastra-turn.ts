@@ -2,7 +2,6 @@ import { Agent } from '@mastra/core/agent';
 import { ToolCallFilter } from '@mastra/core/processors';
 import { createTool } from '@mastra/core/tools';
 import type { Workspace } from '@mastra/core/workspace';
-import type { Memory } from '@mastra/memory';
 import type { Intervention, WaldenUIMessageChunk } from '@walden/contracts';
 import type { McpTools } from '../services/mcp';
 import type { AgentTurnInput } from '../services/types';
@@ -14,6 +13,7 @@ import {
   standaloneLearningCheck,
   standaloneShortAnswerCheck,
 } from './learning-checks';
+import { OBSERVATION_TOKEN_THRESHOLD, type PreparedMemory } from './memory/memory';
 import { noteTools } from './note-proposals/note-access';
 import {
   CORE_INSTRUCTIONS,
@@ -28,7 +28,7 @@ import { askInputSchema, learningCheckInputSchema } from './tool-schemas';
 import { agentUIChunks, newUIStreamState, type UIStreamState } from './ui-stream';
 
 export type AgentRuntime = {
-  memory?: { memory: Memory; threadId: string; resourceId: string };
+  memory?: PreparedMemory;
   workspace?: Workspace;
   onToolResult?: (name: string, result: unknown) => void;
 };
@@ -105,6 +105,14 @@ function createMastraAgent(
 ) {
   const turnContext = buildTurnContext({
     memoryManaged: Boolean(runtime.memory),
+    ...(runtime.memory && 'compactConversation' in externalTools
+      ? {
+          contextUsage: {
+            tokens: runtime.memory.contextTokens,
+            summarizeAt: OBSERVATION_TOKEN_THRESHOLD,
+          },
+        }
+      : {}),
     note: input.note,
     messages: input.conversation.messages,
     currentMessage: input.message,

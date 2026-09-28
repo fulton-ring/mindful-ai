@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { TurnStart } from '@walden/contracts';
 import { Hono } from 'hono';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { sqliteD1Binding } from '../../../agent/memory/tests/d1-test-binding';
 import { HttpError } from '../../../http';
 import type { Bindings, Variables } from '../../../types';
@@ -130,4 +130,40 @@ it('admits one immutable turn, protects replay, and persists Stop', async () => 
   const events = await (await app.request(`/api/chat/turns/${turnId}/events`, {}, env)).text();
   expect(events).toContain('"type":"error"');
   expect(events.trimEnd().endsWith('data: [DONE]')).toBe(true);
+});
+
+it('reports the send that used up the budget and each send refused at the limit', async () => {
+  const { DB, env, start } = await fixture();
+  Object.assign(env, { MESSAGE_LIMIT: '1', POSTHOG_API_KEY: 'phc_test' });
+  const events: Record<string, unknown>[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, init: RequestInit) => {
+      events.push(JSON.parse(String(init.body)));
+      return new Response(null, { status: 200 });
+    }),
+  );
+  try {
+    const admitted = await start('first');
+    expect(((await admitted.json()) as TurnStart).budget).toMatchObject({ used: 1, limit: 1 });
+    await DB.prepare("UPDATE turns SET status='completed'").run();
+    expect((await start('second', 'Another question')).status).toBe(429);
+    await vi.waitFor(() => expect(events).toHaveLength(2));
+  } finally {
+    vi.unstubAllGlobals();
+  }
+  expect(events.map(({ event }) => event)).toEqual([
+    'message_limit_reached',
+    'message_limit_blocked',
+  ]);
+  expect(events[0]?.properties).toMatchObject({
+    used: 1,
+    limit: 1,
+    window_hours: 4,
+    turns_in_window: 1,
+    ms_since_window_start: expect.any(Number),
+    model: '@cf/zai-org/glm-5.3-flash',
+    weight: 1,
+  });
+  expect(events[1]?.properties).toMatchObject({ used: 1, ms_until_reset: expect.any(Number) });
 });

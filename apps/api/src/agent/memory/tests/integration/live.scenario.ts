@@ -12,6 +12,8 @@ import { storageFor } from './fixtures';
 const liveAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
 const liveToken = process.env.CLOUDFLARE_API_TOKEN;
 const runLive = process.env.RUN_LIVE_OM === '1' && Boolean(liveAccountId && liveToken);
+/** The model that writes memory in production; LIVE_OM_MODEL tries another. */
+const liveModel = process.env.LIVE_OM_MODEL ?? DEFAULT_AI_MODEL;
 
 async function saveLiveConversation(memory: Memory, threadId: string, resourceId: string) {
   await memory.saveThread({
@@ -48,7 +50,7 @@ async function saveLiveConversation(memory: Memory, threadId: string, resourceId
 }
 
 describe.skipIf(!runLive)('live native observational memory on D1', () => {
-  it('persists parseable Gemma observations through a fresh Memory instance', async () => {
+  it(`persists parseable ${liveModel} observations through a fresh Memory instance`, async () => {
     const binding = sqliteD1Binding(
       join(mkdtempSync(join(tmpdir(), 'walden-live-native-om-')), 'memory.sqlite'),
     );
@@ -58,7 +60,7 @@ describe.skipIf(!runLive)('live native observational memory on D1', () => {
         CLOUDFLARE_ACCOUNT_ID: liveAccountId,
         CLOUDFLARE_API_TOKEN: liveToken,
       },
-      DEFAULT_AI_MODEL,
+      liveModel,
     );
     const memory = new Memory({
       storage,

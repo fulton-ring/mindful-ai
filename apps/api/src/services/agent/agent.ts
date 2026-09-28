@@ -7,6 +7,7 @@ import {
 } from '@walden/contracts';
 import { wrapLanguageModel } from 'ai';
 import { createWorkersAI } from 'workers-ai-provider';
+import { prepareAgentMemory } from '../../agent/memory/memory';
 import { streamNoteProposal } from '../../agent/note-proposals/note-proposal-stream';
 import { agentTrace, annotateResponse, streamAnnotationResponse } from '../../agent/stream-events';
 import { ServiceUnavailableError } from '../../http';
@@ -187,6 +188,8 @@ function streamWithSecondaryCleanup<T>(
 
 /** A turn with research tools can run for minutes; its object seals it past this. */
 const TURN_DEADLINE_MS = 15 * 60_000;
+/** Summarizing a long conversation took 11–20 s on GLM in live tests. */
+const MEMORY_UPDATE_DEADLINE_MS = 90_000;
 
 /**
  * `background` defers telemetry flushes past the response (request handlers
@@ -203,6 +206,17 @@ export function createAgentService(env: ServiceEnv, background?: Background): Ag
   const backgroundModel = (input: AgentTurnInput) =>
     configuredModel({ ...input.persona, model: undefined });
   return {
+    /**
+     * Summarizes the conversation once a reply is saved, so the next reply need not
+     * wait for it. Mastra observes only past its threshold, so this is usually a no-op.
+     */
+    async updateMemory(input: AgentTurnInput, signal?: AbortSignal) {
+      if (!env.DB || !input.ownerId) return;
+      await prepareAgentMemory(env.DB, input.ownerId, input.conversation, {
+        model: backgroundModel(input).model,
+        signal: withDeadline(signal, MEMORY_UPDATE_DEADLINE_MS),
+      });
+    },
     async streamTurn(input: AgentTurnInput, signal?: AbortSignal) {
       const { modelName, model } = configuredModel(input.persona);
       return streamTurnChunks({

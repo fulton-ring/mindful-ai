@@ -1,6 +1,7 @@
 import type { Intervention, WaldenDataParts, WaldenUIMessage } from '@walden/contracts';
 import type { ChatOnFinishCallback, DataUIPart } from 'ai';
 
+import { ApiError } from '../../../../../lib/api';
 import { failureDetails, track } from '../../../../../lib/telemetry';
 import { isInterrupted } from '../../../message-parts';
 import type { LiveTurn } from '../state/use-chat-runtime-state';
@@ -140,18 +141,27 @@ export function handleFinish(args: TurnArgs, event: FinishEvent) {
   });
 }
 
+/** The server's 429 body is `{ error, details: { code: 'message_limit', retryAt } }`. */
+const isMessageLimit = (error: Error) =>
+  error instanceof ApiError &&
+  (error.details as { details?: { code?: string } } | undefined)?.details?.code === 'message_limit';
+
 export function handleError(args: TurnArgs, error: Error) {
   const live = args.runtime.live.current;
   if (!live) return;
   // Nothing was admitted (message limit, conflict, failed preflight): keep the draft.
-  if (!live.turnId) restoreDraft(args, live);
+  if (!live.turnId) {
+    restoreDraft(args, live);
+    args.props.onBudget?.();
+  }
   track('chat_failed', {
     conversation_id: live.conversationId,
     request_id: live.requestId,
     stage: live.turnId ? 'generation' : 'start',
     ...(live.failureCode ? { failure_code: live.failureCode } : failureDetails(error)),
   });
-  // A turn stopped elsewhere (another tab) ends as interrupted without an error banner.
-  if (live.failureCode !== 'cancelled')
+  // A turn stopped elsewhere (another tab) ends as interrupted without an error banner,
+  // and the composer itself explains a message limit.
+  if (live.failureCode !== 'cancelled' && !isMessageLimit(error))
     args.display.setError(error.message || 'The response was interrupted.');
 }

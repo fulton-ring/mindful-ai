@@ -1,3 +1,4 @@
+import type { MessageBudget } from '@walden/contracts';
 import { ArrowUp, Square } from 'lucide-react';
 import type { ComponentProps, DragEvent, RefObject } from 'react';
 import { useRef, useState } from 'react';
@@ -8,6 +9,7 @@ import { effectivePersona, PersonaPicker } from '../../../personas/PersonaPicker
 import { AttachmentBadge } from './AttachmentBadge';
 import { ChatToolsMenu } from './ChatToolsMenu';
 import { ComposerEditor } from './ComposerEditor';
+import { messageLimitNotice } from './message-limit-notice';
 
 const FILE_ACCEPT =
   '.md,.markdown,.txt,.csv,.json,.ts,.tsx,.js,.jsx,.py,.sql,.html,.css,.xml,.yaml,.yml,.toml,.sh,.log,.pdf,.docx,.xlsx,image/png,image/jpeg,image/webp';
@@ -17,6 +19,7 @@ const BLOCK_HELP: Record<string, string> = {
   upload_in_progress: 'Wait for the upload to finish.',
   message_too_long: 'Messages are limited to 2,000 characters.',
   empty_message: 'Enter a message or attach a file.',
+  message_limit: 'You have reached your message limit.',
 };
 
 function acceptsFile(file: File) {
@@ -48,6 +51,7 @@ type ComposerProps = {
   autoHighlights: boolean;
   personas: ComponentProps<typeof PersonaPicker>['personas'];
   personaId: string;
+  budget?: MessageBudget | null;
   messageInput: RefObject<HTMLElement | null>;
   attachments?: File[];
   uploadProgress?: ReadonlyMap<File, number>;
@@ -207,6 +211,7 @@ export function ChatComposer({
   autoHighlights,
   personas,
   personaId,
+  budget,
   messageInput,
   attachments = [],
   uploadProgress,
@@ -223,13 +228,10 @@ export function ChatComposer({
   const fileInput = useRef<HTMLInputElement>(null);
   const { error: attachmentError, addFiles } = useComposerFiles(attachments, onAttach);
   const { draggingFiles, dropHandlers } = useFileDrop(addFiles, sending);
-  const blocked = sendBlockReason(
-    sending,
-    savingChatPreference,
-    input,
-    attachments,
-    uploadProgress,
-  );
+  const limitNotice = messageLimitNotice(budget, selectedPersona, sending);
+  const blocked = limitNotice
+    ? 'message_limit'
+    : sendBlockReason(sending, savingChatPreference, input, attachments, uploadProgress);
   const sendIfReady = () => attemptSend(blocked, onSend);
 
   return (
@@ -241,9 +243,14 @@ export function ChatComposer({
         sendIfReady();
       }}
     >
+      {limitNotice && (
+        <p className="composer-limit" role="status">
+          {limitNotice}
+        </p>
+      )}
       <ComposerEditor
         value={input}
-        disabled={sending}
+        disabled={sending || Boolean(limitNotice)}
         inputRef={messageInput}
         onChange={onInput}
         onSend={sendIfReady}

@@ -72,7 +72,7 @@ export async function chargeMessage(
   throw new HttpError(
     429,
     `You've reached your message limit. It resets ${waitText(resetsAt - now)}.`,
-    { code: 'message_limit', retryAt: new Date(resetsAt).toISOString() },
+    { code: 'message_limit', retryAt: new Date(resetsAt).toISOString(), weight },
   );
 }
 
@@ -104,5 +104,33 @@ export async function loadMessageBudget(
     limit: limit.limit,
     windowHours: limit.windowHours,
     resetsAt: open ? new Date(resetsAt).toISOString() : null,
+  };
+}
+
+/**
+ * Analytics for the limit: how far into the window the account is, and how the
+ * window was spent. `ms_since_window_start` on reaching the limit is how long it
+ * took to use the whole budget.
+ */
+export async function limitWindowStats(
+  db: D1Database,
+  ownerId: string,
+  budget: MessageBudget,
+  now = Date.now(),
+) {
+  const resetsAt = budget.resetsAt ? Date.parse(budget.resetsAt) : now;
+  const startedAt = resetsAt - budget.windowHours * 60 * 60 * 1000;
+  const turns = await first<{ total: number }>(
+    db
+      .prepare('SELECT COUNT(*) AS total FROM turns WHERE owner_id=? AND created_at>=?')
+      .bind(ownerId, new Date(startedAt).toISOString()),
+  );
+  return {
+    used: budget.used,
+    limit: budget.limit,
+    window_hours: budget.windowHours,
+    ms_since_window_start: Math.max(0, now - startedAt),
+    ms_until_reset: Math.max(0, resetsAt - now),
+    turns_in_window: turns?.total ?? 0,
   };
 }

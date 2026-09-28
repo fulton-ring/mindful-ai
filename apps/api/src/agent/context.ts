@@ -11,8 +11,10 @@ import { noteOutline } from './note-proposals/note-access';
 const HISTORY_CHAR_BUDGET = 32_000;
 const NOTE_CHAR_BUDGET = 48_000;
 // This operational ceiling leaves room for tool schemas and the answer while
-// bounding unexpectedly large same-turn tool results.
-const MODEL_INPUT_TOKEN_BUDGET = 48_000;
+// bounding unexpectedly large same-turn tool results. It stays above memory's
+// summarization threshold plus its retained recent messages, so history is
+// summarized before any of it would be trimmed here.
+const MODEL_INPUT_TOKEN_BUDGET = 96_000;
 
 export function contextBudgetProcessor(limit = MODEL_INPUT_TOKEN_BUDGET) {
   const limiter = new TokenLimiter({ limit, trimMode: 'contiguous' });
@@ -61,6 +63,8 @@ type TurnContextInput = {
   dynamicContext: string;
   attachments?: LoadedAttachment[];
   memoryManaged?: boolean;
+  /** Conversation tokens memory supplies this turn, and where it summarizes automatically. */
+  contextUsage?: { tokens?: number; summarizeAt: number };
   maxChars?: number;
   maxNoteChars?: number;
 };
@@ -110,6 +114,15 @@ function attachmentReference(attachment: LoadedAttachment): string {
   return `[Attached file: ${attachment.name}; workspace path: ${path}]`;
 }
 
+function contextUsageLine(usage: TurnContextInput['contextUsage']) {
+  if (!usage) return '';
+  const size =
+    usage.tokens === undefined
+      ? ''
+      : ` About ${usage.tokens.toLocaleString('en-US')} tokens of conversation are in context.`;
+  return `${size} Older messages are summarized automatically past ${usage.summarizeAt.toLocaleString('en-US')} tokens; call compactConversation to summarize them sooner when the conversation has moved on or the user asks.`;
+}
+
 export function buildTurnContext(input: TurnContextInput): {
   messages: ModelMessage[];
   context: ContextMessage[];
@@ -153,7 +166,7 @@ export function buildTurnContext(input: TurnContextInput): {
         role: 'user',
         content: `[Conversation context availability]\n${
           input.memoryManaged
-            ? 'Recent retained transcript messages are supplied by thread-scoped memory. Older messages may be omitted from its window; do not invent unavailable details. The attached note is durable context.'
+            ? `Recent transcript messages are supplied by thread-scoped memory, and older ones as summarized observations; do not invent unavailable details. The attached note is durable context.${contextUsageLine(input.contextUsage)}`
             : omittedMessages
               ? `${omittedMessages} earlier messages are unavailable in this model call. Do not reconstruct their contents or claim to remember them. Ask for missing details only when necessary to answer the current request.`
               : 'All currently retained transcript messages are included. Expired messages are unavailable; the attached note is the durable context.'

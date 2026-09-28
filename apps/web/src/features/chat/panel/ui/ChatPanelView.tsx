@@ -218,6 +218,7 @@ export function ChatPanelView({ props, controller, model }: ViewProps) {
         autoHighlights={controller.autoHighlights}
         personas={props.personas}
         personaId={controller.effectivePersonaId}
+        budget={props.budget}
         messageInput={controller.messageInput}
         onInput={controller.setInput}
         onSend={() => void controller.send()}

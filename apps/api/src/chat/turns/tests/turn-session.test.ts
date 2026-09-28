@@ -2,9 +2,9 @@ import { DEFAULT_PERSONAS, type WaldenUIMessage } from '@walden/contracts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Bindings } from '../../../types';
 
-const mocks = vi.hoisted(() => ({ streamTurn: vi.fn() }));
+const mocks = vi.hoisted(() => ({ streamTurn: vi.fn(), updateMemory: vi.fn() }));
 vi.mock('../../../services/agent/agent', () => ({
-  createAgentService: () => ({ streamTurn: mocks.streamTurn }),
+  createAgentService: () => ({ streamTurn: mocks.streamTurn, updateMemory: mocks.updateMemory }),
   modelNameForPersona: () => 'test-model',
 }));
 
@@ -124,7 +124,10 @@ describe('turn session: lost runs and alarms', () => {
     mocks.streamTurn.mockResolvedValue((async function* () {})());
     const turn = session();
     await readTurnStream(await turn.stream('turn', 0));
-    expect(storage.alarmAt).toBeGreaterThan(Date.now() + RETENTION_MS - 5_000);
+    // Readers finish at [DONE]; the run settles after updating memory.
+    await vi.waitFor(() =>
+      expect(storage.alarmAt).toBeGreaterThan(Date.now() + RETENTION_MS - 5_000),
+    );
     vi.useFakeTimers({ now: Date.now() + RETENTION_MS + 1 });
     try {
       await turn.alarm();
@@ -133,5 +136,40 @@ describe('turn session: lost runs and alarms', () => {
     }
     expect(await storage.state()).toBeUndefined();
     expect(storage.chunks()).toEqual([]);
+  });
+});
+
+describe('turn session: memory after the reply', () => {
+  it('updates memory with the saved reply after readers have it, and not after a Stop', async () => {
+    const { db, session } = await setup();
+    mocks.streamTurn.mockResolvedValue(
+      (async function* () {
+        yield { type: 'text-start', id: 't' } as const;
+        yield { type: 'text-delta', id: 't', delta: 'Saved answer' } as const;
+        yield { type: 'text-end', id: 't' } as const;
+      })(),
+    );
+    await readTurnStream(await session().stream('turn', 0));
+    await vi.waitFor(() => expect(mocks.updateMemory).toHaveBeenCalledOnce());
+    const [input] = mocks.updateMemory.mock.calls[0]!;
+    expect(input.conversation.messages.map(({ id }: { id: string }) => id)).toEqual([
+      'user',
+      'turn',
+    ]);
+    expect(await turnStatus(db)).toBe('completed');
+
+    const stopped = await setup();
+    let streaming!: () => void;
+    const started = new Promise<void>((resolve) => {
+      streaming = resolve;
+    });
+    partialUntilAborted(streaming);
+    mocks.updateMemory.mockClear();
+    const turn = stopped.session();
+    const reader = readTurnStream(await turn.stream('turn', 0));
+    await started;
+    await turn.stop('turn');
+    await reader;
+    expect(mocks.updateMemory).not.toHaveBeenCalled();
   });
 });

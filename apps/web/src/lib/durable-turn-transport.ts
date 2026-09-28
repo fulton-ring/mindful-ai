@@ -1,5 +1,6 @@
 import {
   type ChatRequest,
+  type MessageBudget,
   uiMessageText,
   type WaldenUIMessage,
   type WaldenUIMessageChunk,
@@ -30,6 +31,8 @@ type Options = {
     id: string;
     requestId: string;
     userMessageId?: string | null;
+    /** The message budget after this turn's charge. */
+    budget?: MessageBudget;
     resumed?: ActiveTurn;
   }): void;
 };
@@ -178,8 +181,8 @@ export class DurableTurnTransport implements ChatTransport<WaldenUIMessage> {
     const context = await this.options.prepare({ editing, abortSignal: signal });
     signal.throwIfAborted();
     const request = buildTurnRequest(options, context);
-    const { turnId, userMessageId } = await startTurn(request, signal);
-    this.options.onTurn?.({ id: turnId, requestId: request.requestId, userMessageId });
+    const { turnId, userMessageId, budget } = await startTurn(request, signal);
+    this.options.onTurn?.({ id: turnId, requestId: request.requestId, userMessageId, budget });
     return chunkStream(turnId, signal);
   }
 

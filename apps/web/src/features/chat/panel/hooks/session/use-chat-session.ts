@@ -111,6 +111,7 @@ function createTransport(argsRef: RefObject<TurnArgs | null>) {
         : null;
     },
     onTurn: (turn) => {
+      if (turn.budget) args().props.onBudget?.(turn.budget);
       const live = args().runtime.live.current;
       if (turn.resumed) adoptResumedTurn(args(), turn.resumed);
       else if (live) {

@@ -4,6 +4,7 @@ import type {
   Conversation,
   ConversationSummary,
   EditProposal,
+  MessageBudget,
   MessageFollowupRequest,
   MessageHighlight,
   Note,
@@ -459,6 +460,7 @@ export const api = {
     }),
   deletePersona: (id: string) => request<void>(path`/api/personas/${id}`, { method: 'DELETE' }),
   usage: () => request<Usage>('/api/usage'),
+  budget: () => request<MessageBudget>('/api/budget'),
 };
 
 export async function streamNoteProposal(

@@ -33,6 +33,7 @@ export type AgentTurnInput = {
   pendingProposals?: EditProposal[];
 };
 export type AgentService = {
+  updateMemory(input: AgentTurnInput, signal?: AbortSignal): Promise<void>;
   streamTurn(
     input: AgentTurnInput,
     signal?: AbortSignal,

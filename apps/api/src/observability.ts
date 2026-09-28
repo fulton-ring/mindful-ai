@@ -161,7 +161,39 @@ export type ApiTelemetry = {
 };
 
 /** Bounded lifecycle data for turns that outlive the browser connection. */
-export async function captureTurnLifecycle(
+/** One operational event, sent server-side; it arrives whether or not the browser stays. */
+export async function captureServerEvent(
+  env: TelemetryEnv,
+  event: string,
+  userId: string,
+  properties: Record<string, string | number | boolean>,
+): Promise<void> {
+  if (!env.POSTHOG_API_KEY) return;
+  try {
+    const response = await fetch(`${env.POSTHOG_HOST || DEFAULT_POSTHOG_HOST}/i/v0/e/`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      signal: AbortSignal.timeout(1_500),
+      body: JSON.stringify({
+        api_key: env.POSTHOG_API_KEY,
+        event,
+        properties: {
+          distinct_id: userId,
+          $geoip_disable: true,
+          $process_person_profile: false,
+          ...properties,
+        },
+      }),
+    });
+    await response.body?.cancel();
+    if (!response.ok)
+      console.warn('Server telemetry delivery failed', { event, status: response.status });
+  } catch {
+    console.warn('Server telemetry delivery failed', { event });
+  }
+}
+
+export function captureTurnLifecycle(
   env: TelemetryEnv,
   event: 'chat_turn_started' | 'chat_turn_terminal',
   details: {
@@ -174,34 +206,14 @@ export async function captureTurnLifecycle(
     queueMs?: number;
   },
 ): Promise<void> {
-  if (!env.POSTHOG_API_KEY) return;
-  try {
-    const response = await fetch(`${env.POSTHOG_HOST || DEFAULT_POSTHOG_HOST}/i/v0/e/`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      signal: AbortSignal.timeout(1_500),
-      body: JSON.stringify({
-        api_key: env.POSTHOG_API_KEY,
-        event,
-        properties: {
-          distinct_id: details.userId,
-          $geoip_disable: true,
-          $process_person_profile: false,
-          conversation_id: details.conversationId,
-          turn_id: details.turnId,
-          request_id: details.requestId,
-          attempt: details.attempt,
-          ...(details.status ? { status: details.status } : {}),
-          ...(details.queueMs === undefined ? {} : { queue_ms: details.queueMs }),
-        },
-      }),
-    });
-    await response.body?.cancel();
-    if (!response.ok)
-      console.warn('Turn lifecycle telemetry delivery failed', { status: response.status });
-  } catch {
-    console.warn('Turn lifecycle telemetry delivery failed');
-  }
+  return captureServerEvent(env, event, details.userId, {
+    conversation_id: details.conversationId,
+    turn_id: details.turnId,
+    request_id: details.requestId,
+    attempt: details.attempt,
+    ...(details.status ? { status: details.status } : {}),
+    ...(details.queueMs === undefined ? {} : { queue_ms: details.queueMs }),
+  });
 }
 
 /** Server-side failure counts still arrive when the browser leaves mid-stream. */

@@ -2,6 +2,7 @@ import type {
   Conversation,
   EditProposal,
   Intervention,
+  MessageBudget,
   NoteState,
   Persona,
 } from '@walden/contracts';
@@ -11,6 +12,10 @@ export type ChatPanelProps = {
   scopeId: string | null;
   personas: Persona[];
   personaId: string;
+  /** The account's message budget; null while unknown. */
+  budget?: MessageBudget | null;
+  /** Stores a budget a turn reported, or refetches it when none is given. */
+  onBudget?(value?: MessageBudget): void;
   noteOpen: boolean;
   visible?: boolean;
   onPersona(id: string): void;

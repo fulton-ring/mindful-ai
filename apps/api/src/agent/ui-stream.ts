@@ -1,7 +1,7 @@
 import { toAISdkStream } from '@mastra/ai-sdk';
 import type { ChunkType, MastraModelOutput } from '@mastra/core/stream';
 import type { WaldenUIMessageChunk } from '@walden/contracts';
-import { transientStatus } from '../chat/messages';
+import { metadataPatch, transientStatus } from '../chat/messages';
 import { publicUrl } from '../services/research/research';
 import { GemmaToolLeakDecoder, type RecoveredFrontendToolCall } from './learning-checks';
 import { isLengthLimitedFinalChunk } from './stream-events';
@@ -32,6 +32,8 @@ const TOOL_STATUS: Record<string, string> = {
   searchWeb: 'Searching the web…',
   listWebLinks: 'Listing page links…',
   screenshotWebPage: 'Capturing page…',
+  compactConversation: 'Compacting conversation…',
+  recall: 'Looking back through the conversation…',
 };
 const TOOL_ERROR: Record<string, string> = {
   readWebPage: 'Could not read source',
@@ -39,6 +41,7 @@ const TOOL_ERROR: Record<string, string> = {
   searchWeb: 'Web search failed',
   listWebLinks: 'Could not list page links',
   screenshotWebPage: 'Could not capture page',
+  compactConversation: 'Could not compact the conversation',
 };
 const SOURCE_TOOLS = new Set(['searchWeb', 'searchSources', 'readWebPage', 'screenshotWebPage']);
 
@@ -140,6 +143,7 @@ function* toolResultChunks(
   yield* sourceChunks(state, sources);
   const notIndexed =
     name === 'readWebPage' && isRecord(result.indexing) && result.indexing.status === 'failed';
+  const compacted = name === 'compactConversation' && result.compacted === true;
   yield {
     type: 'tool-output-available',
     toolCallId: chunk.toolCallId,
@@ -148,8 +152,12 @@ function* toolResultChunks(
         ? { sources: sources.map(({ url, title }) => ({ url, ...(title ? { title } : {}) })) }
         : {}),
       ...(notIndexed ? { summary: 'Read, but not saved to search' } : {}),
+      ...(compacted ? { summary: 'Earlier messages summarized' } : {}),
     },
   };
+  // The reply shows the same context checkpoint as an automatic summary.
+  if (compacted)
+    yield { type: 'message-metadata', messageMetadata: metadataPatch({ contextCompacted: true }) };
 }
 
 function textChunks(chunk: Chunk, state: UIStreamState, onCall: OnRecoveredCall): Chunk[] {

@@ -1,5 +1,6 @@
 import { WORKSPACE_TOOLS, Workspace } from '@mastra/core/workspace';
 import { uiMessageText, type WaldenUIMessageChunk } from '@walden/contracts';
+import { createCompactTools } from '../../agent/compact-tool';
 import { createDocumentTools } from '../../agent/document-tool';
 import { streamMastraTurn } from '../../agent/mastra-turn';
 import { type MemoryLifecycleEvent, prepareAgentMemory } from '../../agent/memory/memory';
@@ -150,7 +151,7 @@ async function createPrimaryStream(
   workspace: Workspace | undefined,
   telemetry: ApiTelemetry | null,
 ): Promise<AsyncIterable<WaldenUIMessageChunk>> {
-  const { env, input, model, modelName, signal } = options;
+  const { env, input, model, modelName, signal, memoryModel } = options;
   const mcpTools = await createMcpService(env).tools();
   const allowedUrls = collectAllowedUrls(input);
   const tools: McpTools = {
@@ -158,6 +159,15 @@ async function createPrimaryStream(
     ...createDocumentTools(env, input),
     ...createResearchTools(env, input.ownerId, signal, allowedUrls),
     ...createWebSearchTools(env, signal, allowedUrls),
+    ...(memory && env.DB && input.ownerId
+      ? createCompactTools({
+          db: env.DB,
+          ownerId: input.ownerId,
+          conversation: input.conversation,
+          model: memoryModel,
+          signal,
+        })
+      : {}),
   };
   return streamMastraTurn({
     input: await includeRecentImage(env, input),

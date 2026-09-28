@@ -1,7 +1,13 @@
-import { type ChatRequest, chatRequestSchema, type TurnStart } from '@walden/contracts';
-import { Hono } from 'hono';
+import {
+  type ChatRequest,
+  chatRequestSchema,
+  type MessageBudget,
+  type TurnStart,
+} from '@walden/contracts';
+import { type Context, Hono } from 'hono';
 import { first, parseJson } from '../../db/client';
 import { HttpError, jsonBody, nowIso } from '../../http';
+import { captureServerEvent } from '../../observability';
 import { modelNameForPersona } from '../../services/agent/agent';
 import type { Bindings, Variables } from '../../types';
 import {
@@ -17,7 +23,7 @@ import {
   validateAttachmentBytes,
 } from '../attachments/presign';
 import { requireConversation } from '../conversations/repository';
-import { messageLimitFrom } from './message-limit';
+import { limitWindowStats, loadMessageBudget, messageLimitFrom } from './message-limit';
 import { type PreparedTurn, prepareTurn } from './turn-lifecycle';
 import { turnObject } from './turn-session';
 import type { TurnRow } from './turn-store';
@@ -114,6 +120,56 @@ chatRoutes.get('/attachments/:conversationId/:attachmentId', async (c) => {
   });
 });
 
+type ChatContext = Context<{ Bindings: Bindings; Variables: Variables }>;
+
+/** Telemetry must not delay the response; tests call the app without an execution context. */
+function inBackground(c: ChatContext, task: Promise<void>) {
+  try {
+    c.executionCtx.waitUntil(task);
+  } catch {
+    void task;
+  }
+}
+
+/** The send that used up the budget, and sends refused because of it. */
+function captureLimit(
+  c: ChatContext,
+  event: 'message_limit_reached' | 'message_limit_blocked',
+  budget: MessageBudget,
+  model: string | null,
+  weight: number,
+) {
+  const ownerId = c.get('userId');
+  inBackground(
+    c,
+    limitWindowStats(c.env.DB, ownerId, budget)
+      .then((stats) =>
+        captureServerEvent(c.env, event, c.get('authSubject'), {
+          ...stats,
+          model: model ?? 'default',
+          weight,
+        }),
+      )
+      .catch(() => undefined),
+  );
+}
+
+/** The budget after an admitted turn's charge; the send that used it up is recorded. */
+async function chargedBudget(c: ChatContext, turn: PreparedTurn) {
+  const budget = await loadMessageBudget(c.env.DB, c.get('userId'), messageLimitFrom(c.env));
+  if (budget.used >= budget.limit && budget.used - turn.weight < budget.limit)
+    captureLimit(c, 'message_limit_reached', budget, turn.model, turn.weight);
+  return budget;
+}
+
+async function recordRefusal(c: ChatContext, error: unknown) {
+  const details =
+    error instanceof HttpError ? (error.details as { code?: string; weight?: number }) : null;
+  if (details?.code !== 'message_limit') return;
+  const budget = await loadMessageBudget(c.env.DB, c.get('userId'), messageLimitFrom(c.env));
+  captureLimit(c, 'message_limit_blocked', budget, null, details.weight ?? 1);
+}
+
 /** Starts an admitted turn in its object; a turn already started there is left as it is. */
 const startTurn = (env: Bindings, turnId: string) => turnObject(env, turnId).start(turnId);
 
@@ -196,6 +252,7 @@ chatRoutes.post('/turns', async (c) => {
       attachments,
     );
   } catch (error) {
+    await recordRefusal(c, error);
     const concurrent = await findOwnedTurn(c.env.DB, ownerId, request.requestId);
     if (!concurrent || concurrent.request_json !== requestJson) throw error;
     await startTurn(c.env, concurrent.id);
@@ -222,7 +279,11 @@ chatRoutes.post('/turns', async (c) => {
   } catch {
     /* Minute reconciliation starts an admitted turn the object never received. */
   }
-  return c.json({ turnId: turn.turnId, userMessageId: turn.userMessageId } satisfies TurnStart);
+  return c.json({
+    turnId: turn.turnId,
+    userMessageId: turn.userMessageId,
+    budget: await chargedBudget(c, turn),
+  } satisfies TurnStart);
 });
 
 chatRoutes.get('/turns', async (c) => {

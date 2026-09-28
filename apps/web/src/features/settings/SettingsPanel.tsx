@@ -4,6 +4,7 @@ import type { MessageBudget, Persona } from '@walden/contracts';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '../../lib/api';
+import { resetTime } from '../../lib/reset-time';
 import { failureDetails, track } from '../../lib/telemetry';
 import { AccountSettings } from './AccountSettings';
 
@@ -186,14 +187,6 @@ function Usage() {
       </dl>
     </section>
   );
-}
-
-function resetTime(iso: string) {
-  const at = new Date(iso);
-  const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  return at.toDateString() === new Date().toDateString()
-    ? time
-    : `${at.toLocaleDateString([], { weekday: 'short' })} ${time}`;
 }
 
 function MessageBudgetMeter({ budget }: { budget: MessageBudget }) {

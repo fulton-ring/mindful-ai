@@ -5,6 +5,10 @@ import { first } from '../db/client';
 import type { Bindings, Variables } from '../types';
 
 export const metricsRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+/** The message budget alone, which the composer checks after every reply. */
+metricsRoutes.get('/budget', async (c) =>
+  c.json(await loadMessageBudget(c.env.DB, c.get('userId'), messageLimitFrom(c.env))),
+);
 metricsRoutes.get('/usage', async (c) => {
   const ownerId = c.get('userId');
   const [budget, sent, favorite] = await Promise.all([

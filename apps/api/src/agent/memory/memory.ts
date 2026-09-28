@@ -17,9 +17,15 @@ export type MemoryLifecycleEvent = {
 };
 
 const stores = new WeakMap<D1Database, Promise<D1Store>>();
-const OBSERVATION_TOKEN_THRESHOLD = 12_000;
-const REFLECTION_TOKEN_THRESHOLD = 4_000;
-const RECENT_MESSAGE_TOKEN_RETENTION = 6_000;
+/**
+ * Older messages are summarized once they pass this many tokens. The models'
+ * windows are 256k+, so the threshold is set by cost and latency, not capacity;
+ * the per-step input budget (`agent/context.ts`) must stay above it plus the
+ * retained floor, or messages would be trimmed before they are summarized.
+ */
+export const OBSERVATION_TOKEN_THRESHOLD = 48_000;
+const REFLECTION_TOKEN_THRESHOLD = 12_000;
+const RECENT_MESSAGE_TOKEN_RETENTION = 12_000;
 
 const identity = (ownerId: string, conversationId: string, branchId: string) => ({
   threadId: `conversation:${ownerId}:${conversationId}:branch:${branchId}`,
@@ -45,7 +51,12 @@ function storeFor(db: D1Database): Promise<D1Store> {
   return initialized;
 }
 
-function createObservationalMemory(storage: D1Store, model: LanguageModelV3, signal: AbortSignal) {
+function createObservationalMemory(
+  storage: D1Store,
+  model: LanguageModelV3,
+  signal: AbortSignal,
+  observeAt = OBSERVATION_TOKEN_THRESHOLD,
+) {
   return new Memory({
     storage,
     options: {
@@ -57,12 +68,15 @@ function createObservationalMemory(storage: D1Store, model: LanguageModelV3, sig
         model: abortableObservationModel(model, signal),
         scope: 'thread',
         observation: {
-          messageTokens: OBSERVATION_TOKEN_THRESHOLD,
+          messageTokens: observeAt,
           bufferTokens: false,
           modelSettings: { maxOutputTokens: 4_000, temperature: 0.1 },
           instruction:
             'Preserve user decisions, constraints, unresolved questions, and corrections. Distinguish user statements from assistant claims. Do not turn uncertain claims into facts.',
         },
+        // Mastra's recall tool: summaries keep links to the messages they came from,
+        // so the model can reread exact wording. Scoped to this conversation branch.
+        retrieval: { scope: 'thread' },
         reflection: {
           observationTokens: REFLECTION_TOKEN_THRESHOLD,
           modelSettings: { maxOutputTokens: 3_000, temperature: 0 },
@@ -116,6 +130,14 @@ const toMemoryMessage = (
   },
 });
 
+export type PreparedMemory = {
+  memory: Memory;
+  threadId: string;
+  resourceId: string;
+  /** Conversation tokens the model receives; undefined when it could not be read. */
+  contextTokens?: number;
+};
+
 type PrepareMemoryOptions = {
   model: LanguageModelV3;
   signal: AbortSignal;
@@ -149,10 +171,14 @@ async function syncConversationMessages(
   const stored = await memory.recall({ threadId, resourceId, page: 0, perPage: false });
   const authoritativeIds = new Set(messages.map(({ id }) => id));
   const byId = new Map(stored.messages.map((message) => [message.id, message]));
+  // Stored text comes back trimmed, so compare trimmed text: otherwise any reply
+  // ending in whitespace reads as edited, clearing and redoing the summary each turn.
   const changed = messages.filter((message) => {
     const previous = byId.get(message.id);
     return (
-      previous && (previous.role !== message.role || messageText(previous) !== messageText(message))
+      previous &&
+      (previous.role !== message.role ||
+        messageText(previous).trim() !== messageText(message).trim())
     );
   });
   const staleIds = stored.messages.map(({ id }) => id).filter((id) => !authoritativeIds.has(id));
@@ -207,7 +233,7 @@ export async function prepareAgentMemory(
   ownerId: string,
   conversation: Conversation,
   options: PrepareMemoryOptions,
-): Promise<{ memory: Memory; threadId: string; resourceId: string }> {
+): Promise<PreparedMemory> {
   options.signal.throwIfAborted();
   const storage = await storeFor(db);
   const memory = createObservationalMemory(storage, options.model, options.signal);
@@ -241,7 +267,61 @@ export async function prepareAgentMemory(
     await assertActive();
   }
   options.signal.throwIfAborted();
-  return { memory, threadId, resourceId };
+  return {
+    memory,
+    threadId,
+    resourceId,
+    contextTokens: await contextTokens(engine, threadId, resourceId, messages),
+  };
+}
+
+/** Roughly how many conversation tokens the model receives: summaries plus unsummarized messages. */
+async function contextTokens(
+  engine: NonNullable<Awaited<Memory['omEngine']>>,
+  threadId: string,
+  resourceId: string,
+  messages: MastraDBMessage[],
+): Promise<number | undefined> {
+  try {
+    const status = await engine.getStatus({ threadId, resourceId, messages });
+    return status.pendingTokens + (status.record.observationTokenCount ?? 0);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Summarizes the conversation now, at the model's request, whatever its size:
+ * everything before the retained recent messages becomes observations, and a
+ * `focus` also condenses them around what must be kept. Takes effect from the
+ * next turn, whose context is loaded from memory.
+ */
+export async function compactAgentMemory(
+  db: D1Database,
+  ownerId: string,
+  conversation: Conversation,
+  options: { model: LanguageModelV3; signal: AbortSignal; focus?: string },
+): Promise<{ compacted: boolean; summaryTokens: number }> {
+  const storage = await storeFor(db);
+  // A threshold of one token makes this observation unconditional.
+  const memory = createObservationalMemory(storage, options.model, options.signal, 1);
+  const { threadId, resourceId } = identity(ownerId, conversation.id, conversation.branchId);
+  const engine = await memory.omEngine;
+  if (!engine) throw new Error('D1 observational memory is unavailable.');
+  const { messages } = await memory.recall({ threadId, resourceId, page: 0, perPage: false });
+  const older = messagesBeforeRecentTokenFloor(memory, messages);
+  let result = older.length
+    ? await engine.observe({ threadId, resourceId, messages: older })
+    : { observed: false, reflected: false, record: undefined };
+  if (options.focus) {
+    const reflection = await engine.reflect(threadId, resourceId, options.focus);
+    result = { ...result, reflected: reflection.reflected, record: reflection.record };
+  }
+  await memory.settled();
+  return {
+    compacted: result.observed || result.reflected,
+    summaryTokens: result.record?.observationTokenCount ?? 0,
+  };
 }
 
 export async function deleteAgentMemoryThread(

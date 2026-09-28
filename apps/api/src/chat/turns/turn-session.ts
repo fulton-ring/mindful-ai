@@ -57,6 +57,8 @@ export class TurnSession {
     // A turn this instance never started is sealed as cancelled, never started.
     await this.open(turnId, false);
     if (!this.run) return this.sealed === 'cancelled';
+    // A delivered reply may still be updating memory; it can no longer be stopped.
+    if (this.log?.isEnded) return false;
     this.controller!.abort(STOPPED);
     return (await this.run) === 'cancelled';
   }

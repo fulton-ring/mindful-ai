@@ -8,6 +8,7 @@ import {
 import { ChatPanel } from '../../features/chat/ChatPanel';
 import { storageKeys } from '../../lib/storage-keys';
 import { track } from '../../lib/telemetry';
+import { useMessageBudget } from '../data/use-message-budget';
 import { useChatBridge, useNoteDocument, useWorkspaceShell } from '../data/workspace-context';
 
 const NotesEditor = lazy(() =>
@@ -112,8 +113,11 @@ function ChatReady() {
     setPersonaId,
   } = useWorkspaceShell();
   const bridge = useChatBridge();
+  const messageBudget = useMessageBudget();
   return (
     <ChatPanel
+      budget={messageBudget.budget}
+      onBudget={messageBudget.update}
       visible={!noteOnly && (desktop || mobilePane === 'chat')}
       conversation={conversation}
       scopeId={activeConversationId}

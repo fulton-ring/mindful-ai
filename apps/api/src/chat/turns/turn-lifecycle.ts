@@ -73,6 +73,9 @@ export type PreparedTurn = {
   attachments?: LoadedAttachment[];
   request: ChatRequest;
   pendingIntervention: Intervention | undefined;
+  /** The model the turn runs on and what it cost against the message budget. */
+  model: string | null;
+  weight: number;
 };
 
 type PreparedTurnResult = { kind: 'replay' } | { kind: 'stream'; turn: PreparedTurn };
@@ -415,6 +418,7 @@ async function prepareStreamTurn(
     requestMessage: input.requestMessage,
     request: input.request,
     pendingIntervention: reservation.branchFork ? undefined : pendingIntervention,
+    ...turnModel,
   };
 }
 

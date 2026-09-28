@@ -12,9 +12,9 @@ import { uiMessageSql } from '../../../tests/ui-messages';
 import type { Bindings, Variables } from '../../../types';
 import { readTurnStream, turnObjects } from './turn-fixture';
 
-const mocks = vi.hoisted(() => ({ streamTurn: vi.fn() }));
+const mocks = vi.hoisted(() => ({ streamTurn: vi.fn(), updateMemory: vi.fn() }));
 vi.mock('../../../services/agent/agent', () => ({
-  createAgentService: () => ({ streamTurn: mocks.streamTurn }),
+  createAgentService: () => ({ streamTurn: mocks.streamTurn, updateMemory: mocks.updateMemory }),
   modelNameForPersona: () => 'test-model',
 }));
 

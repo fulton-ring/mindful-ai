@@ -4,6 +4,7 @@ import { createAgentService, modelNameForPersona } from '../../services/agent/ag
 import { aiFailureCode, aiProviderErrorMessage } from '../../services/ai-errors/ai-errors';
 import type { Bindings } from '../../types';
 import { loadAttachments } from '../attachments/attachments';
+import { loadConversation } from '../conversations/repository';
 import { transientStatus } from '../messages';
 import type { ChunkLog } from './chunk-log';
 import { completeTurn, finishTurn, isTurnActive, type TurnInput, type TurnRow } from './turn-store';
@@ -95,6 +96,27 @@ async function generateTurn(
     trackProgress(progress, chunk);
     log.append(chunk);
   }
+  return input;
+}
+
+/**
+ * Brings conversation memory up to date with the saved reply after readers have
+ * it, so a summary is written now rather than making the next reply wait.
+ */
+async function updateMemoryAfterReply(
+  env: Bindings,
+  row: TurnRow,
+  input: TurnInput,
+  background: Background,
+) {
+  try {
+    const conversation = await loadConversation(env.DB, row.owner_id, row.conversation_id, {
+      branchId: row.branch_id,
+    });
+    await createAgentService(env, background).updateMemory({ ...input, conversation });
+  } catch {
+    console.warn('Memory update after reply failed', { turnId: row.id });
+  }
 }
 
 function failureMessage(error: unknown) {
@@ -170,13 +192,15 @@ export async function runTurn(
   const watcher = watchActive(env.DB, row.id, controller);
   const progress: Progress = { model: 'unknown', partialResponse: false, toolIds: new Set() };
   let end: Chunk[] | null;
+  let input: TurnInput | undefined;
+  let completed = false;
   try {
-    await generateTurn(env, row, controller.signal, log, progress, background);
+    input = await generateTurn(env, row, controller.signal, log, progress, background);
     // An aborted agent stream can end without throwing; what streamed is not a whole reply.
     controller.signal.throwIfAborted();
-    end =
-      (await completeTurn(env.DB, row, log.chunks)) ??
-      (await finishTurn(env.DB, row, log.chunks, 'failed', INCOMPLETE));
+    end = await completeTurn(env.DB, row, log.chunks);
+    completed = end !== null;
+    end ??= await finishTurn(env.DB, row, log.chunks, 'failed', INCOMPLETE);
   } catch (error) {
     end = await endTurn(env, row, log, controller.signal, error, progress, background).catch(
       () => null,
@@ -186,6 +210,7 @@ export async function runTurn(
   }
   log.append(...(end ?? [ENDED]));
   log.end();
+  if (completed && input) await updateMemoryAfterReply(env, row, input, background);
   return terminalStatus(env, row, background);
 }
 

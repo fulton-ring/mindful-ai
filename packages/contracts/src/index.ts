@@ -320,7 +320,12 @@ export const chatRequestSchema = z
   );
 export type ChatRequest = z.infer<typeof chatRequestSchema>;
 /** POST /api/chat/turns. `userMessageId` is the server id of the request's user message. */
-export type TurnStart = { turnId: string; userMessageId: string | null };
+export type TurnStart = {
+  turnId: string;
+  userMessageId: string | null;
+  /** The message budget after this turn's charge; absent when a send was replayed. */
+  budget?: MessageBudget;
+};
 /** Body of the per-message follow-up routes (annotations and note proposals). */
 export const messageFollowupRequestSchema = z
   .object({

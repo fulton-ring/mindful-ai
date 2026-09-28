@@ -216,6 +216,26 @@ it('invalidates observations when a response changes under the same ID', async (
   );
 });
 
+it('keeps observations when stored text differs only by trimmed whitespace', async () => {
+  const thread = conversation(2);
+  thread.messages[1]!.parts = [{ type: 'text', text: 'content-1\n' }];
+  thread.messages[1]!.metadata = { createdAt: new Date(1_000).toISOString() };
+  // The memory store keeps text trimmed.
+  mocks.recall.mockResolvedValue({
+    messages: [
+      { id: 'message-0', role: 'user', content: { parts: [{ type: 'text', text: 'content-0' }] } },
+      {
+        id: 'message-1',
+        role: 'assistant',
+        content: { parts: [{ type: 'text', text: 'content-1' }] },
+      },
+    ],
+  });
+  await prepareAgentMemory({} as D1Database, 'owner', thread, options);
+  expect(mocks.clearObservationalMemory).not.toHaveBeenCalled();
+  expect(mocks.saveMessages).not.toHaveBeenCalled();
+});
+
 it('never observes an already-cancelled turn', async () => {
   await expect(
     prepareAgentMemory({} as D1Database, 'owner', conversation(), {
