@@ -19,9 +19,12 @@
       "migrations_dir": "migrations"
     }
   ],
-  "workflows": [
-    { "name": "walden-chat", "binding": "CHAT_WORKFLOW", "class_name": "ChatWorkflow" }
-  ],
+  // One object per chat turn: runs the turn detached from any request and
+  // streams its chunks to every reader.
+  "durable_objects": {
+    "bindings": [{ "name": "CHAT_TURN", "class_name": "ChatTurn" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ChatTurn"] }],
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "walden-attachments" }],
   "ai": {
     "binding": "AI",

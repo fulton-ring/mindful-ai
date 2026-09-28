@@ -11,7 +11,6 @@ import type {
   WaldenUIMessage,
   WaldenUIMessageChunk,
 } from '@walden/contracts';
-import type { AgentCheckpoints } from '../agent/checkpoints';
 import type { LoadedAttachment } from '../chat/attachments/attachments';
 import type { Bindings } from '../types';
 
@@ -36,7 +35,6 @@ export type AgentTurnInput = {
 export type AgentService = {
   streamTurn(
     input: AgentTurnInput,
-    checkpoints: AgentCheckpoints,
     signal?: AbortSignal,
   ): Promise<AsyncIterable<WaldenUIMessageChunk>>;
   annotateTurn(

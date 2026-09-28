@@ -29,7 +29,7 @@ export type LiveTurn = {
 };
 
 /** Why the next aborted finish happened; only a Stop turns into an interrupted reply. */
-export type AbortReason = 'stop' | 'switch' | 'reset' | 'unmount';
+export type AbortReason = 'stop' | 'switch' | 'unmount';
 
 export function useChatRuntimeState(conversation: Conversation | null, scopeId: string | null) {
   return {

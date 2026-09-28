@@ -69,7 +69,7 @@ export function buildTurnRequest(
   };
 }
 
-/** Network failures and 5xx leave the durable turn running; 4xx (429 limit, 409) cannot be retried. */
+/** Network failures and 5xx leave the server turn running; 4xx (429 limit, 409) cannot be retried. */
 function canRetry(error: unknown) {
   return (
     error instanceof TypeError ||
@@ -107,10 +107,6 @@ async function startTurn(request: ChatRequest, signal: AbortSignal) {
   }
 }
 
-/** The server retried the turn and closed this response: a replay from 0 is the new attempt. */
-const isReset = (chunk: WaldenUIMessageChunk) =>
-  chunk.type === 'data-turn' && chunk.data.reset === true;
-
 /** Yields one response's new chunks; returns true once the turn needs no further reads. */
 async function* readTurnResponse(
   response: Response,
@@ -124,7 +120,6 @@ async function* readTurnResponse(
     const chunk = JSON.parse(frame.data) as WaldenUIMessageChunk;
     if (sequence !== undefined) cursor.after = sequence;
     yield chunk;
-    if (isReset(chunk)) return true;
   }
   return false;
 }
@@ -132,7 +127,6 @@ async function* readTurnResponse(
 /**
  * Every chunk of the turn exactly once: re-GETs after the last seen sequence number whenever
  * the server ends a response or the network drops before `[DONE]` (or a 204: nothing follows).
- * A reset marker ends the stream; the reader restarts the turn from 0.
  */
 async function* followTurn(
   turnId: string,
@@ -171,8 +165,9 @@ function chunkStream(turnId: string, signal = new AbortController().signal) {
 }
 
 /**
- * Chat transport over durable server turns: a POST admits the turn, then its event log is
- * streamed (and resumed) by sequence number. Aborting only detaches; Stop cancels explicitly.
+ * Chat transport over server turns: a POST admits the turn, which runs on the server whether
+ * or not anyone reads it; its chunks are streamed (and resumed) by sequence number. Aborting
+ * only detaches; Stop cancels explicitly.
  */
 export class DurableTurnTransport implements ChatTransport<WaldenUIMessage> {
   constructor(private readonly options: Options) {}

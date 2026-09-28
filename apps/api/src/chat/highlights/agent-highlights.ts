@@ -13,7 +13,8 @@ export function agentHighlightStatements(
     content: string;
     annotations: readonly Annotation[];
     updatedAt: string;
-    completedTurnEpoch?: number;
+    /** Applies only if the turn committed at this time; used inside the completion batch. */
+    completedAt?: string;
   },
 ): D1PreparedStatement[] {
   const rows = input.annotations.flatMap((annotation) => {
@@ -25,20 +26,20 @@ export function agentHighlightStatements(
   return [
     db
       .prepare(
-        `DELETE FROM message_highlights WHERE message_id=? AND owner_id=? AND origin='agent'${input.completedTurnEpoch === undefined ? '' : " AND EXISTS(SELECT 1 FROM turns WHERE id=? AND owner_id=? AND status='completed' AND execution_epoch=?)"}`,
+        `DELETE FROM message_highlights WHERE message_id=? AND owner_id=? AND origin='agent'${input.completedAt === undefined ? '' : " AND EXISTS(SELECT 1 FROM turns WHERE id=? AND owner_id=? AND status='completed' AND completed_at=?)"}`,
       )
       .bind(
         input.messageId,
         input.ownerId,
-        ...(input.completedTurnEpoch === undefined
+        ...(input.completedAt === undefined
           ? []
-          : [input.messageId, input.ownerId, input.completedTurnEpoch]),
+          : [input.messageId, input.ownerId, input.completedAt]),
       ),
     ...rows.map(({ start, end, annotation }) =>
       db
         .prepare(
           `INSERT INTO message_highlights (message_id,owner_id,origin,start,end,quote,color,kind,updated_at)
-           ${input.completedTurnEpoch === undefined ? "VALUES (?,?,'agent',?,?,?,NULL,?,?)" : "SELECT ?,?,'agent',?,?,?,NULL,?,? WHERE EXISTS(SELECT 1 FROM turns WHERE id=? AND owner_id=? AND status='completed' AND execution_epoch=?)"}
+           ${input.completedAt === undefined ? "VALUES (?,?,'agent',?,?,?,NULL,?,?)" : "SELECT ?,?,'agent',?,?,?,NULL,?,? WHERE EXISTS(SELECT 1 FROM turns WHERE id=? AND owner_id=? AND status='completed' AND completed_at=?)"}
            ON CONFLICT(message_id,origin,start,end) DO UPDATE SET
              quote=excluded.quote,kind=excluded.kind,updated_at=excluded.updated_at`,
         )
@@ -50,9 +51,9 @@ export function agentHighlightStatements(
           annotation.quote,
           annotation.kind,
           input.updatedAt,
-          ...(input.completedTurnEpoch === undefined
+          ...(input.completedAt === undefined
             ? []
-            : [input.messageId, input.ownerId, input.completedTurnEpoch]),
+            : [input.messageId, input.ownerId, input.completedAt]),
         ),
     ),
   ];

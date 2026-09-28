@@ -435,7 +435,6 @@ export const turns = sqliteTable(
     /** Model the turn was admitted with and its message-budget weight. */
     model: text('model'),
     weight: integer('weight').notNull().default(sql.raw('1')),
-    executionEpoch: integer('execution_epoch').notNull().default(0),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
@@ -445,19 +444,6 @@ export const turns = sqliteTable(
     uniqueIndex('turns_owner_id_request_id_unique').on(table.ownerId, table.requestId),
     index('turns_conversation').on(table.conversationId),
   ],
-);
-
-export const turnEvents = sqliteTable(
-  'turn_events',
-  {
-    seq: integer('seq').primaryKey({ autoIncrement: true }),
-    turnId: text('turn_id')
-      .notNull()
-      .references((): AnySQLiteColumn => turns.id, { onDelete: 'cascade', onUpdate: 'no action' }),
-    /** One UI message stream chunk (JSON) of the turn's current execution epoch. */
-    chunkJson: text('chunk_json').notNull(),
-  },
-  (table) => [index('turn_events_replay').on(table.turnId, table.seq)],
 );
 
 export const turnCancellations = sqliteTable(

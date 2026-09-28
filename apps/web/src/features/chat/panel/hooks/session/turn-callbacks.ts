@@ -34,24 +34,9 @@ export function adoptUserMessageId(args: TurnArgs, userMessageId: string) {
   });
 }
 
-/** The server retried the turn: drop the partial reply and replay the new attempt. */
-function restartTurn(args: TurnArgs, live: LiveTurn) {
-  args.runtime.abortReason.current = 'reset';
-  void args.chat.stop();
-  setTimeout(() => {
-    if (args.runtime.live.current !== live || !live.turnId) return;
-    args.chat.setMessages((messages) => messages.filter(({ id }) => id !== live.turnId));
-    void args.chat.resumeStream({ body: { turnId: live.turnId } });
-  }, 0);
-}
-
 function handleTurnData(args: TurnArgs, data: WaldenDataParts['turn']) {
   const live = args.runtime.live.current;
   if (!live) return;
-  if (data.reset) {
-    restartTurn(args, live);
-    return;
-  }
   live.conversationId = data.conversationId;
   live.branchId = data.branchId;
   live.title = data.title ?? live.title;

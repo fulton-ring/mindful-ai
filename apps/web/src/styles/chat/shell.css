@@ -355,6 +355,17 @@
   .markdown-response {
     line-height: 1.6;
   }
+  /*
+   * Streamdown fades each new word in, but on the next render it rewrites the
+   * word's inline fade length to 0, which snaps a half-faded word to full
+   * opacity; with the paced reveal re-rendering every frame, no fade survived.
+   * A fixed length and no delay let every word finish its fade. (!important is
+   * needed: Streamdown's stylesheet is unlayered, and these rules are layered.)
+   */
+  .markdown-response [data-sd-animate] {
+    animation-duration: 360ms !important;
+    animation-delay: 0ms !important;
+  }
   .markdown-response > *:first-child,
   .message-response > *:first-child {
     margin-top: 0;

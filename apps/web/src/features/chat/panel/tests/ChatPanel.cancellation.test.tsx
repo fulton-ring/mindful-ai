@@ -15,7 +15,6 @@ import {
   replyChunks,
   setComposerValue,
   textChunks,
-  textOf,
   turnData,
   userMessage,
 } from '../../tests/_ChatPanel.test-helpers';
@@ -74,33 +73,6 @@ it('resumes a running turn on mount and saves the replayed answer once', async (
   expect(saved.messages.map(({ id }) => id)).toEqual(['user-1', 'turn-1']);
   expect(screen.getAllByText('A saved answer')).toHaveLength(1);
   expect(transport.startTurn).not.toHaveBeenCalled();
-});
-
-it('drops the partial reply and replays the new attempt when the server resets the turn', async () => {
-  const stream = hang();
-  const { values } = renderSaving();
-  send('Question');
-  await waitFor(() => expect(transport.turnEvents).toHaveBeenCalledTimes(1));
-  const retry = openTurn('turn-1', { admit: false });
-  act(() =>
-    stream.emit(
-      { type: 'start', messageId: 'turn-1', messageMetadata: { createdAt: '' } },
-      ...textChunks('Abandoned attempt'),
-    ),
-  );
-  expect(await screen.findByText('Abandoned attempt')).toBeTruthy();
-  act(() => stream.emit(turnData({ reset: true })));
-  await waitFor(() => expect(transport.turnEvents).toHaveBeenCalledTimes(2));
-  expect(transport.turnEvents).toHaveBeenLastCalledWith('turn-1', 0, expect.any(AbortSignal));
-  act(() => {
-    retry.emit(...replyChunks('turn-1', 'Second attempt'));
-    retry.done();
-  });
-  await waitFor(() => expect(values.onConversation).toHaveBeenCalled());
-  expect(screen.queryByText('Abandoned attempt')).toBeNull();
-  expect(screen.getAllByText('Second attempt')).toHaveLength(1);
-  const saved = values.onConversation.mock.calls.at(-1)?.[0] as Conversation;
-  expect(saved.messages.map((message) => textOf(message))).toEqual(['Question', 'Second attempt']);
 });
 
 it('preserves a saved removal when a late classifier result updates the message', async () => {

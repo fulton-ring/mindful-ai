@@ -36,7 +36,7 @@ it('durably cancels only the exact note proposal attempt', async () => {
         attemptId: 'attempt-new',
       }),
     }),
-    { DB: database() } as Bindings,
+    { DB: database() } as unknown as Bindings,
   );
 
   expect(response.status).toBe(200);

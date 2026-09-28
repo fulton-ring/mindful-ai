@@ -1,6 +1,5 @@
 import { DEFAULT_PERSONAS, type WaldenUIMessageChunk } from '@walden/contracts';
 import { describe, expect, it, vi } from 'vitest';
-import type { AgentCheckpoints } from '../../../agent/checkpoints';
 
 vi.mock('../../../agent/mastra-turn', () => ({
   async *streamMastraTurn() {
@@ -18,8 +17,6 @@ vi.mock('../../research/research', () => ({
 vi.mock('../../research/web-search', () => ({ createWebSearchTools: () => ({}) }));
 
 import { streamTurnChunks } from '../agent-stream';
-
-const checkpoints: AgentCheckpoints = { do: (_name, callback) => callback() };
 
 describe('turn stream completion', () => {
   it('completes without waiting for highlights or telemetry', async () => {
@@ -46,8 +43,8 @@ describe('turn stream completion', () => {
       },
       modelName: 'test-model',
       model: {} as never,
+      memoryModel: {} as never,
       signal: new AbortController().signal,
-      checkpoints,
       background,
     }))
       events.push(event);

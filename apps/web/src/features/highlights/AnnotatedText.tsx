@@ -101,9 +101,11 @@ function AnnotationMark({
 }
 
 const markdownComponents = { mark: AnnotationMark } satisfies Components;
-/** Streamdown's built-in reveal: words fade in as a reply streams. */
-// A longer fade with a tight stagger spreads each ~100 ms batch of words evenly.
-const STREAM_ANIMATION = { animation: 'fadeIn', sep: 'word', duration: 280, stagger: 18 } as const;
+/**
+ * Streamdown's built-in reveal: words fade in as a reply streams. Words arrive
+ * paced by `use-smooth-text`; the fade length is fixed in CSS (`shell.css`).
+ */
+const STREAM_ANIMATION = { animation: 'fadeIn', sep: 'word' } as const;
 const prefersReducedMotion = () =>
   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 

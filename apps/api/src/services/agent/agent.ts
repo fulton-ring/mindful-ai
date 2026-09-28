@@ -7,7 +7,6 @@ import {
 } from '@walden/contracts';
 import { wrapLanguageModel } from 'ai';
 import { createWorkersAI } from 'workers-ai-provider';
-import type { AgentCheckpoints } from '../../agent/checkpoints';
 import { streamNoteProposal } from '../../agent/note-proposals/note-proposal-stream';
 import { agentTrace, annotateResponse, streamAnnotationResponse } from '../../agent/stream-events';
 import { ServiceUnavailableError } from '../../http';
@@ -112,14 +111,14 @@ function createSecondaryContext(
 function createSecondaryOperations(
   env: ServiceEnv,
   background: Background | undefined,
-  configuredModel: ConfigureModel,
+  backgroundModel: (input: AgentTurnInput) => ConfiguredModel,
 ): Pick<AgentService, 'annotateTurn' | 'streamAnnotations' | 'streamNoteProposal'> {
   const annotationRequest = (
     input: AgentTurnInput,
     assistantMessage: WaldenUIMessage,
     signal: AbortSignal | undefined,
   ) => {
-    const { modelName, model } = configuredModel(input.persona);
+    const { modelName, model } = backgroundModel(input);
     const secondary = createSecondaryContext(env, background, input, modelName, signal);
     const request = {
       text: uiMessageText(assistantMessage),
@@ -159,7 +158,7 @@ function createSecondaryOperations(
       assistantMessage: WaldenUIMessage,
       signal?: AbortSignal,
     ) {
-      const { modelName, model } = configuredModel(input.persona);
+      const { modelName, model } = backgroundModel(input);
       const secondary = createSecondaryContext(env, background, input, modelName, signal);
       const stream = streamNoteProposal(
         input,
@@ -186,7 +185,7 @@ function streamWithSecondaryCleanup<T>(
   })();
 }
 
-/** A durable turn may run across Workflow steps, so its deadline is generous. */
+/** A turn with research tools can run for minutes; its object seals it past this. */
 const TURN_DEADLINE_MS = 15 * 60_000;
 
 /**
@@ -198,19 +197,24 @@ export function createAgentService(env: ServiceEnv, background?: Background): Ag
     const modelName = modelNameForPersona(env, persona);
     return { modelName, model: createConfiguredModel(env, modelName) };
   };
+  // Only the reply uses the persona's model. Memory, highlights, and note
+  // suggestions are background work, so they run on the default fast model,
+  // which is quicker and more reliable than a deliberate one such as Qwen.
+  const backgroundModel = (input: AgentTurnInput) =>
+    configuredModel({ ...input.persona, model: undefined });
   return {
-    async streamTurn(input: AgentTurnInput, checkpoints: AgentCheckpoints, signal?: AbortSignal) {
+    async streamTurn(input: AgentTurnInput, signal?: AbortSignal) {
       const { modelName, model } = configuredModel(input.persona);
       return streamTurnChunks({
         env,
         input,
         modelName,
         model,
+        memoryModel: backgroundModel(input).model,
         signal: withDeadline(signal, TURN_DEADLINE_MS),
-        checkpoints,
         background,
       });
     },
-    ...createSecondaryOperations(env, background, configuredModel),
+    ...createSecondaryOperations(env, background, backgroundModel),
   };
 }

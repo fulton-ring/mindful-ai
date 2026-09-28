@@ -18,7 +18,7 @@ it('initializes the complete application schema with current defaults and constr
     const query = (sql: string) => execFileSync('sqlite3', [db, sql], { encoding: 'utf8' }).trim();
     expect(
       query("SELECT count(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"),
-    ).toBe('19');
+    ).toBe('18');
     expect(query("SELECT group_concat(name) FROM sqlite_master WHERE type='trigger'")).toBe(
       'prevent_cancelled_turn_admission,prevent_overlapping_turn_branches',
     );

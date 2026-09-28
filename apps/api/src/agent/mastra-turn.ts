@@ -1,12 +1,11 @@
 import { Agent } from '@mastra/core/agent';
 import { ToolCallFilter } from '@mastra/core/processors';
 import { createTool } from '@mastra/core/tools';
-import { createWorkspaceTools, type Workspace } from '@mastra/core/workspace';
+import type { Workspace } from '@mastra/core/workspace';
 import type { Memory } from '@mastra/memory';
 import type { Intervention, WaldenUIMessageChunk } from '@walden/contracts';
 import type { McpTools } from '../services/mcp';
 import type { AgentTurnInput } from '../services/types';
-import { type AgentCheckpoints, checkpointTools } from './checkpoints';
 import { buildTurnContext, contextBudgetProcessor } from './context';
 import { stableId, TurnProposals } from './interventions';
 import {
@@ -31,9 +30,32 @@ import { agentUIChunks, newUIStreamState, type UIStreamState } from './ui-stream
 export type AgentRuntime = {
   memory?: { memory: Memory; threadId: string; resourceId: string };
   workspace?: Workspace;
-  checkpoints?: AgentCheckpoints;
   onToolResult?: (name: string, result: unknown) => void;
 };
+
+type ExecutableTool = { execute?: (...args: never[]) => Promise<unknown> };
+
+/** Reports each successful tool result, e.g. so search results become readable URLs. */
+function observeToolResults<T extends Record<string, ExecutableTool>>(
+  tools: T,
+  onResult: (name: string, result: unknown) => void,
+): T {
+  return Object.fromEntries(
+    Object.entries(tools).map(([name, tool]) => [
+      name,
+      tool.execute
+        ? {
+            ...tool,
+            execute: async (...args: never[]) => {
+              const result = await tool.execute!(...args);
+              onResult(name, result);
+              return result;
+            },
+          }
+        : tool,
+    ]),
+  ) as T;
+}
 
 function createPendingContext(input: AgentTurnInput) {
   if (input.pendingIntervention?.kind === 'learning_check')
@@ -213,15 +235,7 @@ export async function* streamMastraTurn({
     tools = { ...tools };
     delete tools.searchWeb;
   }
-  if (runtime.checkpoints) {
-    const workspaceTools = runtime.workspace ? await createWorkspaceTools(runtime.workspace) : {};
-    runtime.workspace?.setToolsConfig({ enabled: false });
-    tools = checkpointTools(
-      { ...tools, ...workspaceTools },
-      runtime.checkpoints,
-      runtime.onToolResult,
-    );
-  }
+  if (runtime.onToolResult) tools = observeToolResults(tools, runtime.onToolResult);
   const proposals = new TurnProposals();
   const agentTools = createMastraTools(input, tools, proposals);
   const { agent, turnContext } = createMastraAgent(input, model, tools, runtime, trace, agentTools);

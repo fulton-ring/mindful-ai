@@ -238,14 +238,6 @@ CREATE TABLE `turn_cancellations` (
 	FOREIGN KEY (`owner_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE TABLE `turn_events` (
-	`seq` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`turn_id` text NOT NULL,
-	`chunk_json` text NOT NULL,
-	FOREIGN KEY (`turn_id`) REFERENCES `turns`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `turn_events_replay` ON `turn_events` (`turn_id`,`seq`);--> statement-breakpoint
 CREATE TABLE `turns` (
 	`id` text PRIMARY KEY,
 	`request_id` text NOT NULL,
@@ -261,7 +253,6 @@ CREATE TABLE `turns` (
 	`user_message_id` text,
 	`model` text,
 	`weight` integer DEFAULT 1 NOT NULL,
-	`execution_epoch` integer DEFAULT 0 NOT NULL,
 	FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`owner_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`branch_id`) REFERENCES `conversation_branches`(`id`) ON UPDATE no action ON DELETE cascade,

@@ -2,8 +2,10 @@ import { ACTIVE_ANNOTATION_KINDS } from '@walden/contracts';
 import { z } from 'zod';
 
 export const annotationKindSchema = z.enum(ACTIVE_ANNOTATION_KINDS);
+// Limits are applied per candidate in `semanticAnnotations`, not here: one
+// over-long quote from the model would otherwise fail the whole batch.
 export const annotationCandidateSchema = z.object({
-  quote: z.string().min(1).max(200),
+  quote: z.string().min(1),
   kind: annotationKindSchema,
   worthHighlighting: z.boolean(),
 });
@@ -11,7 +13,7 @@ export const annotationOutputSchema = z.object({
   // Deciding that nothing is worth highlighting is a correct outcome, and a
   // model expresses it by returning no array at all. Without this default that
   // restraint fails schema validation and surfaces to the reader as an error.
-  annotations: z.array(annotationCandidateSchema).max(12).default([]),
+  annotations: z.array(annotationCandidateSchema).default([]),
 });
 export const noteProposalOutputSchema = z.object({
   shouldPropose: z.boolean(),

@@ -1,10 +1,8 @@
 import type { NoteProposalEvent } from '@walden/contracts';
 import { expect, it } from 'vitest';
-import type { AgentCheckpoints } from '../../../agent/checkpoints';
 import { createAgentService, OPENROUTER_DEFAULT_MODEL } from '../agent';
 
 /** Live smoke tests run outside a Workflow, so each checkpoint just runs inline. */
-const inlineCheckpoints: AgentCheckpoints = { do: (_name, callback) => callback() };
 
 const key = process.env.OPENROUTER_API_KEY;
 const model = process.env.OPENROUTER_TEST_MODEL ?? OPENROUTER_DEFAULT_MODEL;
@@ -17,33 +15,30 @@ it.skipIf(!key)(
       AI_MODEL: model,
       OPENROUTER_API_KEY: key,
     });
-    const stream = await service.streamTurn(
-      {
-        turnId: 'openrouter-smoke-turn',
-        requestId: 'openrouter-smoke-request',
-        conversation: {
-          id: 'openrouter-smoke-conversation',
-          title: 'Test thread',
-          noteId: null,
-          messages: [],
-          expiresAt: new Date(Date.now() + 60_000).toISOString(),
-          learningChecksEnabled: false,
-          branchId: 'openrouter-smoke-branch',
-          branches: [],
-        },
-        note: null,
-        persona: {
-          id: 'mentor',
-          name: 'Mentor',
-          prompt: 'Reply directly and briefly.',
-          tone: 'neutral',
-          brevity: 'brief',
-          challenge: 'gentle',
-        },
-        message: 'Reply with exactly: openrouter is connected',
+    const stream = await service.streamTurn({
+      turnId: 'openrouter-smoke-turn',
+      requestId: 'openrouter-smoke-request',
+      conversation: {
+        id: 'openrouter-smoke-conversation',
+        title: 'Test thread',
+        noteId: null,
+        messages: [],
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        learningChecksEnabled: false,
+        branchId: 'openrouter-smoke-branch',
+        branches: [],
       },
-      inlineCheckpoints,
-    );
+      note: null,
+      persona: {
+        id: 'mentor',
+        name: 'Mentor',
+        prompt: 'Reply directly and briefly.',
+        tone: 'neutral',
+        brevity: 'brief',
+        challenge: 'gentle',
+      },
+      message: 'Reply with exactly: openrouter is connected',
+    });
     let text = '';
     for await (const event of stream) if (event.type === 'text-delta') text += event.delta;
     expect(text.toLowerCase()).toContain('openrouter is connected');

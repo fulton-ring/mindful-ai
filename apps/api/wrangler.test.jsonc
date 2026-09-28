@@ -23,13 +23,10 @@
       "r2_buckets": [{ "binding": "FILES", "bucket_name": "walden-attachments-test" }],
       // Document extraction uses Workers AI toMarkdown, which has no local emulation.
       "ai": { "binding": "AI", "remote": true },
-      "workflows": [
-        {
-          "name": "walden-chat-local-test",
-          "binding": "CHAT_WORKFLOW",
-          "class_name": "ChatWorkflow"
-        }
-      ],
+      "durable_objects": {
+        "bindings": [{ "name": "CHAT_TURN", "class_name": "ChatTurn" }]
+      },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ChatTurn"] }],
       "vars": {
         "UPLOAD_LOCAL_FALLBACK": "true"
       }

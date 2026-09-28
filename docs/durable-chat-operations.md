@@ -1,17 +1,21 @@
 # Durable chat operations
 
-Chat admission returns a turn ID. Cloudflare Workflow generates the answer, and D1 stores ordered events for `/api/chat/turns/:id/events?after=<seq>`. Closing a tab only detaches the observer. Stop records cancellation in D1 and terminates the Workflow. The minute cron retries scheduling admitted turns; the hourly cron still handles conversation retention.
+Chat admission returns a turn ID and starts the turn in its own Durable Object (`ChatTurn`, keyed by turn ID). The object runs the agent detached from any request, keeps the turn's UI message chunks in memory and in its SQLite storage, and streams them to every reader of `/api/chat/turns/:id/events?after=<seq>`, replaying from the cursor and then following live. Closing a tab only detaches that reader. Stop aborts the run; what streamed is kept as an interrupted reply. When the run ends, the object writes the reply to D1 and keeps its chunks for an hour so late readers can finish replaying.
+
+An object is evicted about a minute after its last incoming request, and a model call does not count, so a running turn sets an alarm every 30 seconds to stay alive. A deploy or restart ends the run: the next alarm, reader, or Stop finds the turn stored as running but not running there, and seals it as interrupted with what it had streamed. There is no automatic retry. The minute cron starts admitted turns an object never received and fails turns that never finished admission; the hourly cron still handles conversation retention.
+
+A tab only learns of a turn it did not start (another tab or device) when the conversation opens or the tab regains focus.
 
 ## Local checks
 
-1. Run `pnpm --filter @walden/api db:migrate`, then restart `pnpm dev` so the Worker loads the `CHAT_WORKFLOW` binding.
-   The Vite UI on port 5173 proxies `/api` to port 8787. `dev:test` normally uses port 8788; if a test-config Worker is run on 8787, it must include the Workflow binding too. Wrangler is required locally because it supplies the D1 and Workflow emulators.
+1. Run `pnpm --filter @walden/api db:migrate`, then restart `pnpm dev` so the Worker loads the `CHAT_TURN` binding.
+   The Vite UI on port 5173 proxies `/api` to port 8787. `dev:test` normally uses port 8788; if a test-config Worker is run on 8787, it must include the Durable Object binding too. Wrangler is required locally because it supplies the D1 and Durable Object emulators.
 2. Send a long prompt. Confirm text appears while Stop is available.
 3. Leave the thread, open it in another tab, refresh, and confirm there is one response that continues or finishes.
 4. Stop a turn and check that its D1 `turns.status` is `cancelled`; no completed assistant message may be added afterward.
 5. Simulate a lost event connection and confirm the next `/events` request uses the last received sequence number. The client must not send `/cancel` for a disconnected observer.
 
-Run `pnpm verify`, `pnpm lint`, `pnpm db:check`, and `git diff --check` before release. Wrangler's dry-run build checks the Workflow binding and Worker bundle.
+Run `pnpm verify`, `pnpm lint`, `pnpm db:check`, and `git diff --check` before release. Wrangler's dry-run build checks the Durable Object binding and Worker bundle.
 
 ## Message limit
 
@@ -19,8 +23,8 @@ Each account has an anchored message window. Its first message opens a window of
 
 ## Production rollout
 
-Apply D1 migrations with `pnpm --filter @walden/api db:migrate:remote` before deploying the Worker, and deploy the API and bundled web assets together. `turns`, `turn_events` and `turn_cancellations` hold active turn state; the schema is in `0000_baseline.sql` (see `docs/database.md`).
+Apply D1 migrations with `pnpm --filter @walden/api db:migrate:remote` before deploying the Worker, and deploy the API and bundled web assets together. `turns` and `turn_cancellations` hold turn state in D1; a running turn's chunks live only in its object. The schema is in `apps/api/migrations` (see `docs/database.md`).
 
-After deployment, smoke-test a long answer, tab closure and reattachment, Stop, file reading, note proposals, and search. Compare D1 `turns.status` with Workflow instance status for the same turn ID. PostHog records `chat_turn_started`, `chat_turn_recovered`, and `chat_turn_terminal` with bounded IDs and status only. If admission fails, check the Workflow binding and minute reconciliation logs. If replay fails, inspect `turn_events` sequence and the authenticated events endpoint. Events of finished turns are pruned a day after completion.
+After deployment, smoke-test a long answer, tab closure and reattachment, Stop, file reading, note proposals, and search. PostHog records `chat_turn_started` and `chat_turn_terminal` with bounded IDs and status only. If admission fails, check the Durable Object binding and minute reconciliation logs. If replay fails, check the authenticated events endpoint; a finished turn's chunks are cleared an hour after it ends, after which the endpoint answers 204 and the reply loads from D1.
 
-If rollback is needed, first stop new admissions, let active Workflows finish or cancel them, then restore the previous Worker version. The schema can remain in place. Do not restore a pre-migration D1 snapshot unless the lost conversations and notes are acceptable.
+If rollback is needed, restore the previous Worker version; running turns end as interrupted, as with any deploy. Versions from before the Durable Object engine used a Workflow and a `turn_events` table that the current baseline no longer creates, so they cannot be restored against this schema. Do not restore a pre-migration D1 snapshot unless the lost conversations and notes are acceptable.

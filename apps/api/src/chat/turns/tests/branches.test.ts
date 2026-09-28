@@ -10,8 +10,7 @@ import { sqliteD1Binding } from '../../../agent/memory/tests/d1-test-binding';
 import { HttpError } from '../../../http';
 import { uiMessageSql } from '../../../tests/ui-messages';
 import type { Bindings, Variables } from '../../../types';
-import { readTurnChunks } from '../durable-store';
-import { runChatTurn } from '../workflow-runner';
+import { readTurnStream, turnObjects } from './turn-fixture';
 
 const mocks = vi.hoisted(() => ({ streamTurn: vi.fn() }));
 vi.mock('../../../services/agent/agent', () => ({
@@ -74,20 +73,8 @@ async function requestTurn(db: Bindings['DB'], payload: Record<string, unknown>)
   app.onError((error, c) =>
     error instanceof HttpError ? c.json({ error: error.message }, error.status) : c.json({}, 500),
   );
-  let execution: Promise<unknown> = Promise.resolve();
-  const env = {
-    DB: db,
-    CHAT_WORKFLOW: {
-      create: async ({ id }: { id: string }) => {
-        const step = {
-          do: (_name: string, optionsOrTask: unknown, task?: () => Promise<unknown>) =>
-            (task ?? (optionsOrTask as () => Promise<unknown>))(),
-        };
-        execution = runChatTurn(env as Bindings, id, step as never);
-        return { id };
-      },
-    },
-  } as unknown as Bindings;
+  const objects = turnObjects(() => env);
+  const env = { DB: db, CHAT_TURN: objects.namespace } as unknown as Bindings;
   const response = await app.fetch(
     new Request('https://walden.test/api/chat/turns', {
       method: 'POST',
@@ -99,8 +86,9 @@ async function requestTurn(db: Bindings['DB'], payload: Record<string, unknown>)
   );
   if (!response.ok) throw new Error(await response.text());
   const { turnId } = (await response.json()) as { turnId: string };
-  await execution;
-  return (await readTurnChunks(db, turnId)).map(({ chunk }) => chunk);
+  const { chunks, done } = await readTurnStream(await objects.session(turnId).stream(turnId, 0));
+  expect(done).toBe(true);
+  return chunks;
 }
 
 /** The branch the turn ran on, from its opening `data-turn` chunk. */
@@ -172,7 +160,6 @@ describe('conversation branches: regeneration', () => {
       expect.objectContaining({
         conversation: expect.objectContaining({ branchId, messages: [] }),
       }),
-      expect.objectContaining({ do: expect.any(Function) }),
       expect.any(AbortSignal),
     );
     const branch = await loadConversation(db, 'owner', 'conversation', { branchId });
@@ -320,57 +307,4 @@ describe('conversation branches: failures', () => {
       expect(chunks[0]).toMatchObject({ type: 'start', messageId: partial.id });
     },
   );
-});
-
-describe('durable model preview', () => {
-  beforeEach(() => vi.clearAllMocks());
-  it('streams the preview once, rewinds a retried call, and drops the replayed duplicate', async () => {
-    const db = await fixture();
-    mocks.streamTurn.mockImplementation(
-      async (_input: unknown, checkpoints: import('../../../agent/checkpoints').AgentCheckpoints) =>
-        (async function* () {
-          const preview = checkpoints.preview!;
-          const mark = preview.mark();
-          await preview.write([
-            { type: 'start-step' },
-            { type: 'text-start', id: 'call:t' },
-            { type: 'text-delta', id: 'call:t', delta: 'Half an ans' },
-          ]);
-          // The model call failed and is retried inside its checkpoint.
-          await preview.rewind(mark);
-          await preview.write([{ type: 'start-step' }, ...answer('call:t', 'Whole answer')]);
-          await preview.write([{ type: 'finish-step' }]);
-          // After the checkpoint, the agent replays the same output; it is a duplicate.
-          yield { type: 'start-step' } as const;
-          yield* answer('t', 'Whole answer');
-          yield { type: 'finish-step' } as const;
-        })(),
-    );
-    const chunks = await requestTurn(db, {
-      requestId: 'preview',
-      conversationId: 'conversation',
-      branchId: 'default',
-      noteRevision: null,
-      message: 'Explain.',
-      personaId: 'thinking-partner',
-    });
-    expect(chunks[0]).toMatchObject({ type: 'data-turn', data: { reset: true } });
-    expect(chunks.slice(1).map(({ type }) => type)).toEqual([
-      'start',
-      'data-turn',
-      'data-status',
-      'start-step',
-      'text-start',
-      'text-delta',
-      'text-end',
-      'finish-step',
-      'data-turn',
-      'finish',
-    ]);
-    const reloaded = await loadConversation(db, 'owner', 'conversation', { branchId: 'default' });
-    expect(reloaded.messages.at(-1)?.parts).toEqual([
-      { type: 'step-start' },
-      { type: 'text', text: 'Whole answer', state: 'done' },
-    ]);
-  });
 });

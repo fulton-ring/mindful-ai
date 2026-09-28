@@ -58,6 +58,15 @@ export function isLengthLimitedFinalChunk(chunk: {
   return reason === 'length' && (chunk.type === 'finish' || isContinued === false);
 }
 
+/** The longest quote kept, and the most candidates considered per response window. */
+const MAX_QUOTE_LENGTH = 200;
+const MAX_CANDIDATES = 12;
+
+const isEligible = (candidate: AnnotationCandidate, seen: ReadonlySet<string>) =>
+  candidate.worthHighlighting &&
+  candidate.quote.length <= MAX_QUOTE_LENGTH &&
+  !seen.has(candidate.quote);
+
 export function semanticAnnotations(
   candidates: AnnotationCandidate[],
   sourceText: string,
@@ -68,8 +77,8 @@ export function semanticAnnotations(
   const annotations: Annotation[] = [];
   const sourceLength = sourceText.trim().length;
   let coveredCharacters = 0;
-  for (const candidate of candidates) {
-    if (!candidate.worthHighlighting || seen.has(candidate.quote)) continue;
+  for (const candidate of candidates.slice(0, MAX_CANDIDATES)) {
+    if (!isEligible(candidate, seen)) continue;
     const start = sourceText.indexOf(candidate.quote);
     if (start < 0 || sourceText.indexOf(candidate.quote, start + 1) >= 0) continue;
     const end = start + candidate.quote.length;

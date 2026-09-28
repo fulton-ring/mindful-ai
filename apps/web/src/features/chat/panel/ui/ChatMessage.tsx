@@ -18,6 +18,7 @@ import {
 import { InterventionCard } from '../../../capture/InterventionCard';
 import { AnnotatedText } from '../../../highlights/AnnotatedText';
 import type { ContextualActionId } from '../../../highlights/contextual-actions';
+import { useSmoothText } from '../../../highlights/use-smooth-text';
 import { ContextCheckpoint } from '../../ContextCheckpoint';
 import {
   filePartsOf,
@@ -86,7 +87,8 @@ export function ChatMessage({ message, ...props }: Props) {
 type MessageProps = Omit<Props, 'message'> & { message: WaldenUIMessage };
 
 function AssistantMessage({ message, ...props }: MessageProps) {
-  const text = messageText(message);
+  const streaming = props.isLive && props.sending;
+  const { text, revealing } = useSmoothText(messageText(message), streaming);
   const reasoning = reasoningText(message);
   const learningCheck = learningCheckOf(message);
   const interrupted = isInterrupted(message);
@@ -126,7 +128,7 @@ function AssistantMessage({ message, ...props }: MessageProps) {
           highlights={message.metadata?.highlights}
           onHighlight={!props.isLive && !interrupted ? props.onHighlight : undefined}
           markdown
-          streaming={props.isLive && props.sending}
+          streaming={revealing}
           animatedAnnotationIds={
             props.isLive
               ? new Set((annotations ?? []).map((item) => item.id))

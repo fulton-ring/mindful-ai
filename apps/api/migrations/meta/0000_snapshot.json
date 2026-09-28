@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "45cb924e-2179-4c5f-9d8d-908a69a04ed5",
+  "id": "da2d5635-df1f-4d5c-8827-6291d5139922",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "account_privacy": {
@@ -1749,60 +1749,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "turn_events": {
-      "name": "turn_events",
-      "columns": {
-        "seq": {
-          "name": "seq",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "turn_id": {
-          "name": "turn_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "chunk_json": {
-          "name": "chunk_json",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "turn_events_replay": {
-          "name": "turn_events_replay",
-          "columns": [
-            "turn_id",
-            "seq"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "turn_events_turn_id_turns_id_fk": {
-          "name": "turn_events_turn_id_turns_id_fk",
-          "tableFrom": "turn_events",
-          "tableTo": "turns",
-          "columnsFrom": [
-            "turn_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "turns": {
       "name": "turns",
       "columns": {
@@ -1904,14 +1850,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "1"
-        },
-        "execution_epoch": {
-          "name": "execution_epoch",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
         }
       },
       "indexes": {

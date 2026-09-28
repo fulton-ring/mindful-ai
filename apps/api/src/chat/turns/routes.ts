@@ -17,11 +17,10 @@ import {
   validateAttachmentBytes,
 } from '../attachments/presign';
 import { requireConversation } from '../conversations/repository';
-import { cancelTurn, type DurableTurnRow } from './durable-store';
-import { createTurnEventsResponse } from './event-stream';
 import { messageLimitFrom } from './message-limit';
-import { ensureTurnScheduled } from './scheduling';
 import { type PreparedTurn, prepareTurn } from './turn-lifecycle';
+import { turnObject } from './turn-session';
+import type { TurnRow } from './turn-store';
 export const chatRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 chatRoutes.post('/attachments/:conversationId/initiate', async (c) => {
@@ -115,8 +114,11 @@ chatRoutes.get('/attachments/:conversationId/:attachmentId', async (c) => {
   });
 });
 
+/** Starts an admitted turn in its object; a turn already started there is left as it is. */
+const startTurn = (env: Bindings, turnId: string) => turnObject(env, turnId).start(turnId);
+
 async function findOwnedTurn(db: D1Database, ownerId: string, id: string) {
-  return first<DurableTurnRow>(
+  return first<TurnRow>(
     db
       .prepare(
         'SELECT * FROM turns WHERE owner_id=? AND (id=? OR request_id=?) ORDER BY CASE WHEN id=? THEN 0 ELSE 1 END LIMIT 1',
@@ -125,8 +127,8 @@ async function findOwnedTurn(db: D1Database, ownerId: string, id: string) {
   );
 }
 
-/** What the Workflow needs to run the turn; attachment bytes are reloaded there. */
-function durableInput(
+/** What the turn's object needs to run it; attachment bytes are reloaded there. */
+function turnInput(
   ownerId: string,
   telemetryUserId: string,
   request: ChatRequest,
@@ -155,7 +157,6 @@ function durableInput(
 }
 
 chatRoutes.post('/turns', async (c) => {
-  if (!c.env.CHAT_WORKFLOW) throw new HttpError(503, 'Durable chat is unavailable.');
   const parsed = chatRequestSchema.safeParse(await jsonBody<unknown>(c));
   if (!parsed.success) throw new HttpError(400, 'Invalid chat request', parsed.error.flatten());
   const request = parsed.data;
@@ -165,7 +166,7 @@ chatRoutes.post('/turns', async (c) => {
   if (previous) {
     if (previous.request_json !== requestJson)
       throw new HttpError(409, 'Request ID was already used for a different turn.');
-    await ensureTurnScheduled(c.env, previous);
+    await startTurn(c.env, previous.id);
     return c.json({
       turnId: previous.id,
       userMessageId: previous.user_message_id,
@@ -197,7 +198,7 @@ chatRoutes.post('/turns', async (c) => {
   } catch (error) {
     const concurrent = await findOwnedTurn(c.env.DB, ownerId, request.requestId);
     if (!concurrent || concurrent.request_json !== requestJson) throw error;
-    await ensureTurnScheduled(c.env, concurrent);
+    await startTurn(c.env, concurrent.id);
     return c.json({
       turnId: concurrent.id,
       userMessageId: concurrent.user_message_id,
@@ -209,17 +210,17 @@ chatRoutes.post('/turns', async (c) => {
     return c.json({ turnId: replay.id, userMessageId: replay.user_message_id } satisfies TurnStart);
   }
   const turn = result.turn;
-  const input = durableInput(ownerId, c.get('authSubject'), request, turn);
-  const row = await first<DurableTurnRow>(
+  const input = turnInput(ownerId, c.get('authSubject'), request, turn);
+  const row = await first<TurnRow>(
     c.env.DB.prepare(
       "UPDATE turns SET input_json=?,request_json=?,user_message_id=? WHERE id=? AND owner_id=? AND status='streaming' RETURNING *",
     ).bind(JSON.stringify(input), requestJson, turn.userMessageId, turn.turnId, ownerId),
   );
   if (!row) throw new HttpError(500, 'Turn admission failed.');
   try {
-    await ensureTurnScheduled(c.env, row);
+    await startTurn(c.env, row.id);
   } catch {
-    /* Minute reconciliation retries an admitted turn. */
+    /* Minute reconciliation starts an admitted turn the object never received. */
   }
   return c.json({ turnId: turn.turnId, userMessageId: turn.userMessageId } satisfies TurnStart);
 });
@@ -230,13 +231,13 @@ chatRoutes.get('/turns', async (c) => {
   if (!conversationId || !branchId)
     throw new HttpError(400, 'Conversation and branch are required.');
   await requireConversation(c.env.DB, c.get('userId'), conversationId, branchId);
-  const row = await first<DurableTurnRow>(
+  const row = await first<TurnRow>(
     c.env.DB.prepare(
       "SELECT * FROM turns WHERE conversation_id=? AND owner_id=? AND status='streaming' AND (branch_id=? OR source_branch_id=?) ORDER BY created_at DESC LIMIT 1",
     ).bind(conversationId, c.get('userId'), branchId, branchId),
   );
   if (!row) return c.json({ turn: null });
-  await ensureTurnScheduled(c.env, row).catch(() => undefined);
+  await startTurn(c.env, row.id).catch(() => undefined);
   const request = parseJson<{ regenerateMessageId?: string; editMessageId?: string }>(
     row.request_json,
     {},
@@ -259,7 +260,7 @@ chatRoutes.get('/turns/:id/events', async (c) => {
   if (!row) throw new HttpError(404, 'Turn not found');
   const cursor = Number(c.req.header('Last-Event-ID') ?? c.req.query('after') ?? 0);
   if (!Number.isSafeInteger(cursor) || cursor < 0) throw new HttpError(400, 'Invalid event cursor');
-  return createTurnEventsResponse(c.env.DB, row, cursor);
+  return turnObject(c.env, row.id).stream(row.id, cursor);
 });
 
 chatRoutes.post('/turns/:id/cancel', async (c) => {
@@ -273,8 +274,6 @@ chatRoutes.post('/turns/:id/cancel', async (c) => {
     .run();
   const row = await findOwnedTurn(c.env.DB, ownerId, id);
   if (!row) return c.json({ cancelled: true });
-  const cancelled = await cancelTurn(c.env.DB, row.id, row.owner_id);
-  if (cancelled && c.env.CHAT_WORKFLOW)
-    await (await c.env.CHAT_WORKFLOW.get(row.id)).terminate().catch(() => undefined);
-  return c.json({ cancelled });
+  if (row.status !== 'streaming') return c.json({ cancelled: false });
+  return c.json({ cancelled: await turnObject(c.env, row.id).stop(row.id) });
 });

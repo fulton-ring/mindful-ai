@@ -95,3 +95,16 @@ it('allows a concise answer to be highlighted when the whole statement is substa
     semanticAnnotations([{ quote: text, kind: 'decision', worthHighlighting: true }], text, 'turn'),
   ).toHaveLength(1);
 });
+
+it('drops an over-long quote and keeps the rest, considering at most twelve candidates', () => {
+  const long = `${'Tides rise and fall '.repeat(11)}twice daily.`;
+  const text = `${long} The Moon pulls the ocean. The Sun helps. ${'Filler sentence here. '.repeat(20)}`;
+  const candidate = (quote: string) => ({ quote, kind: 'fact' as const, worthHighlighting: true });
+  expect(
+    semanticAnnotations([candidate(long), candidate('The Moon pulls the ocean.')], text, 'turn'),
+  ).toEqual([expect.objectContaining({ quote: 'The Moon pulls the ocean.' })]);
+  const twelveMisses = Array.from({ length: 12 }, () => candidate('absent'));
+  expect(semanticAnnotations([...twelveMisses, candidate('The Sun helps.')], text, 'turn')).toEqual(
+    [],
+  );
+});

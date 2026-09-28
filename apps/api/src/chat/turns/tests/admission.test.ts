@@ -9,6 +9,7 @@ import { sqliteD1Binding } from '../../../agent/memory/tests/d1-test-binding';
 import { HttpError } from '../../../http';
 import type { Bindings, Variables } from '../../../types';
 import { chatRoutes } from '../routes';
+import { turnObjects } from './turn-fixture';
 
 async function fixture() {
   const file = join(mkdtempSync(join(tmpdir(), 'walden-admission-')), 'db.sqlite');
@@ -29,13 +30,16 @@ async function fixture() {
   await DB.prepare(
     "INSERT INTO conversation_branches (id,conversation_id,owner_id,head_message_id,is_default,created_at) VALUES ('branch','chat','owner',NULL,1,'now')",
   ).run();
+  // Admitted turns are never run here: Stop seals them as the object would a turn it holds.
+  const objects = turnObjects(() => env);
   const env = {
     DB,
-    CHAT_WORKFLOW: {
-      create: async ({ id }: { id: string }) => ({ id }),
-      get: async () => ({
-        status: async () => ({ status: 'running' }),
-        terminate: async () => undefined,
+    CHAT_TURN: {
+      idFromName: (name: string) => name,
+      get: (turnId: string) => ({
+        start: async () => undefined,
+        stop: (id: string) => objects.session(turnId).stop(id),
+        stream: (id: string, after: number) => objects.session(turnId).stream(id, after),
       }),
     },
   } as unknown as Bindings;

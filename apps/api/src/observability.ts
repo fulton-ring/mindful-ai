@@ -163,7 +163,7 @@ export type ApiTelemetry = {
 /** Bounded lifecycle data for turns that outlive the browser connection. */
 export async function captureTurnLifecycle(
   env: TelemetryEnv,
-  event: 'chat_turn_started' | 'chat_turn_recovered' | 'chat_turn_terminal',
+  event: 'chat_turn_started' | 'chat_turn_terminal',
   details: {
     userId: string;
     conversationId: string;

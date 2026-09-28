@@ -47,23 +47,38 @@ function switchConversation(args: TurnArgs) {
   chat.setMessages(props.conversation?.messages ?? []);
 }
 
-/** Follows a turn still running on the server for the open thread and branch. */
+/**
+ * Follows a turn still running on the server for the open thread and branch: on
+ * open, and whenever the tab comes back into view, since a turn started in
+ * another tab is not pushed to this one.
+ */
 function useResumeEffect(args: TurnArgs) {
   const conversationId = args.props.conversation?.id;
   const branchId = args.props.conversation?.branchId;
   useEffect(() => {
     if (!conversationId || !branchId) return;
     let cancelled = false;
-    void api
-      .activeTurn(conversationId, branchId)
-      .then(({ turn }) => {
-        if (!turn || cancelled || args.runtime.live.current) return;
-        adoptResumedTurn(args, turn);
-        void args.chat.resumeStream({ body: { turnId: turn.id } });
-      })
-      .catch(() => undefined);
+    const resume = () => {
+      if (args.runtime.live.current) return;
+      void api
+        .activeTurn(conversationId, branchId)
+        .then(({ turn }) => {
+          if (!turn || cancelled || args.runtime.live.current) return;
+          adoptResumedTurn(args, turn);
+          void args.chat.resumeStream({ body: { turnId: turn.id } });
+        })
+        .catch(() => undefined);
+    };
+    const resumeWhenVisible = () => {
+      if (document.visibilityState === 'visible') resume();
+    };
+    resume();
+    document.addEventListener('visibilitychange', resumeWhenVisible);
+    window.addEventListener('focus', resume);
     return () => {
       cancelled = true;
+      document.removeEventListener('visibilitychange', resumeWhenVisible);
+      window.removeEventListener('focus', resume);
     };
   }, [conversationId, branchId]);
 }

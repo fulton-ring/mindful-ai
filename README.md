@@ -63,7 +63,7 @@ The Worker, frontend assets, D1 schema, AI binding, and cleanup schedule are dep
 
 Chat requires **Workers Paid**. Workers Free can terminate Mastra chat and annotation requests for exceeding CPU time, leaving an interrupted response. On 2026-09-20 this was reproduced in production; a request was killed at about 2 seconds of CPU. Local Wrangler does not reproduce that production limit. Upgrade the account's Workers plan before treating signed-in chat as ready for use.
 
-Chat turns run in a Cloudflare Workflow, not the request that started them. A dropped connection only detaches the client; it reattaches through the turn's event stream, and Stop cancels the turn durably. The workflow gives each turn a 15-minute execution budget. This is recovery from failure, not a substitute for sufficient runtime capacity.
+Each chat turn runs in its own Durable Object, not in the request that started it. A dropped connection only detaches the client; it reattaches through the turn's event stream, and Stop cancels the turn. A turn has a 15-minute budget. A deploy or restart mid-turn ends the reply as interrupted, keeping what streamed, with Try again.
 
 ## Local-first evaluation
 

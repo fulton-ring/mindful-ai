@@ -1,17 +1,9 @@
 import type { Intervention, WaldenUIMessage, WaldenUIMessageChunk } from '@walden/contracts';
 import { describe, expect, it } from 'vitest';
 import { buildUIMessage } from '../../messages';
-import {
-  appendTurnChunks,
-  beginTurnExecution,
-  cancelTurn,
-  completeTurn,
-  readTurnChunks,
-  restartTurnChunks,
-} from '../durable-store';
+import { completeTurn, finishTurn, loadTurn, type TurnRow } from '../turn-store';
 import { turnFixture } from './turn-fixture';
 
-const TURN = { id: 'turn', conversation_id: 'conversation', branch_id: 'branch' };
 const text = (id: string, value: string): WaldenUIMessageChunk[] => [
   { type: 'text-start', id },
   { type: 'text-delta', id, delta: value },
@@ -50,8 +42,9 @@ const reply: WaldenUIMessageChunk[] = [
   { type: 'data-intervention', id: check.id, data: check },
 ];
 
-const stored = async (db: D1Database) =>
-  (await readTurnChunks(db, 'turn')).map(({ chunk }) => chunk);
+const turnRow = async (db: D1Database) => (await loadTurn(db, 'turn')) as TurnRow;
+const stop = async (db: D1Database, chunks: WaldenUIMessageChunk[] = []) =>
+  finishTurn(db, await turnRow(db), chunks, 'cancelled', 'Turn cancelled', 'cancelled');
 const assistantRow = async (db: D1Database) => {
   const row = await db
     .prepare("SELECT ui_message FROM messages WHERE role='assistant'")
@@ -86,53 +79,13 @@ describe('stored chunks replay into the persisted message', () => {
   });
 });
 
-describe('durable turn progress', () => {
-  it('starts each execution epoch from a reset and rejects writes from an obsolete one', async () => {
-    const db = await turnFixture();
-    const firstEpoch = (await beginTurnExecution(db, TURN))!;
-    expect(firstEpoch).toBe(1);
-    await appendTurnChunks(db, 'turn', firstEpoch, text('a', 'first'));
-    expect(await stored(db)).toEqual(text('a', 'first'));
-
-    const secondEpoch = (await beginTurnExecution(db, TURN))!;
-    expect(secondEpoch).toBe(2);
-    await appendTurnChunks(db, 'turn', firstEpoch, text('a', 'stale'));
-    await appendTurnChunks(db, 'turn', secondEpoch, text('b', 'second'));
-
-    expect(await stored(db)).toEqual([
-      {
-        type: 'data-turn',
-        transient: true,
-        data: { conversationId: 'conversation', branchId: 'branch', reset: true },
-      },
-      ...text('b', 'second'),
-    ]);
-  });
-
-  it('rewinds a retried model call to the chunks written before it', async () => {
-    const db = await turnFixture();
-    const epoch = (await beginTurnExecution(db, TURN))!;
-    await appendTurnChunks(db, 'turn', epoch, [{ type: 'start', messageId: 'turn' }]);
-    await appendTurnChunks(db, 'turn', epoch, [
-      { type: 'text-start', id: 'x' },
-      { type: 'text-delta', id: 'x', delta: 'half' },
-    ]);
-    await restartTurnChunks(db, TURN, epoch, [{ type: 'start', messageId: 'turn' }]);
-    await appendTurnChunks(db, 'turn', epoch, text('y', 'whole'));
-    const chunks = await stored(db);
-    expect(chunks.slice(1)).toEqual([{ type: 'start', messageId: 'turn' }, ...text('y', 'whole')]);
-    expect(chunks[0]).toMatchObject({ type: 'data-turn', data: { reset: true } });
-  });
-});
-
-describe('durable completion', () => {
+describe('turn completion', () => {
   it('commits the streamed reply once, with its intervention, and ignores a late Stop', async () => {
     const db = await turnFixture();
-    const epoch = (await beginTurnExecution(db, TURN))!;
-    await appendTurnChunks(db, 'turn', epoch, reply);
-    expect(await completeTurn(db, 'turn', epoch)).toBe(true);
-    expect(await completeTurn(db, 'turn', epoch)).toBe(false);
-    await cancelTurn(db, 'turn', 'owner');
+    const row = await turnRow(db);
+    const end = await completeTurn(db, row, reply);
+    expect(await completeTurn(db, row, reply)).toBeNull();
+    expect(await stop(db)).toBeNull();
     expect(await db.prepare('SELECT status,input_json FROM turns').first()).toEqual({
       status: 'completed',
       input_json: null,
@@ -160,7 +113,7 @@ describe('durable completion', () => {
     expect(await db.prepare('SELECT head_message_id FROM conversation_branches').first()).toEqual({
       head_message_id: 'turn',
     });
-    expect((await stored(db)).slice(-2)).toEqual([
+    expect(end).toEqual([
       {
         type: 'data-turn',
         transient: true,
@@ -178,33 +131,31 @@ describe('durable completion', () => {
 
   it('drops the text of a reply that was only a quiz once it became a learning check', async () => {
     const db = await turnFixture();
-    const epoch = (await beginTurnExecution(db, TURN))!;
     const question = 'Which way does ice move in water?\nA) It floats\nB) It sinks';
     const { standaloneLearningCheck } = await import('../../../agent/learning-checks');
     const quiz = standaloneLearningCheck(question, 'turn')!;
-    await appendTurnChunks(db, 'turn', epoch, [
+    const chunks: WaldenUIMessageChunk[] = [
       { type: 'start', messageId: 'turn', messageMetadata: { createdAt: 't0' } },
       ...text('t', question),
       { type: 'data-intervention', id: quiz.id, data: quiz },
-    ]);
-    expect(await completeTurn(db, 'turn', epoch)).toBe(true);
+    ];
+    expect(await completeTurn(db, await turnRow(db), chunks)).not.toBeNull();
     expect((await assistantRow(db))?.parts.map(({ type }) => type)).toEqual(['data-intervention']);
   });
 });
 
-describe('durable Stop', () => {
-  it('keeps partial parts as an interrupted reply and blocks an obsolete executor', async () => {
+describe('turn Stop', () => {
+  it('keeps partial parts as an interrupted reply and blocks a later completion', async () => {
     const db = await turnFixture();
-    const epoch = (await beginTurnExecution(db, TURN))!;
-    await appendTurnChunks(db, 'turn', epoch, [
+    const row = await turnRow(db);
+    const partial: WaldenUIMessageChunk[] = [
       { type: 'start', messageId: 'turn', messageMetadata: { createdAt: 't0' } },
       { type: 'text-start', id: 't' },
       { type: 'text-delta', id: 't', delta: 'Partial' },
       { type: 'tool-input-available', toolCallId: 'call', toolName: 'readWebPage', input: {} },
-    ]);
-    expect(await cancelTurn(db, 'turn', 'owner')).toBe(true);
-    await appendTurnChunks(db, 'turn', epoch, text('late', 'Too late'));
-    expect(await completeTurn(db, 'turn', epoch)).toBe(false);
+    ];
+    const end = await stop(db, partial);
+    expect(await completeTurn(db, row, [...partial, ...text('late', 'Too late')])).toBeNull();
     expect(await db.prepare('SELECT status FROM turns').first()).toEqual({ status: 'cancelled' });
     expect(await assistantRow(db)).toEqual({
       id: 'turn',
@@ -221,7 +172,7 @@ describe('durable Stop', () => {
         },
       ],
     });
-    expect((await stored(db)).slice(-4)).toEqual([
+    expect(end).toEqual([
       {
         type: 'data-turn',
         transient: true,
@@ -240,8 +191,7 @@ describe('durable Stop', () => {
 
   it('opens a failed turn that never streamed with a start chunk', async () => {
     const db = await turnFixture();
-    await cancelTurn(db, 'turn', 'owner');
-    const chunks = await stored(db);
+    const chunks = (await stop(db))!;
     expect(chunks[0]).toMatchObject({ type: 'start', messageId: 'turn' });
     expect(chunks.at(-1)?.type).toBe('finish');
     expect((await assistantRow(db))?.parts).toEqual([]);

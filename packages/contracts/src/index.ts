@@ -202,8 +202,6 @@ export type WaldenDataParts = {
     title?: string;
     expiresAt?: string;
     failureCode?: ChatFailureCode;
-    /** The turn restarted: discard the partial assistant message and replay the turn from seq 0. */
-    reset?: boolean;
   };
 };
 export const dataPartSchemas = {
@@ -219,12 +217,11 @@ export const dataPartSchemas = {
     title: z.string().optional(),
     expiresAt: z.string().optional(),
     failureCode: z.string().optional(),
-    reset: z.boolean().optional(),
   }),
 } satisfies { [K in keyof WaldenDataParts]: z.ZodType<unknown> };
 /** The stored, streamed, and rendered message: AI SDK UIMessage with Walden metadata and data parts. */
 export type WaldenUIMessage = UIMessage<WaldenMessageMetadata, WaldenDataParts>;
-/** One chunk of a turn's UI message stream, as stored and served by the turn events endpoint. */
+/** One chunk of a turn's UI message stream, as served by the turn events endpoint. */
 export type WaldenUIMessageChunk = InferUIMessageChunk<WaldenUIMessage>;
 /** Attachment files are `file` parts whose `url` is this path, served to the owner only. */
 export const attachmentUrl = (conversationId: string, attachmentId: string) =>

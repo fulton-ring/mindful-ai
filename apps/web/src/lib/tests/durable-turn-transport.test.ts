@@ -151,18 +151,6 @@ describe('durable turn streaming', () => {
     expect(await read(await send(transport()))).toHaveLength(1);
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
-
-  it('stops at a reset marker instead of continuing after the discarded attempt', async () => {
-    const reset = { type: 'data-turn', transient: true, data: { ...context, reset: true } };
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(Response.json({ turnId: 'turn-1' }))
-      .mockResolvedValueOnce(new Response(`${text(1, 'Old')}${frame(2, reset)}`));
-    vi.stubGlobal('fetch', fetchMock);
-    const chunks = await read(await send(transport()));
-    expect(chunks.at(-1)).toEqual(reset);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-  });
 });
 
 describe('durable turn failures and auth', () => {

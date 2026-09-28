@@ -124,13 +124,15 @@ it('preserves a valid empty classification for the JSON compatibility path', asy
       kind: 'fact',
       worthHighlighting: true,
     }));
-  // The cap scales with reply length now, but must still be bounded.
-  expect(options.structuredOutput.schema.safeParse({ annotations: candidates(12) }).success).toBe(
-    true,
-  );
-  expect(options.structuredOutput.schema.safeParse({ annotations: candidates(13) }).success).toBe(
-    false,
-  );
+  // Limits are applied per candidate afterwards: an extra or over-long candidate
+  // must not fail validation of the whole batch.
+  const schema = options.structuredOutput.schema;
+  expect(schema.safeParse({ annotations: candidates(13) }).success).toBe(true);
+  expect(
+    schema.safeParse({
+      annotations: [{ quote: 'x'.repeat(250), kind: 'fact', worthHighlighting: true }],
+    }).success,
+  ).toBe(true);
 });
 
 it('surfaces structured-output failure as an error event and compatibility error', async () => {

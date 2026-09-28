@@ -1,2 +1,2 @@
-export { ChatWorkflow } from './chat/turns/workflow';
+export { ChatTurn } from './chat/turns/turn-object';
 export { default } from './index';
