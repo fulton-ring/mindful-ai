@@ -10,6 +10,13 @@ it('renders inline equations in assistant markdown', () => {
   expect(container.querySelectorAll('.katex')).toHaveLength(2);
 });
 
+it('keeps dollar amounts as text instead of typesetting the span between them', () => {
+  const text = "To clear $10K ACV you'd need hundreds of them; Teams closed at $200/month.";
+  const { container } = render(<AnnotatedText text={text} markdown onAction={() => {}} />);
+  expect(container.querySelector('.katex')).toBeNull();
+  expect(container.textContent).toBe(text);
+});
+
 vi.mock('../../../components/ui/tooltip', async () => {
   const React = await import('react');
   const ReactDOM = await import('react-dom');
