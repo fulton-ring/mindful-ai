@@ -177,3 +177,18 @@ it('lists a response’s source-url parts once each', () => {
   );
   expect(view.getByRole('button', { name: '1 source' })).toBeTruthy();
 });
+
+it('labels workspace tools plainly, including replies saved under the framework prefix', () => {
+  const view = render(
+    <ResponseActivity
+      live
+      parts={[
+        tool('call-1', 'searchFiles', 'output-available'),
+        tool('call-2', 'mastra_workspace_read_file', 'output-available'),
+      ]}
+    />,
+  );
+  expect(view.getByText('Search files')).toBeTruthy();
+  expect(view.getByText('Read file')).toBeTruthy();
+  expect(view.queryByText(/mastra/i)).toBeNull();
+});

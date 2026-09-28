@@ -20,10 +20,13 @@ function toolLabel(name: string) {
   if (name === 'readWebPage') return 'Read page';
   if (name === 'searchSources') return 'Search sources';
   if (name === 'searchWeb') return 'Search web';
+  // Replies saved before workspace tools were renamed still carry the framework prefix.
   const words = name
+    .replace(/^mastra_workspace_/, '')
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/[_-]+/g, ' ')
-    .trim();
+    .trim()
+    .toLowerCase();
   return words ? words[0]!.toUpperCase() + words.slice(1) : 'Tool';
 }
 

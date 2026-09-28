@@ -1,5 +1,7 @@
-import { createWorkspaceTools, Workspace } from '@mastra/core/workspace';
+import { createWorkspaceTools } from '@mastra/core/workspace';
 import { expect, it } from 'vitest';
+import { createTurnWorkspace } from '../../services/agent/agent-stream';
+import type { AgentTurnInput } from '../../services/types';
 import { R2WorkspaceFilesystem } from '../r2-workspace';
 
 const id = '00112233-4455-6677-8899-aabbccddeeff';
@@ -44,12 +46,18 @@ const bucket = {
   },
 };
 
-it('lets Mastra list and grep extension-aware R2 files and converted sidecars', async () => {
+it('lists and searches extension-aware R2 files and converted sidecars under plain tool names', async () => {
   const filesystem = new R2WorkspaceFilesystem(bucket as never, 'owner', 'thread');
-  const tools = await createWorkspaceTools(new Workspace({ filesystem }));
-  const grep = tools.mastra_workspace_grep as { execute: (args: unknown) => Promise<string> };
-  const list = tools.mastra_workspace_list_files as { execute: (args: unknown) => Promise<string> };
-  const stat = tools.mastra_workspace_file_stat as { execute: (args: unknown) => Promise<string> };
+  const workspace = createTurnWorkspace({ FILES: bucket as never }, {
+    ownerId: 'owner',
+    conversation: { id: 'thread' },
+  } as AgentTurnInput)!;
+  const tools = await createWorkspaceTools(workspace);
+  expect(Object.keys(tools).filter((name) => name.includes('mastra'))).toEqual([]);
+  type Tool = { execute: (args: unknown) => Promise<string> };
+  const grep = tools.searchFiles as Tool;
+  const list = tools.listFiles as Tool;
+  const stat = tools.fileInfo as Tool;
   const original = `/attachments/${id}.md`;
   const sidecar = `/attachments/${id}.pdf.md`;
   expect(await list.execute({ path: '/' })).toContain('attachments');

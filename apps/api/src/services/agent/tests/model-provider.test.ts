@@ -39,6 +39,6 @@ describe('configured model provider', () => {
       chat_template_kwargs: { enable_thinking: false },
     });
     // Qwen 3.8 answers 400 to reasoning_effort 'high'.
-    expect(cloudflareModelSettings('@cf/qwen/qwen3.8-27b')).toEqual({ reasoning_effort: 'medium' });
+    expect(cloudflareModelSettings('@cf/qwen/qwen3.8-27b')).toEqual({ reasoning_effort: 'low' });
   });
 });

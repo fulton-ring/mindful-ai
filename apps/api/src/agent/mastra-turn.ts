@@ -181,7 +181,6 @@ function responseOptions(
     stopWhen: () => proposals.drain().intervention?.kind === 'learning_check',
     maxSteps: 16,
     toolCallConcurrency: 1,
-    modelSettings: { maxOutputTokens: 4_096 },
   };
 }
 

@@ -1,4 +1,4 @@
-import { Workspace } from '@mastra/core/workspace';
+import { WORKSPACE_TOOLS, Workspace } from '@mastra/core/workspace';
 import { uiMessageText, type WaldenUIMessageChunk } from '@walden/contracts';
 import { createDocumentTools } from '../../agent/document-tool';
 import { streamMastraTurn } from '../../agent/mastra-turn';
@@ -96,10 +96,30 @@ async function* prepareTurnMemory(
   return next.value;
 }
 
+const FILES = WORKSPACE_TOOLS.FILESYSTEM;
+/**
+ * Workspace tools are named after the framework (`mastra_workspace_read_file`);
+ * these plain names match the other tools and are what the reader sees.
+ */
+const WORKSPACE_TOOL_NAMES = {
+  [FILES.READ_FILE]: 'readFile',
+  [FILES.WRITE_FILE]: 'writeFile',
+  [FILES.EDIT_FILE]: 'editFile',
+  [FILES.LIST_FILES]: 'listFiles',
+  [FILES.DELETE]: 'deleteFile',
+  [FILES.FILE_STAT]: 'fileInfo',
+  [FILES.MKDIR]: 'makeFolder',
+  [FILES.GREP]: 'searchFiles',
+  [FILES.AST_EDIT]: 'editCode',
+};
+
 export function createTurnWorkspace(env: ServiceEnv, input: AgentTurnInput): Workspace | undefined {
   if (!input.ownerId || !env.FILES) return undefined;
   return new Workspace({
     filesystem: new R2WorkspaceFilesystem(env.FILES, input.ownerId, input.conversation.id),
+    tools: Object.fromEntries(
+      Object.entries(WORKSPACE_TOOL_NAMES).map(([tool, name]) => [tool, { name }]),
+    ),
   });
 }
 
