@@ -23,8 +23,6 @@ type ChunkOf<T extends Chunk['type']> = Extract<Chunk, { type: T }>;
 type Source = { sourceId: string; url: string; title?: string };
 type OnRecoveredCall = (call: RecoveredFrontendToolCall) => void;
 
-export const SEARCH_FAILURE =
-  'Web search failed. Please retry; this does not mean no matching reports exist.';
 const MAX_TOOLS = 20;
 const MAX_SOURCES = 20;
 const FRONTEND_TOOLS = new Set(['proposeAsk', 'proposeLearningCheck']);
@@ -122,9 +120,12 @@ function toolCallChunks(chunk: ChunkOf<'tool-input-available'>, state: UIStreamS
   ];
 }
 
+/**
+ * A failed tool is shown as failed and never ends the reply: the model receives
+ * the tool's error (which says a failed search is not an empty one) and carries on.
+ */
 function* toolErrorChunks(toolCallId: string, name: string): Generator<Chunk> {
   yield { type: 'tool-output-error', toolCallId, errorText: TOOL_ERROR[name] ?? 'Tool failed' };
-  if (name === 'searchWeb') throw new Error(SEARCH_FAILURE);
 }
 
 function* toolResultChunks(

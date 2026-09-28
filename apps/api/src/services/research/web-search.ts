@@ -107,7 +107,12 @@ async function executeWebSearch(
   signal.throwIfAborted();
   rejectPrivateQuery(query);
   if (++state.calls > 2) throw new Error('Web search limit reached for this turn.');
-  const response = await requestWebSearch(apiKey, signal, query);
+  let response = await requestWebSearch(apiKey, signal, query);
+  // The search provider behind OpenRouter fails transiently (upstream 502s).
+  if (response.status >= 500) {
+    await response.body?.cancel();
+    response = await requestWebSearch(apiKey, signal, query);
+  }
   if (!response.ok) {
     await response.body?.cancel();
     throw new Error('Web search is unavailable. Do not interpret this as no matching reports.');

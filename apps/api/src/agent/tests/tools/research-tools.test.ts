@@ -133,35 +133,35 @@ it('allows fifteen sequential tool calls followed by a final answer', async () =
 });
 
 describe('research tools in a Mastra turn', () => {
-  it('stops a failed web lookup before the model can turn it into an unsupported answer', async () => {
+  it('shows a failed web lookup as failed and lets the model answer with its error', async () => {
     const events: WaldenUIMessageChunk[] = [];
     const calls: LanguageModelV3CallOptions[] = [];
-    const run = async () => {
-      for await (const event of streamMastraTurn({
-        input: { ...turnInput(), message: 'Explain the huggingface attack to me' },
-        model: researchModel(calls, true),
-        signal: new AbortController().signal,
-        tools: {
-          searchWeb: createTool({
-            id: 'search_web',
-            description: 'Search',
-            inputSchema: z.object({ query: z.string() }),
-            execute: async () => {
-              throw new Error('Provider unavailable');
-            },
-          }),
-        },
-      }))
-        events.push(event);
-    };
-    await expect(run()).rejects.toThrow('Web search failed');
-    expect(calls[0]?.toolChoice).not.toEqual({ type: 'tool', toolName: 'searchWeb' });
-    expect(events.some((event) => event.type === 'text-delta')).toBe(false);
+    for await (const event of streamMastraTurn({
+      input: { ...turnInput(), message: 'Explain the huggingface attack to me' },
+      model: researchModel(calls, true),
+      signal: new AbortController().signal,
+      tools: {
+        searchWeb: createTool({
+          id: 'search_web',
+          description: 'Search',
+          inputSchema: z.object({ query: z.string() }),
+          execute: async () => {
+            throw new Error(
+              'Web search is unavailable. Do not interpret this as no matching reports.',
+            );
+          },
+        }),
+      },
+    }))
+      events.push(event);
     expect(events).toContainEqual({
       type: 'tool-output-error',
       toolCallId: expect.any(String),
       errorText: 'Web search failed',
     });
+    // The reply goes on, and the model sees why the search came back empty.
+    expect(events.some((event) => event.type === 'text-delta')).toBe(true);
+    expect(JSON.stringify(calls[1]?.prompt)).toContain('Web search is unavailable');
   });
   it('keeps the source usable but exposes failed search indexing', async () => {
     const controller = new AbortController();

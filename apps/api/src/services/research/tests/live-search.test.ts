@@ -2,8 +2,6 @@ import { DEFAULT_PERSONAS, type WaldenUIMessageChunk } from '@walden/contracts';
 import { expect, it } from 'vitest';
 import { createAgentService, DEFAULT_AI_MODEL } from '../../agent/agent';
 
-/** Live smoke tests run outside a Workflow, so each checkpoint just runs inline. */
-
 const { CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, OPENROUTER_API_KEY } = process.env;
 
 it.skipIf(!CLOUDFLARE_API_TOKEN || !CLOUDFLARE_ACCOUNT_ID || !OPENROUTER_API_KEY)(

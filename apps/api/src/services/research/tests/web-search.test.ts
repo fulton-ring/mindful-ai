@@ -64,3 +64,16 @@ it('caps search calls per turn and honors cancellation', async () => {
 it('does not advertise search without credentials', () => {
   expect(createWebSearchTools({}, new AbortController().signal)).toEqual({});
 });
+it('retries once when the search provider fails upstream, and reports a second failure', async () => {
+  const { search, fetcher } = fixture([citation('https://openai.com/report')]);
+  const upstream = () =>
+    Response.json({ error: { message: 'upstream returned 502' } }, { status: 502 });
+  fetcher.mockImplementationOnce(upstream);
+  expect(await search.execute({ query: 'public topic' })).toMatchObject({
+    results: [{ url: 'https://openai.com/report' }],
+  });
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  fetcher.mockImplementationOnce(upstream).mockImplementationOnce(upstream);
+  await expect(search.execute({ query: 'another topic' })).rejects.toThrow('unavailable');
+  expect(fetcher).toHaveBeenCalledTimes(4);
+});
