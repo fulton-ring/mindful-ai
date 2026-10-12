@@ -335,6 +335,9 @@ function dismissCurrentProposal(refs: EditorRefs, update: ViewUpdate) {
 }
 
 function handleEditorUpdate(update: ViewUpdate, refs: EditorRefs) {
+  // The caret is only kept for the re-render that answers an edit; once the user moves it, the
+  // editor's own selection is the one to keep.
+  if (update.selectionSet && !update.docChanged) refs.caret.current = null;
   if (!update.docChanged || update.transactions.some(hasExternalChange)) return;
   const projection = refs.projection.current;
   const projectionChanges = refs.projectionChanges.current;
@@ -384,12 +387,12 @@ export function syncEditorDocument(
   projected: PendingProjection,
 ) {
   const current = view.state.doc.toString();
+  const caret = refs.caret.current;
+  refs.caret.current = null;
   if (current === projected.text) {
     refs.spans.current = note.provenance;
     return;
   }
-  const caret = refs.caret.current;
-  refs.caret.current = null;
   view.dispatch({
     changes: minimalEdit(current, projected.text),
     ...(caret === null
