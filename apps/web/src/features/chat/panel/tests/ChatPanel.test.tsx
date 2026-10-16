@@ -139,7 +139,7 @@ describe('streamed response activity', () => {
     expect(screen.queryByText('Running')).toBeNull();
     const assistant = document.querySelector('article.message.assistant');
     const activity = assistant?.querySelector('[aria-label="Response activity"]');
-    const responseText = screen.getByText('The page says hello.');
+    const responseText = await screen.findByText('The page says hello.');
     const sources = assistant?.querySelector('[aria-label="Response sources"]');
     expect(activity?.compareDocumentPosition(responseText)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(responseText.compareDocumentPosition(sources as Node)).toBe(
