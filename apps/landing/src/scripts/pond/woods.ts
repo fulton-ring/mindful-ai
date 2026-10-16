@@ -11,12 +11,18 @@ import { type Brush, type Point3, upright } from './brush';
 import { ease } from './landmarks';
 import { dotTexture, type Palette } from './palette';
 import { PLACES, POND, STOPS } from './path';
+import type { createSprouts } from './sprouts';
 
 // The woods the pond hides in: a wall of trees around the far shore, more along
 // both sides of the walk, and the small things underfoot. Nothing grows on the
 // path or between the camera and what it stops to look at.
 
-type Woods = { brush: Brush; palette: Palette; scene: Object3D };
+type Woods = {
+  brush: Brush;
+  palette: Palette;
+  scene: Object3D;
+  sprouts: ReturnType<typeof createSprouts>;
+};
 
 const segmentDistance = (x: number, z: number, a: Point3, b: Point3) => {
   const [dx, dz] = [b[0] - a[0], b[2] - a[2]];
@@ -189,6 +195,7 @@ function plantTree(woods: Woods, x: number, z: number, scale: number) {
   scene.add(group);
   const kind = KINDS[Math.floor(brush.random() * KINDS.length)];
   kind(woods, group, 4.2 + brush.random() * 1.4);
+  woods.sprouts.add(group);
 }
 
 /** Tries random spots from `spot` until `count` trees stand. */
@@ -261,24 +268,27 @@ function undergrowth(woods: Woods, walk: Vector3[]) {
     const z = 26 - brush.random() * 80;
     if (!isClear(x, z, walk, -1.2)) continue;
     if (brush.random() < 0.85) {
+      const tuft = new Group();
+      tuft.position.set(x, 0, z);
+      woods.scene.add(tuft);
       const lean = brush.wander(0.4);
       for (const spread of [-0.25, 0, 0.25])
         brush.stroke(
           [
-            [x, 0, z],
-            [x + spread * 1.6 + lean, 0.45 + brush.random() * 0.35, z],
+            [0, 0, 0],
+            [spread * 1.6 + lean, 0.45 + brush.random() * 0.35, 0],
           ],
           0.018,
-          {
-            jitter: 0.03,
-          },
+          { jitter: 0.03, parent: tuft },
         );
+      woods.sprouts.add(tuft);
     } else {
       const rock = new Group();
       rock.position.set(x, 0.25, z);
       woods.scene.add(rock);
       brush.stroke(upright(brush.loop(0.5, 0.28, 9, 0.2)), 0.03, { closed: true, parent: rock });
       shade(woods, rock, brush.loop(0.48, 0.26, 9, 0.1));
+      woods.sprouts.add(rock);
     }
   }
 }
@@ -331,11 +341,22 @@ function fireflies(woods: Woods) {
   };
 }
 
-export function buildWoods(scene: Object3D, brush: Brush, palette: Palette, walk: Vector3[]) {
-  const woods = { brush, palette, scene };
+export function buildWoods(
+  scene: Object3D,
+  brush: Brush,
+  palette: Palette,
+  walk: Vector3[],
+  sprouts: ReturnType<typeof createSprouts>,
+) {
+  const woods = { brush, palette, scene, sprouts };
   forest(woods, walk);
   undergrowth(woods, walk);
   lilies(woods);
   const flies = fireflies(woods);
-  return { update: flies };
+  return {
+    update(t: number, time: number) {
+      sprouts.update(t);
+      flies(t, time);
+    },
+  };
 }

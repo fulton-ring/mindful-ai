@@ -13,6 +13,7 @@ import { type Brush, flat, type Point3, upright } from './brush';
 import { ease } from './landmarks';
 import { dotTexture, type Palette } from './palette';
 import { POND, type walkCurves } from './path';
+import { createSprouts } from './sprouts';
 import { buildWoods, isClear } from './woods';
 
 // Everything around the stops: the pond, the far hills, a sun that sets, the
@@ -147,7 +148,7 @@ export function buildLandscape(scene: Object3D, brush: Brush, palette: Palette, 
   horizon(brush);
   const setting = sun(scene, brush, palette);
   pond(scene, brush, palette);
-  const woods = buildWoods(scene, brush, palette, walk);
+  const woods = buildWoods(scene, brush, palette, walk, createSprouts(palette, curves.eye));
   footpath(brush, walk);
   const night = stars(scene, palette);
   return {
