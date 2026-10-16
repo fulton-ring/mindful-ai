@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { WaldenUIMessageChunk } from '@walden/contracts';
 import type { Bindings } from '../../types';
-import { TurnSession, type TurnState, type TurnStorage } from './turn-session';
+import type { TurnSession, TurnState, TurnStorage } from './turn-session';
 
 function objectStorage(storage: DurableObjectStorage): TurnStorage {
   storage.sql.exec(
@@ -29,28 +29,32 @@ function objectStorage(storage: DurableObjectStorage): TurnStorage {
 
 /** One chat turn: runs it, buffers its chunks, and streams them to every reader. */
 export class ChatTurn extends DurableObject<Bindings> {
-  private readonly session: TurnSession;
+  private readonly session: Promise<TurnSession>;
 
   constructor(ctx: DurableObjectState, env: Bindings) {
     super(ctx, env);
-    this.session = new TurnSession(env, objectStorage(ctx.storage), (task) => {
-      void task.catch(() => undefined);
-    });
+    // Importing this class at startup must not initialize the agent runtime.
+    this.session = import('./turn-session').then(
+      ({ TurnSession }) =>
+        new TurnSession(env, objectStorage(ctx.storage), (task) => {
+          void task.catch(() => undefined);
+        }),
+    );
   }
 
-  start(turnId: string) {
-    return this.session.start(turnId);
+  async start(turnId: string) {
+    return (await this.session).start(turnId);
   }
 
-  stream(turnId: string, after: number) {
-    return this.session.stream(turnId, after);
+  async stream(turnId: string, after: number) {
+    return (await this.session).stream(turnId, after);
   }
 
-  stop(turnId: string) {
-    return this.session.stop(turnId);
+  async stop(turnId: string) {
+    return (await this.session).stop(turnId);
   }
 
-  override alarm() {
-    return this.session.alarm();
+  override async alarm() {
+    return (await this.session).alarm();
   }
 }
