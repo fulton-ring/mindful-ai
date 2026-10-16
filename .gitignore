@@ -19,3 +19,4 @@ test-results/
 .superpowers/
 *.tsbuildinfo
 .auth/
+.astro/

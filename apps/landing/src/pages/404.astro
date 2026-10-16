@@ -1,0 +1,13 @@
+---
+import LegalFooter from '../components/LegalFooter.astro';
+import Base from '../layouts/Base.astro';
+import { APP_URL } from '../site';
+---
+
+<Base title="Not found · Walden">
+  <main style="max-width: 41rem; margin: 0 auto; padding: 18vh 16px;">
+    <h1>Nothing here.</h1>
+    <p><a href="/">Back to Walden</a> or <a href={APP_URL}>open the app</a>.</p>
+    <LegalFooter />
+  </main>
+</Base>

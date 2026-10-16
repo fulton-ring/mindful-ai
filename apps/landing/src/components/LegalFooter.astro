@@ -1,0 +1,32 @@
+---
+import { COMPANY } from '../site';
+
+const year = new Date().getFullYear();
+---
+
+<nav class="legal" aria-label="Legal">
+  <span>© {year} {COMPANY.name}</span>
+  <a href={COMPANY.terms}>Terms of Service</a>
+  <a href={COMPANY.privacy}>Privacy Policy</a>
+  <a href={`mailto:${COMPANY.email}`}>{COMPANY.email}</a>
+</nav>
+
+<style>
+  .legal {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin-top: 24px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .legal a {
+    color: inherit;
+    text-underline-offset: 3px;
+  }
+
+  .legal a:hover {
+    color: var(--ink);
+  }
+</style>

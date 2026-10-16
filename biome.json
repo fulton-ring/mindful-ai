@@ -16,7 +16,8 @@
       "!**/routeTree.gen.ts",
       "!**/playwright-report",
       "!**/test-results",
-      "!**/migrations/meta"
+      "!**/migrations/meta",
+      "!**/.astro"
     ]
   },
   "formatter": {
@@ -63,6 +64,16 @@
       }
     }
   },
+  "overrides": [
+    {
+      "includes": ["**/*.astro"],
+      "linter": {
+        "rules": {
+          "correctness": { "noUnusedVariables": "off", "noUnusedImports": "off" }
+        }
+      }
+    }
+  ],
   "css": {
     "parser": {
       "tailwindDirectives": true
