@@ -12,13 +12,24 @@ import type { Palette } from './palette';
 const REACH = 30;
 /** What stands this close to the first view is there from the start. */
 const START = 13;
+/** Trees this far from the first view stand in from the start as a faint backdrop. */
+const BACKDROP = 34;
+/** How far from the paper toward full ink the backdrop sits until the walk nears it. */
+const FAINT = 0.35;
 /** How much of the walk it takes to finish appearing. */
 const GROW = 0.07;
 /** Steps between paper and full ink; each is one shared material per tone. */
 const LEVELS = 8;
 
 type Tone = 'ink' | 'light' | 'deep';
-type Sprout = { object: Object3D; at: number; meshes: [Mesh, Tone][]; shown: number };
+type Sprout = {
+  object: Object3D;
+  at: number;
+  /** How much ink it has before the walk reaches it: 0, or `FAINT` for the backdrop. */
+  faint: number;
+  meshes: [Mesh, Tone][];
+  shown: number;
+};
 
 /** The walk's progress when the eye first comes within `REACH` of x, z, sampled along the walk. */
 function arrival(samples: Vector3[], x: number, z: number) {
@@ -66,28 +77,36 @@ export function createSprouts(palette: Palette, eye: Curve<Vector3>) {
 
   function show(sprout: Sprout, amount: number) {
     sprout.shown = amount;
-    sprout.object.visible = amount > 0;
-    const level = Math.floor(amount * (LEVELS + 1));
+    // The backdrop is already drawn, just faint; everything else draws itself in.
+    const drawn = sprout.faint ? 1 : amount;
+    const ink = sprout.faint + (1 - sprout.faint) * amount;
+    sprout.object.visible = drawn > 0;
+    const level = Math.floor(ink * (LEVELS + 1));
     sprout.meshes.forEach(([mesh, tone], k) => {
       mesh.material =
         level > LEVELS ? palette.materials[tone] : faded.steps[tone][Math.max(0, level - 1)];
       // Strokes draw one after another, base first; fills appear once the outline is down.
       const start = (k / sprout.meshes.length) * 0.5;
-      if (tone === 'ink') reveal(mesh, (amount - start) / 0.5);
-      else mesh.visible = amount > 0.6;
+      if (tone === 'ink') reveal(mesh, (drawn - start) / 0.5);
+      else mesh.visible = drawn > 0.6;
     });
   }
 
   return {
-    /** Holds `object` back until the walk comes near it. */
-    add(object: Object3D) {
+    /**
+     * Holds `object` back until the walk comes near it; with `backdrop`, a far one
+     * stands faintly in the distance meanwhile.
+     */
+    add(object: Object3D, backdrop = false) {
       const meshes: [Mesh, Tone][] = [];
       object.traverse((child) => {
         const tone = child instanceof Mesh ? toneOf(child.material) : undefined;
         if (tone) meshes.push([child as Mesh, tone]);
       });
-      const at = arrival(samples, object.position.x, object.position.z);
-      const sprout = { object, at, meshes, shown: -1 };
+      const { x, z } = object.position;
+      const at = arrival(samples, x, z);
+      const far = Math.hypot(samples[0].x - x, samples[0].z - z) > BACKDROP;
+      const sprout = { object, at, faint: backdrop && far ? FAINT : 0, meshes, shown: -1 };
       sprouts.push(sprout);
       show(sprout, ease(0, at, GROW));
     },

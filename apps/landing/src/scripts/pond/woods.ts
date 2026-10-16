@@ -195,7 +195,7 @@ function plantTree(woods: Woods, x: number, z: number, scale: number) {
   scene.add(group);
   const kind = KINDS[Math.floor(brush.random() * KINDS.length)];
   kind(woods, group, 4.2 + brush.random() * 1.4);
-  woods.sprouts.add(group);
+  woods.sprouts.add(group, true);
 }
 
 /** Tries random spots from `spot` until `count` trees stand. */
