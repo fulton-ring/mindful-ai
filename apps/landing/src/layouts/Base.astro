@@ -12,6 +12,8 @@ const {
 } = Astro.props;
 const canonicalUrl = new URL(Astro.url.pathname, Astro.site);
 const shareImage = new URL('/social-preview.png', Astro.site);
+const shareTitle = 'walden';
+const shareDescription = 'a quiet place to think';
 const shareImageAlt = 'Walden — A quiet place to think. The Walden ripple mark on warm paper.';
 ---
 
@@ -27,8 +29,8 @@ const shareImageAlt = 'Walden — A quiet place to think. The Walden ripple mark
     <link rel="canonical" href={canonicalUrl} />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Walden" />
-    <meta property="og:title" content={title} />
-    <meta property="og:description" content={description} />
+    <meta property="og:title" content={shareTitle} />
+    <meta property="og:description" content={shareDescription} />
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:image" content={shareImage} />
     <meta property="og:image:type" content="image/png" />
@@ -36,8 +38,8 @@ const shareImageAlt = 'Walden — A quiet place to think. The Walden ripple mark
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content={shareImageAlt} />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content={title} />
-    <meta name="twitter:description" content={description} />
+    <meta name="twitter:title" content={shareTitle} />
+    <meta name="twitter:description" content={shareDescription} />
     <meta name="twitter:image" content={shareImage} />
     <meta name="twitter:image:alt" content={shareImageAlt} />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
