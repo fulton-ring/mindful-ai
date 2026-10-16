@@ -2,6 +2,8 @@ name: Checks
 on:
   push:
   pull_request:
+  # Deploys both Workers from main by hand, e.g. after rotating the token.
+  workflow_dispatch:
 
 jobs:
   verify:
@@ -20,7 +22,7 @@ jobs:
   # Which deployables a push to main touched, so each Worker deploys only when it
   # changed. Redeploying the app Worker ends any chat reply in progress.
   changes:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     outputs:
       app: ${{ steps.filter.outputs.app }}
@@ -44,7 +46,7 @@ jobs:
   # db:migrate:remote` by hand before pushing code that needs them.
   deploy-app:
     needs: [verify, changes]
-    if: needs.changes.outputs.app == 'true'
+    if: needs.changes.outputs.app == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-app
@@ -75,7 +77,7 @@ jobs:
 
   deploy-landing:
     needs: [verify, changes]
-    if: needs.changes.outputs.landing == 'true'
+    if: needs.changes.outputs.landing == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-landing
