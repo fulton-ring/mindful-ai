@@ -2,6 +2,7 @@ name: Checks
 on:
   push:
   pull_request:
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -15,3 +16,90 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:ci
       - run: pnpm verify
+
+  # Which deployables a push to main touched, so each Worker deploys only when it
+  # changed. Redeploying the app Worker ends any chat reply in progress.
+  changes:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+      landing: ${{ steps.filter.outputs.landing }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            app:
+              - 'apps/api/**'
+              - 'apps/web/**'
+              - 'packages/**'
+              - 'pnpm-lock.yaml'
+            landing:
+              - 'apps/landing/**'
+              - 'pnpm-lock.yaml'
+
+  # D1 migrations are not applied here: run `pnpm --filter @walden/api
+  # db:migrate:remote` by hand before pushing code that needs them.
+  deploy-app:
+    needs: [verify, changes]
+    if: needs.changes.outputs.app == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-app
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: https://chat.withwalden.app
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - name: Skip without a deploy token
+        if: env.CLOUDFLARE_API_TOKEN == ''
+        run: echo "::notice::CLOUDFLARE_API_TOKEN is not set; skipping the deploy."
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: env.CLOUDFLARE_API_TOKEN != ''
+        run: pnpm install --frozen-lockfile
+      - if: env.CLOUDFLARE_API_TOKEN != ''
+        run: pnpm exec turbo run build --filter=@walden/api
+      - name: Deploy the walden Worker
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        working-directory: apps/api
+        run: pnpm exec wrangler deploy
+
+  deploy-landing:
+    needs: [verify, changes]
+    if: needs.changes.outputs.landing == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-landing
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: https://withwalden.app
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - name: Skip without a deploy token
+        if: env.CLOUDFLARE_API_TOKEN == ''
+        run: echo "::notice::CLOUDFLARE_API_TOKEN is not set; skipping the deploy."
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: env.CLOUDFLARE_API_TOKEN != ''
+        run: pnpm install --frozen-lockfile
+      - if: env.CLOUDFLARE_API_TOKEN != ''
+        run: pnpm exec turbo run build --filter=@walden/landing
+      - name: Deploy the walden-landing Worker
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        working-directory: apps/landing
+        run: pnpm exec wrangler deploy
