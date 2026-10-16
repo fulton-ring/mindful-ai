@@ -9,11 +9,8 @@
   // workers.dev stays available alongside them; with routes set it is off unless
   // enabled explicitly.
   "workers_dev": true,
-  "routes": [
-    { "pattern": "chat.withwalden.app", "custom_domain": true },
-    { "pattern": "withwalden.app", "custom_domain": true },
-    { "pattern": "www.withwalden.app", "custom_domain": true }
-  ],
+  // withwalden.app and www are the landing page (apps/landing, `walden-landing`).
+  "routes": [{ "pattern": "chat.withwalden.app", "custom_domain": true }],
   // @mastra/cloudflare-d1 imports the `cloudflare` REST SDK only for its
   // apiToken mode; the D1 binding path never constructs it.
   "alias": { "cloudflare": "./stubs/cloudflare.ts" },
@@ -66,7 +63,7 @@
     "CLOUDFLARE_ACCOUNT_ID": "e9be35217a75f5d2148e572d8853b3bf",
     "POSTHOG_PROJECT_ID": "619294",
     "CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsud2l0aHdhbGRlbi5hcHAk",
-    "CLERK_AUTHORIZED_PARTIES": "http://localhost:5173,http://localhost:8788,http://localhost:8787,http://127.0.0.1:5173,http://127.0.0.1:8788,http://127.0.0.1:8787,https://walden.jeremy-herzog.workers.dev,https://chat.withwalden.app,https://withwalden.app,https://www.withwalden.app",
+    "CLERK_AUTHORIZED_PARTIES": "http://localhost:5173,http://localhost:8788,http://localhost:8787,http://127.0.0.1:5173,http://127.0.0.1:8788,http://127.0.0.1:8787,https://walden.jeremy-herzog.workers.dev,https://chat.withwalden.app",
     "AI_SEARCH_INSTANCE": "mindful-ai-sources",
     "MESSAGE_LIMIT": "20",
     "MESSAGE_WINDOW_HOURS": "4"
