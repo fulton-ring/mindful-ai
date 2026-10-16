@@ -388,6 +388,14 @@ const beats = [
         calc(env(safe-area-inset-bottom, 0px) + 31vh) calc(env(safe-area-inset-left, 0px) + 22px);
     }
 
+    /* The first beat is read at the very top of the page rather than centred, so
+       it is one screen tall and its card sits in view on load. */
+    .beat:first-child {
+      min-height: 100vh;
+      min-height: 100svh;
+      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 9svh);
+    }
+
     .card {
       max-width: none;
       padding: 22px 22px;

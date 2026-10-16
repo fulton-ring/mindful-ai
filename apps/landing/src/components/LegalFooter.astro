@@ -4,21 +4,31 @@ import { COMPANY } from '../site';
 const year = new Date().getFullYear();
 ---
 
-<nav class="legal" aria-label="Legal">
-  <span>© {year} {COMPANY.name}</span>
-  <a href={COMPANY.terms}>Terms of Service</a>
-  <a href={COMPANY.privacy}>Privacy Policy</a>
-  <a href={`mailto:${COMPANY.email}`}>{COMPANY.email}</a>
-</nav>
+<footer class="legal">
+  <nav aria-label="Legal">
+    <a href={COMPANY.terms}>Terms of Service</a>
+    <a href={COMPANY.privacy}>Privacy Policy</a>
+    <a href={`mailto:${COMPANY.email}`}>{COMPANY.email}</a>
+  </nav>
+  <p>© {year} {COMPANY.name}</p>
+</footer>
 
 <style>
-  .legal {
+  /* One item per line, so the links never wrap into each other on a phone. */
+  .legal,
+  .legal nav {
     display: flex;
-    flex-wrap: wrap;
-    gap: 6px 16px;
-    margin-top: 24px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .legal {
+    gap: 12px;
+    margin-top: 28px;
     color: var(--muted);
     font-size: 14px;
+    line-height: 1.4;
   }
 
   .legal a {
@@ -28,5 +38,9 @@ const year = new Date().getFullYear();
 
   .legal a:hover {
     color: var(--ink);
+  }
+
+  .legal p {
+    margin: 0;
   }
 </style>
