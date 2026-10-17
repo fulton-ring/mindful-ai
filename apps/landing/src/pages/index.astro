@@ -106,12 +106,11 @@ const beats = [
         <p>Chats clear after a week, so what lasts is what you understood.</p>
         <a class="pill solid" href={APP_URL}>Start thinking</a>
       </div>
+      <div class="foot">
+        <LegalFooter />
+      </div>
     </section>
   </main>
-
-  <div class="foot">
-    <LegalFooter />
-  </div>
 
   <nav class="rail" aria-label="Walk progress">
     {
@@ -235,8 +234,11 @@ const beats = [
     justify-content: flex-end;
   }
 
+  /* The walk ends at the foot of the page, so the last beat is one screen tall to
+     leave its card in the middle. */
   .beat:last-child {
-    min-height: 115vh;
+    min-height: 100vh;
+    min-height: 100svh;
   }
 
   .card {
@@ -339,10 +341,16 @@ const beats = [
   }
 
 
-  /* The legal links close the page on a band of paper, apart from the cards. */
-  .foot {
+  /* The legal links close the page on a band of paper, apart from the cards. They
+     sit inside the last beat so the page ends where it did and the walk's last
+     card stays where it was. */
+  .beat:last-child {
     position: relative;
-    z-index: 2;
+  }
+
+  .foot {
+    position: absolute;
+    inset: auto 0 0;
     padding: 22px calc(env(safe-area-inset-right, 0px) + 84px)
       calc(env(safe-area-inset-bottom, 0px) + 22px) calc(env(safe-area-inset-left, 0px) + 7vw);
     background: var(--halo);
