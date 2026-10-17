@@ -43,11 +43,11 @@ const beats = [
         >
           <path d="M3 11 C 50 4, 90 15, 130 8 S 200 6, 217 10"></path>
         </svg>
-        <p class="lede">A quiet place to think.</p>
-        <p class="hint">
+        <p class="lede">
+          A quiet place to think.
           <svg
-            width="22"
-            height="22"
+            width="20"
+            height="20"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -290,18 +290,20 @@ const beats = [
     margin: 4px 0 18px;
   }
 
+  /* The arrow beside the line is the only hint to scroll. */
   .card .lede {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     color: var(--ink);
     font-size: 21px;
   }
 
-  .card .hint {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 26px;
-    font-size: 15px;
+  .lede svg {
+    flex: none;
+    color: var(--muted);
   }
+
 
   .chat {
     display: flex;
