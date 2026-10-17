@@ -105,10 +105,13 @@ const beats = [
         <h2>Conversations fade. Notes stay.</h2>
         <p>Chats clear after a week, so what lasts is what you understood.</p>
         <a class="pill solid" href={APP_URL}>Start thinking</a>
-        <LegalFooter />
       </div>
     </section>
   </main>
+
+  <div class="foot">
+    <LegalFooter />
+  </div>
 
   <nav class="rail" aria-label="Walk progress">
     {
@@ -336,6 +339,27 @@ const beats = [
   }
 
 
+  /* The legal links close the page on a band of paper, apart from the cards. */
+  .foot {
+    position: relative;
+    z-index: 2;
+    padding: 22px calc(env(safe-area-inset-right, 0px) + 84px)
+      calc(env(safe-area-inset-bottom, 0px) + 22px) calc(env(safe-area-inset-left, 0px) + 7vw);
+    background: var(--halo);
+    box-shadow: 0 0 40px 28px var(--halo);
+  }
+
+  .foot :global(.legal),
+  .foot :global(.legal nav) {
+    flex-flow: row wrap;
+    align-items: baseline;
+    column-gap: 24px;
+  }
+
+  .foot :global(.legal) {
+    margin: 0;
+  }
+
   .rail {
     position: fixed;
     z-index: 5;
@@ -393,6 +417,18 @@ const beats = [
       min-height: 100vh;
       min-height: 100svh;
       padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 9svh);
+    }
+
+    .foot {
+      padding-right: calc(env(safe-area-inset-right, 0px) + 56px);
+      padding-left: calc(env(safe-area-inset-left, 0px) + 22px);
+    }
+
+    /* One item per line on a phone, so the links never wrap into each other. */
+    .foot :global(.legal),
+    .foot :global(.legal nav) {
+      flex-direction: column;
+      align-items: flex-start;
     }
 
     .card {
