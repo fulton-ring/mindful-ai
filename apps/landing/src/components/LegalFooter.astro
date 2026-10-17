@@ -10,7 +10,7 @@ const year = new Date().getFullYear();
     <a href={COMPANY.privacy}>Privacy Policy</a>
     <a href={`mailto:${COMPANY.email}`}>{COMPANY.email}</a>
   </nav>
-  <p>© {year} {COMPANY.name}</p>
+  <p>© {year} <a href={COMPANY.site}>{COMPANY.name}</a></p>
 </footer>
 
 <style>

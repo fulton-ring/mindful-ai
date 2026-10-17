@@ -11,6 +11,7 @@ export const APP_URL = (import.meta.env.PUBLIC_APP_URL || fallback).replace(/\/+
 // is one copy of each.
 export const COMPANY = {
   name: 'Fulton Ring',
+  site: 'https://fultonring.com',
   email: 'info@fultonring.com',
   terms: `${APP_URL}/terms`,
   privacy: `${APP_URL}/privacy`,
