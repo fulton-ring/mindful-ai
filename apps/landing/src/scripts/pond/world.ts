@@ -22,7 +22,7 @@ function buildScene(canvas: HTMLCanvasElement) {
   scene.add(strokes);
   const brush = createBrush(seeded(11), palette.materials.ink, strokes);
   const curves = walkCurves(NARROW.matches);
-  const landscape = buildLandscape(strokes, brush, palette, curves);
+  const landscape = buildLandscape(strokes, brush, palette, curves, NARROW.matches);
   const landmarks = buildLandmarks(strokes, brush, palette);
   return { renderer, scene, palette, landscape, landmarks };
 }

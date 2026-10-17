@@ -142,13 +142,19 @@ function stars(scene: Object3D, palette: Palette) {
   return material;
 }
 
-export function buildLandscape(scene: Object3D, brush: Brush, palette: Palette, curves: Curves) {
+export function buildLandscape(
+  scene: Object3D,
+  brush: Brush,
+  palette: Palette,
+  curves: Curves,
+  narrow: boolean,
+) {
   // Evenly spaced along the walk, about a stride apart.
   const walk = curves.eye.getSpacedPoints(Math.round(curves.eye.getLength() / 1.7));
   horizon(brush);
   const setting = sun(scene, brush, palette);
   pond(scene, brush, palette);
-  const woods = buildWoods(scene, brush, palette, walk, createSprouts(palette, curves.eye));
+  const woods = buildWoods(scene, brush, palette, walk, createSprouts(palette, curves.eye, narrow));
   footpath(brush, walk);
   const night = stars(scene, palette);
   return {

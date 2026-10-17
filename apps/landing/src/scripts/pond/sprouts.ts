@@ -14,8 +14,12 @@ const REACH = 30;
 const START = 13;
 /** Trees this far from the first view stand in from the start as a faint backdrop. */
 const BACKDROP = 34;
-/** How far from the paper toward full ink the backdrop sits until the walk nears it. */
-const FAINT = 0.35;
+/**
+ * How far from the paper toward full ink the backdrop sits until the walk nears
+ * it. A phone's tall, narrow view stacks the distance into a thin band behind
+ * each shape, so there it is lighter and has half the trees.
+ */
+const FAINT = { wide: 0.35, narrow: 0.2 };
 /** How much of the walk it takes to finish appearing. */
 const GROW = 0.07;
 /** Steps between paper and full ink; each is one shared material per tone. */
@@ -68,7 +72,7 @@ function fadedMaterials(palette: Palette) {
   return { steps, sync };
 }
 
-export function createSprouts(palette: Palette, eye: Curve<Vector3>) {
+export function createSprouts(palette: Palette, eye: Curve<Vector3>, narrow: boolean) {
   const samples = Array.from({ length: 241 }, (_, i) => eye.getPoint(i / 240, new Vector3()));
   const faded = fadedMaterials(palette);
   const sprouts: Sprout[] = [];
@@ -106,7 +110,9 @@ export function createSprouts(palette: Palette, eye: Curve<Vector3>) {
       const { x, z } = object.position;
       const at = arrival(samples, x, z);
       const far = Math.hypot(samples[0].x - x, samples[0].z - z) > BACKDROP;
-      const sprout = { object, at, faint: backdrop && far ? FAINT : 0, meshes, shown: -1 };
+      const thinned = narrow && sprouts.length % 2 === 1;
+      const faint = backdrop && far && !thinned ? FAINT[narrow ? 'narrow' : 'wide'] : 0;
+      const sprout = { object, at, faint, meshes, shown: -1 };
       sprouts.push(sprout);
       show(sprout, ease(0, at, GROW));
     },
