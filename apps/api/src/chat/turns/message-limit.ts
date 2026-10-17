@@ -1,5 +1,7 @@
 import type { MessageBudget } from '@walden/contracts';
 import { first } from '../../db/client';
+import type { AppDatabase } from '../../db/database';
+import { prepareQuery } from '../../db/database';
 import { HttpError } from '../../http';
 import type { Bindings } from '../../types';
 
@@ -28,7 +30,7 @@ const windowMs = ({ windowHours }: MessageLimit) => windowHours * 60 * 60 * 1000
 
 type WindowRow = { started_at: string; used: number };
 
-const loadWindow = (db: D1Database, ownerId: string) =>
+const loadWindow = (db: AppDatabase, ownerId: string) =>
   first<WindowRow>(
     db.prepare('SELECT started_at,used FROM message_windows WHERE owner_id=?').bind(ownerId),
   );
@@ -48,7 +50,7 @@ function waitText(ms: number) {
  * Returns the window start so a failed admission can refund the charge.
  */
 export async function chargeMessage(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   limit: MessageLimit,
   weight: number,
@@ -56,19 +58,35 @@ export async function chargeMessage(
 ): Promise<string> {
   const startedAt = new Date(now).toISOString();
   const expiredBefore = new Date(now - windowMs(limit)).toISOString();
-  const result = await db
-    .prepare(
-      `INSERT INTO message_windows (owner_id,started_at,used) VALUES (?,?,?)
+  const result =
+    weight <= limit.limit
+      ? await prepareQuery(db, {
+          sqlite: `INSERT INTO message_windows (owner_id,started_at,used) VALUES (?,?,?)
        ON CONFLICT(owner_id) DO UPDATE SET
          started_at=CASE WHEN started_at<=? THEN excluded.started_at ELSE started_at END,
          used=CASE WHEN started_at<=? THEN excluded.used ELSE used+excluded.used END
        WHERE started_at<=? OR used+excluded.used<=?`,
-    )
-    .bind(ownerId, startedAt, weight, expiredBefore, expiredBefore, expiredBefore, limit.limit)
-    .run();
+          postgres: `INSERT INTO message_windows (owner_id,started_at,used) VALUES (?,?,?)
+       ON CONFLICT(owner_id) DO UPDATE SET
+         started_at=CASE WHEN message_windows.started_at<=? THEN excluded.started_at ELSE message_windows.started_at END,
+         used=CASE WHEN message_windows.started_at<=? THEN excluded.used ELSE message_windows.used+excluded.used END
+       WHERE message_windows.started_at<=? OR message_windows.used+excluded.used<=?`,
+        })
+          .bind(
+            ownerId,
+            startedAt,
+            weight,
+            expiredBefore,
+            expiredBefore,
+            expiredBefore,
+            limit.limit,
+          )
+          .run()
+      : null;
   const window = await loadWindow(db, ownerId);
-  if ((result.meta.changes ?? 0) > 0 && window) return window.started_at;
-  const resetsAt = window ? Date.parse(window.started_at) + windowMs(limit) : now + windowMs(limit);
+  if ((result?.meta.changes ?? 0) > 0 && window) return window.started_at;
+  const previousReset = window ? Date.parse(window.started_at) + windowMs(limit) : 0;
+  const resetsAt = previousReset > now ? previousReset : now + windowMs(limit);
   throw new HttpError(
     429,
     `You've reached your message limit. It resets ${waitText(resetsAt - now)}.`,
@@ -78,20 +96,23 @@ export async function chargeMessage(
 
 /** Returns a charge when the turn it paid for was never admitted. */
 export async function refundMessage(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   startedAt: string,
   weight: number,
 ) {
-  await db
-    .prepare('UPDATE message_windows SET used=MAX(used-?,0) WHERE owner_id=? AND started_at=?')
+  await prepareQuery(db, {
+    sqlite: 'UPDATE message_windows SET used=MAX(used-?,0) WHERE owner_id=? AND started_at=?',
+    postgres:
+      'UPDATE message_windows SET used=GREATEST(used-?,0) WHERE owner_id=? AND started_at=?',
+  })
     .bind(weight, ownerId, startedAt)
     .run();
 }
 
 /** Current budget for display. An ended window reads as a full budget. */
 export async function loadMessageBudget(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   limit: MessageLimit,
   now = Date.now(),
@@ -113,7 +134,7 @@ export async function loadMessageBudget(
  * took to use the whole budget.
  */
 export async function limitWindowStats(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   budget: MessageBudget,
   now = Date.now(),

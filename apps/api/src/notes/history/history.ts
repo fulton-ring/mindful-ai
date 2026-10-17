@@ -1,12 +1,13 @@
 import type { Note, NoteState } from '@walden/contracts';
 import { applyProposal } from '@walden/domain';
 import { all, first } from '../../db/client';
+import type { AppDatabase } from '../../db/database';
 import { HttpError } from '../../http';
 import { selectNote, toNote } from '../repository';
 import { SELECT_SUGGESTION, type SuggestionRow, toNoteSuggestion } from '../suggestions/queries';
 
 export async function loadNoteState(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   noteId: string,
 ): Promise<NoteState> {

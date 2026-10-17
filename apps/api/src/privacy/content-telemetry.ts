@@ -1,13 +1,14 @@
+import type { AppDatabase } from '../db/database';
 /** Only new, user-visible exchanges are captured. Mastra's raw spans stay private. */
 export const PRIVACY_VERSION = '2026-09-20';
 type Env = {
-  DB?: D1Database;
+  DB?: AppDatabase;
   POSTHOG_API_KEY?: string;
   POSTHOG_HOST?: string;
   POSTHOG_PERSONAL_API_KEY?: string;
   POSTHOG_PROJECT_ID?: string;
 };
-export async function contentPreference(db: D1Database | undefined, ownerId: string | undefined) {
+export async function contentPreference(db: AppDatabase | undefined, ownerId: string | undefined) {
   if (!db || !ownerId) return null;
   try {
     return await db

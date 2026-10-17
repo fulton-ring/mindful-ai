@@ -6,6 +6,7 @@ import type {
 } from '@walden/contracts';
 import { deleteAgentMemoryThread } from '../../agent/memory/memory';
 import { all, first, parseJson } from '../../db/client';
+import type { AppDatabase } from '../../db/database';
 import { HttpError, newId, nowIso } from '../../http';
 import { parseStoredMessage } from '../messages';
 
@@ -35,7 +36,7 @@ type MessageRow = {
 };
 
 async function purgeConversationState(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   conversationId: string,
 ): Promise<void> {
@@ -57,7 +58,7 @@ async function purgeConversationState(
 }
 
 async function loadConversationRow(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   id: string,
 ): Promise<ConversationRow> {
@@ -77,7 +78,7 @@ async function loadConversationRow(
 }
 
 async function loadConversationBranches(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   id: string,
 ): Promise<BranchRow[]> {
@@ -104,7 +105,7 @@ type ResolvedBranch = {
 };
 
 async function renewConversation(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   id: string,
   branch: BranchRow,
@@ -140,7 +141,7 @@ async function renewConversation(
 }
 
 async function resolveConversationBranch(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   id: string,
   row: ConversationRow,
@@ -193,7 +194,7 @@ function mapConversationMessage(row: MessageRow): WaldenUIMessage {
 }
 
 async function loadConversationMessages(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   id: string,
   headMessageId: string | null,
@@ -208,14 +209,21 @@ async function loadConversationMessages(
            WHERE m.conversation_id=? AND m.owner_id=?
          )
          SELECT m.id,m.ui_message,
-           COALESCE((SELECT json_group_array(json_object('start',ordered.start,'end',ordered.end,'quote',ordered.quote,'color',ordered.color,'origin',ordered.origin))
+${
+  db.dialect === 'postgres'
+    ? `           COALESCE((SELECT json_agg(json_build_object('start',h.start,'end',h."end",'quote',h.quote,'color',h.color,'origin',h.origin) ORDER BY h.updated_at ASC,h.start ASC,h."end" ASC)::text
+             FROM message_highlights h WHERE h.message_id=m.id AND h.owner_id=m.owner_id AND h.origin='user'),'[]') AS highlights_json,
+           COALESCE((SELECT json_agg(json_build_object('quote',h.quote,'kind',h.kind,'start',h.start) ORDER BY h.start ASC)::text
+             FROM message_highlights h WHERE h.message_id=m.id AND h.owner_id=m.owner_id AND h.origin='agent'),'[]') AS agent_highlights_json`
+    : `           COALESCE((SELECT json_group_array(json_object('start',ordered.start,'end',ordered.end,'quote',ordered.quote,'color',ordered.color,'origin',ordered.origin))
              FROM (SELECT h.start,h.end,h.quote,h.color,h.origin FROM message_highlights h
                WHERE h.message_id=m.id AND h.owner_id=m.owner_id AND h.origin='user'
-               ORDER BY h.updated_at ASC,h.rowid ASC) ordered),'[]') AS highlights_json,
+               ORDER BY h.updated_at ASC,h.start ASC,h.end ASC) ordered),'[]') AS highlights_json,
            COALESCE((SELECT json_group_array(json_object('quote',a.quote,'kind',a.kind,'start',a.start))
              FROM (SELECT h.quote,h.kind,h.start FROM message_highlights h
                WHERE h.message_id=m.id AND h.owner_id=m.owner_id AND h.origin='agent'
-               ORDER BY h.start ASC) a),'[]') AS agent_highlights_json
+               ORDER BY h.start ASC) a),'[]') AS agent_highlights_json`
+}
          FROM path JOIN messages m ON m.id=path.id ORDER BY path.depth DESC`,
       )
       .bind(headMessageId, id, ownerId, id, ownerId),
@@ -248,7 +256,7 @@ function buildConversation(
 }
 
 export async function loadConversation(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   id: string,
   options: { renewExpired?: boolean; branchId?: string } = {},
@@ -269,7 +277,7 @@ export async function loadConversation(
 }
 
 export async function createConversation(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   noteId: string | null,
   body: { personaId?: string },
@@ -318,7 +326,7 @@ export async function createConversation(
  * exists; loadConversation also loads the transcript and may renew or purge.
  */
 export async function requireConversation(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   id: string,
   branchId?: string,

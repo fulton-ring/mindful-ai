@@ -15,7 +15,7 @@ import { readTurnStream, turnObjects } from './turn-fixture';
 const mocks = vi.hoisted(() => ({ streamTurn: vi.fn(), updateMemory: vi.fn() }));
 vi.mock('../../../services/agent/agent', () => ({
   createAgentService: () => ({ streamTurn: mocks.streamTurn, updateMemory: mocks.updateMemory }),
-  modelNameForPersona: () => 'test-model',
+  modelNameForPersona: () => '@cf/zai-org/glm-5.3-flash',
 }));
 
 import { loadConversation } from '../../conversations/repository';
@@ -32,7 +32,11 @@ async function fixture() {
       .join('\n'),
   });
   const db = sqliteD1Binding(file);
-  await db.prepare("INSERT INTO users VALUES ('owner','subject','now','now',0)").run();
+  await db
+    .prepare(
+      "INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('owner','subject','now','now',0)",
+    )
+    .run();
   await db
     .prepare(
       "INSERT INTO conversations (id,owner_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('conversation','owner','Title','now','2999-01-01','active','now')",
@@ -74,7 +78,7 @@ async function requestTurn(db: Bindings['DB'], payload: Record<string, unknown>)
     error instanceof HttpError ? c.json({ error: error.message }, error.status) : c.json({}, 500),
   );
   const objects = turnObjects(() => env);
-  const env = { DB: db, CHAT_TURN: objects.namespace } as unknown as Bindings;
+  const env = { DB: db, AI: {}, CHAT_TURN: objects.namespace } as unknown as Bindings;
   const response = await app.fetch(
     new Request('https://walden.test/api/chat/turns', {
       method: 'POST',
@@ -291,7 +295,11 @@ describe('conversation branches: failures', () => {
       const partial = reloaded.messages.at(-1)!;
       expect(partial).toMatchObject({
         role: 'assistant',
-        metadata: { status: 'interrupted', contextCompacted: true, model: 'test-model' },
+        metadata: {
+          status: 'interrupted',
+          contextCompacted: true,
+          model: '@cf/zai-org/glm-5.3-flash',
+        },
         parts: [
           { type: 'text', text: 'A useful answer that stops early.', state: 'done' },
           { type: 'reasoning', text: 'Partial reasoning.', state: 'done' },

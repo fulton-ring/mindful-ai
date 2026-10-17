@@ -6,7 +6,9 @@ import {
 } from '@walden/contracts';
 import { type Context, Hono } from 'hono';
 import { first, parseJson } from '../../db/client';
+import type { AppDatabase } from '../../db/database';
 import { HttpError, jsonBody, nowIso } from '../../http';
+import { getPublicInferenceConfig, validateInferenceModel } from '../../inference/config';
 import { captureServerEvent } from '../../observability';
 import { modelNameForPersona } from '../../services/agent/agent';
 import type { Bindings, Variables } from '../../types';
@@ -14,6 +16,7 @@ import {
   attachmentKey,
   loadAttachments,
   MAX_ATTACHMENT_BYTES,
+  stagingAttachmentKey,
   validateAttachmentFile,
 } from '../attachments/attachments';
 import {
@@ -45,6 +48,15 @@ chatRoutes.post('/attachments/:conversationId/initiate', async (c) => {
     throw new HttpError(413, 'Files must be between 1 byte and 1 MB.');
   const mimeType = attachmentMimeType(body.name, body.mimeType ?? '');
   const id = crypto.randomUUID();
+  if (c.env.FILES.presignPut) {
+    const uploadUrl = await c.env.FILES.presignPut(
+      stagingAttachmentKey(ownerId, conversationId, id),
+      mimeType,
+      120,
+    );
+    return c.json({ id, mode: 'presigned', uploadUrl, headers: { 'Content-Type': mimeType } });
+  }
+  if (c.env.FILES.uploadMode === 'direct') return c.json({ id, mode: 'local' });
   const { R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } = c.env;
   if (R2_ACCOUNT_ID && R2_BUCKET && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY) {
     const uploadUrl = await presignUpload(
@@ -78,12 +90,35 @@ chatRoutes.post('/attachments/:conversationId/:attachmentId/complete', async (c)
 });
 
 chatRoutes.post('/attachments/:conversationId', async (c) => {
-  if (c.env.UPLOAD_LOCAL_FALLBACK !== 'true') throw new HttpError(404, 'Not found.');
+  if (c.env.FILES?.uploadMode !== 'direct' && c.env.UPLOAD_LOCAL_FALLBACK !== 'true')
+    throw new HttpError(404, 'Not found.');
   if (!c.env.FILES) throw new HttpError(503, 'File uploads are unavailable.');
   const conversationId = c.req.param('conversationId');
   const ownerId = c.get('userId');
   await requireConversation(c.env.DB, ownerId, conversationId);
-  const form = await c.req.formData();
+  const reader = c.req.raw.body?.getReader();
+  if (!reader) throw new HttpError(400, 'Choose a file to upload.');
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    length += value.byteLength;
+    if (length > MAX_ATTACHMENT_BYTES + 65_536) {
+      await reader.cancel();
+      throw new HttpError(413, 'Files must be between 1 byte and 1 MB.');
+    }
+    chunks.push(value);
+  }
+  const payload = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    payload.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  const form = await new Response(payload, {
+    headers: { 'content-type': c.req.header('content-type') ?? '' },
+  }).formData();
   const file = form.get('file');
   if (!(file instanceof File)) throw new HttpError(400, 'Choose a file to upload.');
   validateAttachmentFile(file);
@@ -173,7 +208,7 @@ async function recordRefusal(c: ChatContext, error: unknown) {
 /** Starts an admitted turn in its object; a turn already started there is left as it is. */
 const startTurn = (env: Bindings, turnId: string) => turnObject(env, turnId).start(turnId);
 
-async function findOwnedTurn(db: D1Database, ownerId: string, id: string) {
+async function findOwnedTurn(db: AppDatabase, ownerId: string, id: string) {
   return first<TurnRow>(
     db
       .prepare(
@@ -212,6 +247,22 @@ function turnInput(
   };
 }
 
+async function admissionRuntime(c: ChatContext, ownerId: string) {
+  const catalog = await getPublicInferenceConfig(c.env);
+  if (!catalog.configured) throw new HttpError(503, 'AI inference is not configured.');
+  const models = new Map(catalog.models.map((model) => [model.id, model]));
+  return {
+    db: c.env.DB,
+    ownerId,
+    messageLimit: messageLimitFrom(c.env),
+    modelWeightFor: (model: string) => models.get(model)?.weight ?? 1,
+    modelFor: (persona: import('@walden/contracts').Persona) => {
+      const model = modelNameForPersona(c.env, persona);
+      return validateInferenceModel(model, catalog).id;
+    },
+  };
+}
+
 chatRoutes.post('/turns', async (c) => {
   const parsed = chatRequestSchema.safeParse(await jsonBody<unknown>(c));
   if (!parsed.success) throw new HttpError(400, 'Invalid chat request', parsed.error.flatten());
@@ -239,18 +290,10 @@ chatRoutes.post('/turns', async (c) => {
         request.attachmentIds,
       )
     : [];
+  const runtime = await admissionRuntime(c, ownerId);
   let result: Awaited<ReturnType<typeof prepareTurn>>;
   try {
-    result = await prepareTurn(
-      {
-        db: c.env.DB,
-        ownerId,
-        messageLimit: messageLimitFrom(c.env),
-        modelFor: (persona) => modelNameForPersona(c.env, persona),
-      },
-      request,
-      attachments,
-    );
+    result = await prepareTurn(runtime, request, attachments);
   } catch (error) {
     await recordRefusal(c, error);
     const concurrent = await findOwnedTurn(c.env.DB, ownerId, request.requestId);
@@ -319,6 +362,11 @@ chatRoutes.get('/turns', async (c) => {
 chatRoutes.get('/turns/:id/events', async (c) => {
   const row = await findOwnedTurn(c.env.DB, c.get('userId'), c.req.param('id'));
   if (!row) throw new HttpError(404, 'Turn not found');
+  if (c.req.header('X-Walden-Turn-Protocol') !== '2')
+    throw new HttpError(409, 'Reload the app to reconnect to this reply.', {
+      code: 'turn_protocol',
+      action: 'reload',
+    });
   const cursor = Number(c.req.header('Last-Event-ID') ?? c.req.query('after') ?? 0);
   if (!Number.isSafeInteger(cursor) || cursor < 0) throw new HttpError(400, 'Invalid event cursor');
   return turnObject(c.env, row.id).stream(row.id, cursor);
@@ -329,7 +377,7 @@ chatRoutes.post('/turns/:id/cancel', async (c) => {
   const id = c.req.param('id');
   const before = await findOwnedTurn(c.env.DB, ownerId, id);
   await c.env.DB.prepare(
-    'INSERT OR IGNORE INTO turn_cancellations(owner_id,request_id,created_at) VALUES(?,?,?)',
+    'INSERT INTO turn_cancellations(owner_id,request_id,created_at) VALUES(?,?,?) ON CONFLICT DO NOTHING',
   )
     .bind(ownerId, before?.request_id ?? id, nowIso())
     .run();

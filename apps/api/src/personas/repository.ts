@@ -1,5 +1,6 @@
 import { DEFAULT_PERSONAS, type Persona } from '@walden/contracts';
 import { first } from '../db/client';
+import type { AppDatabase } from '../db/database';
 
 export type PersonaRow = {
   id: string;
@@ -28,14 +29,14 @@ export const toPersona = ({
   icon: icon ?? DEFAULT_PERSONAS.find((persona) => persona.id === replaces)?.icon ?? 'user',
 });
 
-export const loadPersonaRow = (db: D1Database, ownerId: string, id: string) =>
+export const loadPersonaRow = (db: AppDatabase, ownerId: string, id: string) =>
   first<PersonaRow>(
     db
       .prepare(`SELECT ${PERSONA_COLUMNS} FROM personas WHERE id=? AND owner_id=?`)
       .bind(id, ownerId),
   );
 
-export const loadPersona = async (db: D1Database, ownerId: string, id: string) => {
+export const loadPersona = async (db: AppDatabase, ownerId: string, id: string) => {
   const row = await loadPersonaRow(db, ownerId, id);
   return row ? toPersona(row) : null;
 };

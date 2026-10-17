@@ -21,7 +21,11 @@ async function fixture() {
       .join('\n'),
   });
   const db = sqliteD1Binding(file);
-  await db.prepare("INSERT INTO users VALUES ('owner','subject','now','now',0)").run();
+  await db
+    .prepare(
+      "INSERT INTO users (id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('owner','subject','now','now',0)",
+    )
+    .run();
   const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
   app.use('*', async (c, next) => {
     c.set('userId', 'owner');
@@ -32,7 +36,7 @@ async function fixture() {
     error instanceof HttpError ? c.json({ error: error.message }, error.status) : c.json({}, 500),
   );
   const list = async (): Promise<Persona[]> =>
-    (await app.request('/api/personas', {}, { DB: db } as Bindings)).json();
+    (await app.request('/api/personas', {}, { DB: db, AI: {} as Ai } as Bindings)).json();
   return { app, db, list };
 }
 
@@ -58,7 +62,7 @@ describe('persona list ordering', () => {
           replacesPersonaId: 'thinking-partner',
         }),
       },
-      { DB: db } as Bindings,
+      { DB: db, AI: {} as Ai } as Bindings,
     );
     expect(created.status).toBe(201);
     await app.request('/api/personas/thinking-partner', { method: 'DELETE' }, {
@@ -87,7 +91,7 @@ describe('persona list ordering', () => {
           tone: 'warm',
         }),
       },
-      { DB: db } as Bindings,
+      { DB: db, AI: {} as Ai } as Bindings,
     );
     expect((await list()).map((p) => p.name)).toEqual([
       'Mentor',
@@ -104,7 +108,7 @@ it('persists an icon on create and edit, and preserves it when omitted from a pa
     app.request(
       path,
       { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
-      { DB: db } as Bindings,
+      { DB: db, AI: {} as Ai } as Bindings,
     );
   const created = await request('/api/personas', 'POST', {
     name: 'Coach',
@@ -131,7 +135,7 @@ it('persists a model choice for each persona and uses GLM when none is saved', a
     app.request(
       path,
       { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
-      { DB: db } as Bindings,
+      { DB: db, AI: {} as Ai } as Bindings,
     );
   const created = await request('/api/personas', 'POST', {
     name: 'Coach',
@@ -154,12 +158,14 @@ it('persists a model choice for each persona and uses GLM when none is saved', a
     '@cf/zai-org/glm-5.3-flash',
   );
   expect((await list()).find((item) => item.id === 'thinking-partner')?.model).toBeUndefined();
+  expect((await request(`/api/personas/${persona.id}`, 'PATCH', { model: null })).status).toBe(200);
+  expect((await list()).find((item) => item.id === persona.id)?.model).toBeUndefined();
 });
 
 it('rejects deleting the last persona, including simultaneous deletion requests', async () => {
   const { app, db, list } = await fixture();
   const remove = (id: string) =>
-    app.request(`/api/personas/${id}`, { method: 'DELETE' }, { DB: db } as Bindings);
+    app.request(`/api/personas/${id}`, { method: 'DELETE' }, { DB: db, AI: {} as Ai } as Bindings);
   const responses = await Promise.all((await list()).map((p) => remove(p.id)));
   expect(responses.map((r) => r.status).sort()).toEqual([204, 204, 409]);
   expect(await list()).toHaveLength(1);
@@ -167,7 +173,11 @@ it('rejects deleting the last persona, including simultaneous deletion requests'
 
 it('protects a last custom persona and ignores other owners personas', async () => {
   const { app, db, list } = await fixture();
-  await db.prepare("INSERT INTO users VALUES ('other','other','now','now',0)").run();
+  await db
+    .prepare(
+      "INSERT INTO users (id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('other','other','now','now',0)",
+    )
+    .run();
   for (const owner of ['owner', 'other']) {
     await db
       .prepare(
@@ -179,12 +189,21 @@ it('protects a last custom persona and ignores other owners personas', async () 
   for (const p of await list()) {
     if (p.id !== 'owner')
       expect(
-        (await app.request(`/api/personas/${p.id}`, { method: 'DELETE' }, { DB: db } as Bindings))
-          .status,
+        (
+          await app.request(`/api/personas/${p.id}`, { method: 'DELETE' }, {
+            DB: db,
+            AI: {} as Ai,
+          } as Bindings)
+        ).status,
       ).toBe(204);
   }
   expect(
-    (await app.request('/api/personas/owner', { method: 'DELETE' }, { DB: db } as Bindings)).status,
+    (
+      await app.request('/api/personas/owner', { method: 'DELETE' }, {
+        DB: db,
+        AI: {} as Ai,
+      } as Bindings)
+    ).status,
   ).toBe(409);
   expect(await list()).toHaveLength(1);
 });
@@ -195,7 +214,7 @@ it('keeps an override in its built-in slot and icon when a patch tries to move i
     app.request(
       path,
       { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
-      { DB: db } as Bindings,
+      { DB: db, AI: {} as Ai } as Bindings,
     );
   const created = await request('/api/personas', 'POST', {
     name: 'Mentor',

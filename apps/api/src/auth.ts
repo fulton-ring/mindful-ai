@@ -1,6 +1,14 @@
 import { verifyToken } from '@clerk/backend';
 import type { Context, MiddlewareHandler } from 'hono';
-import { HttpError, nowIso } from './http';
+import { getAuth } from './auth/better-auth';
+
+export type { AppAuth } from './auth/better-auth';
+
+import { ensureAppUser, readAuthMode, requireAcceptedAuthMode } from './auth/state';
+import { HttpError } from './http';
+
+export { readAuthMode } from './auth/state';
+
 import type { Bindings, Variables } from './types';
 
 export const parseAuthorizedParties = (value: string | undefined): string[] | undefined => {
@@ -21,32 +29,72 @@ const verificationReason = (error: unknown): string => {
   return 'invalid';
 };
 
-const ensureUser = async (
-  c: Context<{ Bindings: Bindings; Variables: Variables }>,
-  subject: string,
-) => {
-  let existing = await c.env.DB.prepare('SELECT id FROM users WHERE auth_subject = ?')
-    .bind(subject)
-    .first<{ id: string }>();
-  if (!existing) {
-    const now = nowIso();
-    await c.env.DB.prepare(
-      'INSERT INTO users (id, auth_subject, created_at, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(auth_subject) DO NOTHING',
+/** Reject ambient browser requests from other sites, including no-auth installations. */
+const publicOrigin = (request: Request, appUrl?: string) => {
+  if (appUrl === undefined) return new URL(request.url).origin;
+  try {
+    const url = new URL(appUrl);
+    if (
+      !['http:', 'https:'].includes(url.protocol) ||
+      url.username ||
+      url.password ||
+      url.pathname !== '/' ||
+      url.search ||
+      url.hash
     )
-      .bind(crypto.randomUUID(), subject, now, now)
-      .run();
-    existing = await c.env.DB.prepare('SELECT id FROM users WHERE auth_subject = ?')
-      .bind(subject)
-      .first<{ id: string }>();
+      throw new Error();
+    return url.origin;
+  } catch {
+    throw new HttpError(503, 'APP_URL must be an HTTP or HTTPS origin');
   }
-  if (!existing) throw new HttpError(500, 'Could not initialize account');
-  return existing.id;
+};
+
+export const requireSameOrigin = (request: Request, appUrl?: string) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(request.method)) return;
+  const origin = request.headers.get('origin');
+  const fetchSite = request.headers.get('sec-fetch-site');
+  if ((origin && origin !== publicOrigin(request, appUrl)) || fetchSite === 'cross-site')
+    throw new HttpError(403, 'Cross-origin mutations are not allowed');
+};
+
+/** A cookie or provider switch must not send an old workspace's data into a new account. */
+const requireAccountIdentity = (c: Context<{ Bindings: Bindings; Variables: Variables }>) => {
+  const expected = c.req.header('X-Walden-Account-Id');
+  if (expected !== undefined && expected !== c.get('userId'))
+    throw new HttpError(409, 'Your account changed. Reload Walden before continuing.', {
+      code: 'auth_identity_changed',
+      action: 'reload',
+    });
 };
 
 export const authMiddleware: MiddlewareHandler<{
   Bindings: Bindings;
   Variables: Variables;
 }> = async (c, next) => {
+  const mode = readAuthMode(c.env);
+  // Keep malformed/absent Clerk credentials a 401 even before touching the database.
+  if (mode === 'none') {
+    requireSameOrigin(c.req.raw, c.env.APP_URL);
+    await requireAcceptedAuthMode(c.env.DB, mode);
+    const userId = await ensureAppUser(c.env.DB, mode, 'default');
+    c.set('userId', userId);
+    c.set('authSubject', userId);
+    requireAccountIdentity(c);
+    await next();
+    return;
+  }
+  if (mode === 'better-auth') {
+    requireSameOrigin(c.req.raw, c.env.APP_URL);
+    await requireAcceptedAuthMode(c.env.DB, mode);
+    const auth = await getAuth(c.env);
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) throw new HttpError(401, 'Authentication required');
+    c.set('userId', await ensureAppUser(c.env.DB, mode, session.user.id));
+    c.set('authSubject', session.user.id);
+    requireAccountIdentity(c);
+    await next();
+    return;
+  }
   let subject: string;
   const authorization = c.req.header('authorization');
   if (authorization === undefined) {
@@ -69,8 +117,15 @@ export const authMiddleware: MiddlewareHandler<{
     throw new HttpError(401, 'Invalid authentication token');
   }
 
-  const userId = await ensureUser(c, subject);
+  await requireAcceptedAuthMode(c.env.DB, mode);
+  const userId = await ensureAppUser(c.env.DB, mode, subject);
   c.set('userId', userId);
   c.set('authSubject', subject);
+  requireAccountIdentity(c);
   await next();
 };
+
+export const getAccountIdentity = (c: Context<{ Bindings: Bindings; Variables: Variables }>) => ({
+  id: c.get('userId'),
+  authMode: readAuthMode(c.env),
+});

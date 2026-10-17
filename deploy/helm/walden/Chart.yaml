@@ -1,0 +1,6 @@
+apiVersion: v2
+name: walden
+description: Walden with external PostgreSQL, Valkey and private S3 storage
+version: 0.1.0
+appVersion: '0.1.0'
+type: application

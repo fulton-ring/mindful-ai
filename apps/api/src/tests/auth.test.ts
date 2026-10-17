@@ -16,7 +16,11 @@ const testApp = () => {
   return app;
 };
 
-const env = { CLERK_SECRET_KEY: 'test-secret', DB: {} as D1Database };
+const env = {
+  CLERK_SECRET_KEY: 'test-secret',
+  CLERK_PUBLISHABLE_KEY: 'pk_test',
+  DB: {} as D1Database,
+};
 
 describe('Clerk token configuration', () => {
   it('ignores empty authorized-party configuration values', () => {

@@ -1,14 +1,9 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import type { McpTools } from '../mcp';
-import {
-  assertActive,
-  boundedBytes,
-  boundedJson,
-  escapeRegex,
-  publicUrl,
-  within,
-} from './research-common';
+import type { ResearchBrowser } from './ports';
+import { createCloudflareResearchBrowser } from './research';
+import { assertActive, publicUrl, within } from './research-common';
 
 const MAX_LINKS = 80;
 const MAX_IMAGE_BYTES = 512_000;
@@ -20,34 +15,17 @@ function allowedPage(url: string, allowedUrls: Set<string> | undefined): URL {
   return page;
 }
 
-function browserOptions(page: URL) {
-  return {
-    url: page.toString(),
-    allowRequestPattern: [`^${escapeRegex(page.origin)}(?:/|$)`],
-    gotoOptions: { timeout: 15_000, waitUntil: 'domcontentloaded' as const },
-  };
-}
-
 async function listLinks(
-  browser: Pick<BrowserRun, 'quickAction'>,
+  browser: ResearchBrowser,
   signal: AbortSignal,
   allowedUrls: Set<string> | undefined,
   url: string,
 ) {
   const page = allowedPage(url, allowedUrls);
   assertActive(signal);
-  const response = await within(
-    browser.quickAction('links', { ...browserOptions(page), visibleLinksOnly: true }),
-    signal,
-    20_000,
-  );
-  if (!response.ok) throw new Error('Listing page links failed.');
-  const body = await boundedJson<{ success?: boolean; result?: unknown }>(response);
-  if (body.success !== true || !Array.isArray(body.result))
-    throw new Error('Browser Run returned invalid links.');
-
+  const values = await within(browser.listVisibleLinks(page.toString(), signal), signal, 20_000);
   const seen = new Set<string>();
-  const links = body.result.flatMap((value) => {
+  const links = values.flatMap((value) => {
     if (typeof value !== 'string' || value.length > 2_048) return [];
     try {
       const found = publicUrl(value);
@@ -70,26 +48,20 @@ async function listLinks(
 }
 
 async function screenshotPage(
-  browser: Pick<BrowserRun, 'quickAction'>,
+  browser: ResearchBrowser,
   signal: AbortSignal,
   allowedUrls: Set<string> | undefined,
   url: string,
 ) {
   const page = allowedPage(url, allowedUrls);
   assertActive(signal);
-  const response = await within(
-    browser.quickAction('screenshot', {
-      ...browserOptions(page),
-      viewport: { width: 1280, height: 720 },
-      screenshotOptions: { type: 'jpeg', quality: 65 },
-    }),
+  const { bytes: image, mimeType } = await within(
+    browser.screenshot(page.toString(), signal),
     signal,
     20_000,
   );
-  if (!response.ok) throw new Error('Capturing the page failed.');
-  const mimeType = response.headers.get('content-type')?.split(';')[0];
-  if (mimeType !== 'image/jpeg') throw new Error('Browser Run returned an invalid screenshot.');
-  const image = await within(boundedBytes(response, MAX_IMAGE_BYTES), signal, 2_000);
+  if (mimeType !== 'image/jpeg' || image.byteLength > MAX_IMAGE_BYTES)
+    throw new Error('Invalid screenshot.');
   assertActive(signal);
   return {
     url: page.toString(),
@@ -98,10 +70,12 @@ async function screenshotPage(
 }
 
 export function createBrowserActions(
-  browser: Pick<BrowserRun, 'quickAction'>,
+  transport: ResearchBrowser | Pick<BrowserRun, 'quickAction'>,
   signal: AbortSignal,
   allowedUrls?: Set<string>,
 ): McpTools {
+  const browser =
+    'quickAction' in transport ? createCloudflareResearchBrowser(transport) : transport;
   return {
     listWebLinks: createTool({
       id: 'list_web_links',

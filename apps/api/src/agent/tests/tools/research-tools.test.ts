@@ -28,7 +28,12 @@ it('sends attached image bytes to the model as image content', async () => {
         name: 'chart.png',
         mimeType: 'image/png',
         size: 3,
-        bytes: new Uint8Array([1, 2, 3]),
+        bytes: new Uint8Array(
+          Buffer.from(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jGmQAAAAASUVORK5CYII=',
+            'base64',
+          ),
+        ),
       },
     ],
   };

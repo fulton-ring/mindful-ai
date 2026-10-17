@@ -1,0 +1,7 @@
+{{- if lt (int .Values.http.replicas) 2 }}{{ fail "http.replicas must be at least 2" }}{{ end -}}
+{{- if lt (int .Values.worker.replicas) 2 }}{{ fail "worker.replicas must be at least 2" }}{{ end -}}
+{{- $_ := required "externalSecretName is required" .Values.externalSecretName -}}
+{{- $_ := required "config.APP_URL is required" .Values.config.APP_URL -}}
+{{- $_ := required "config.S3_ENDPOINT is required" .Values.config.S3_ENDPOINT -}}
+{{- $_ := required "config.S3_BUCKET is required" .Values.config.S3_BUCKET -}}
+{{- if ne .Values.config.FILE_STORAGE "s3" }}{{ fail "Kubernetes requires FILE_STORAGE=s3" }}{{ end -}}

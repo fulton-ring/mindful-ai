@@ -1,5 +1,6 @@
 import type { NoteSuggestion } from '@walden/contracts';
 import { all, first } from '../../db/client';
+import type { AppDatabase } from '../../db/database';
 
 export type SuggestionRow = {
   id: string;
@@ -33,7 +34,7 @@ export const SELECT_SUGGESTION =
   'SELECT id,note_id,conversation_id,source_message_id,base_revision,old_text,new_text,reason,status,created_at,updated_at FROM note_suggestions';
 
 export async function loadNoteSuggestionBySource(
-  db: D1Database,
+  db: AppDatabase,
   input: {
     ownerId: string;
     conversationId: string;
@@ -59,7 +60,7 @@ export async function loadNoteSuggestionBySource(
 }
 
 export async function loadNoteSuggestionBatch(
-  db: D1Database,
+  db: AppDatabase,
   input: { ownerId: string; conversationId: string; branchId: string; generationKey: string },
 ): Promise<NoteSuggestion[]> {
   const rows = await db
@@ -87,7 +88,7 @@ export async function loadNoteSuggestionBatch(
 
 /** Pending suggestions on a note, oldest first, so a turn can supersede its own earlier work. */
 export async function loadPendingNoteSuggestions(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   noteId: string,
 ): Promise<NoteSuggestion[]> {
@@ -113,7 +114,7 @@ export async function loadPendingNoteSuggestions(
  * so a failed lookup fails the decision instead of placing text blind.
  */
 export async function loadNoteAdditionQueue(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   noteId: string,
 ): Promise<Array<{ id: string; text: string; accepted: boolean }>> {

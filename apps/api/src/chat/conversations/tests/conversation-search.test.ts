@@ -16,8 +16,8 @@ it('searches owned thread titles, messages, and note text while respecting expir
   );
   execFileSync('sqlite3', [file], {
     input: `${schema}
-      INSERT INTO users VALUES ('owner','owner-subject','now','now',0);
-      INSERT INTO users VALUES ('other','other-subject','now','now',0);
+      INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('owner','owner-subject','now','now',0);
+      INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('other','other-subject','now','now',0);
       INSERT INTO notes (id,owner_id,markdown,revision,provenance_json,created_at,updated_at,title)
         VALUES ('note','owner','The stroma contains enzymes.',0,'[]','now','now','Botany');
       INSERT INTO conversations (id,owner_id,note_id,title,last_user_activity_at,expires_at,status,created_at) VALUES

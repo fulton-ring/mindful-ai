@@ -41,6 +41,7 @@ function ErrorNotice({ message, onDismiss }: { message: string; onDismiss(): voi
   return (
     <div className="chat-error" role="alert">
       <p>{message}</p>
+      {/reload/i.test(message) && <button onClick={() => location.reload()}>Reload Walden</button>}
       <button
         type="button"
         className="icon-button"

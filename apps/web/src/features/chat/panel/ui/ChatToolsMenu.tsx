@@ -1,6 +1,7 @@
 import { Paperclip, SlidersHorizontal } from 'lucide-react';
 
 import { Popover, PopoverContent, PopoverTrigger } from '../../../../components/ui/popover';
+import { useRuntimeConfig } from '../../../../lib/runtime-config';
 import { track } from '../../../../lib/telemetry';
 
 type Props = {
@@ -23,6 +24,7 @@ export function ChatToolsMenu({
   onPreference,
   onAutoHighlights,
 }: Props) {
+  const capabilities = useRuntimeConfig()?.capabilities;
   return (
     <Popover onOpenChange={(open) => open && track('chat_tools_opened')}>
       <PopoverTrigger asChild>
@@ -35,6 +37,7 @@ export function ChatToolsMenu({
         side="top"
         align="start"
       >
+        <ToolReadiness />
         <button
           type="button"
           aria-disabled={disabled}
@@ -57,7 +60,7 @@ export function ChatToolsMenu({
         <Preference
           label="Web search"
           value={webSearch}
-          disabled={disabled}
+          disabled={disabled || capabilities?.webSearch === false}
           onChange={(value) => onPreference('webSearch', value)}
         />
         <Preference
@@ -102,5 +105,19 @@ function Preference({
         onChange={(event) => onChange(event.target.checked)}
       />
     </label>
+  );
+}
+
+function ToolReadiness() {
+  const capabilities = useRuntimeConfig()?.capabilities;
+  if (!capabilities) return null;
+  return (
+    <div className="muted px-2 py-2 text-sm">
+      {!capabilities.webSearch && <p>Web search is not configured on this instance.</p>}
+      {!capabilities.documentExtraction && (
+        <p>Document attachments are unavailable. You can attach supported text files and images.</p>
+      )}
+      {!capabilities.savedSourceSearch && <p>Saved source search is unavailable.</p>}
+    </div>
   );
 }

@@ -1,0 +1,25 @@
+# docker compose --env-file .env.self-hosted -f compose.external-postgres.yaml up --build
+# Standalone runtime with an existing PostgreSQL database and a local file volume.
+services:
+  app:
+    image: walden:local
+    build: .
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    ports: ['127.0.0.1:${PORT:-3000}:3000']
+    env_file: [.env.self-hosted]
+    environment:
+      APP_ROLE: all
+      FILE_STORAGE: ${FILE_STORAGE:-local}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+    volumes: [walden-postgres-files:/data]
+    security_opt:
+      - no-new-privileges:true
+      - seccomp:./deploy/docker/chromium-seccomp.json
+    tmpfs: [/tmp:mode=1777,size=512m]
+    shm_size: 512mb
+    stop_grace_period: 60s
+
+volumes:
+  walden-postgres-files:

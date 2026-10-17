@@ -9,12 +9,14 @@ import {
   validateAttachmentFile,
 } from './attachments';
 
-export type R2SigningConfig = {
-  accountId: string;
-  bucket: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-};
+export type { R2SigningConfig } from '../../storage/r2';
+
+import {
+  ObjectSizeLimitError,
+  type ObjectStore,
+  readObjectBytes,
+} from '../../storage/object-store';
+import type { R2SigningConfig } from '../../storage/r2';
 
 const IMAGE_MIME: Record<string, string> = {
   png: 'image/png',
@@ -45,6 +47,7 @@ export async function presignUpload(
 ): Promise<string> {
   const client = new S3Client({
     region: 'auto',
+    requestChecksumCalculation: 'WHEN_REQUIRED',
     endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
     credentials: {
       accessKeyId: config.accessKeyId,
@@ -89,38 +92,44 @@ export function validateAttachmentBytes(bytes: Uint8Array, mimeType: string): vo
 }
 
 export async function completeUpload(
-  bucket: R2Bucket,
+  bucket: ObjectStore,
   ownerId: string,
   conversationId: string,
   id: string,
   name: string,
 ): Promise<{ id: string; name: string; mimeType: string; size: number }> {
   const stagingKey = stagingAttachmentKey(ownerId, conversationId, id);
-  const object = await bucket.get(stagingKey);
-  if (!object) throw new HttpError(404, 'Uploaded file not found.');
-  if (object.size < 1 || object.size > MAX_ATTACHMENT_BYTES) {
+  const metadata = await bucket.head(stagingKey);
+  if (!metadata) throw new HttpError(404, 'Uploaded file not found.');
+  if (metadata.size < 1 || metadata.size > MAX_ATTACHMENT_BYTES) {
     await bucket.delete(stagingKey);
     throw new HttpError(413, 'Files must be between 1 byte and 1 MB.');
   }
-  const mimeType = attachmentMimeType(name, object.httpMetadata?.contentType ?? '');
-  if (object.httpMetadata?.contentType !== mimeType) {
-    await bucket.delete(stagingKey);
-    throw new HttpError(415, 'Uploaded file type does not match.');
-  }
-  const bytes = new Uint8Array(await object.arrayBuffer());
+  const object = await bucket.get(stagingKey);
+  if (!object) throw new HttpError(404, 'Uploaded file not found.');
   try {
+    if (object.size < 1 || object.size > MAX_ATTACHMENT_BYTES)
+      throw new HttpError(413, 'Files must be between 1 byte and 1 MB.');
+    const mimeType = attachmentMimeType(name, object.httpMetadata?.contentType ?? '');
+    if (object.httpMetadata?.contentType !== mimeType)
+      throw new HttpError(415, 'Uploaded file type does not match.');
+    const bytes = await readObjectBytes(object, MAX_ATTACHMENT_BYTES);
+    validateAttachmentFile(new File([bytes], name, { type: mimeType }));
     validateAttachmentBytes(bytes, mimeType);
+    const safeName = name.slice(0, 180);
+    const stored = await bucket.put(attachmentKey(ownerId, conversationId, id), bytes, {
+      httpMetadata: { contentType: mimeType },
+      customMetadata: { name: safeName },
+      onlyIf: { etagDoesNotMatch: '*' },
+    });
+    if (stored === null) throw new HttpError(409, 'Attachment was already finalized.');
+    return { id, name: safeName, mimeType, size: bytes.byteLength };
   } catch (error) {
-    await bucket.delete(stagingKey);
+    if (error instanceof ObjectSizeLimitError)
+      throw new HttpError(413, 'Uploaded file exceeds the 1 MB byte limit.');
     throw error;
+  } finally {
+    await object.body?.cancel().catch(() => undefined);
+    await bucket.delete(stagingKey);
   }
-  const safeName = name.slice(0, 180);
-  const stored = await bucket.put(attachmentKey(ownerId, conversationId, id), bytes, {
-    httpMetadata: { contentType: mimeType },
-    customMetadata: { name: safeName },
-    onlyIf: { etagDoesNotMatch: '*' },
-  });
-  await bucket.delete(stagingKey);
-  if (stored === null) throw new HttpError(409, 'Attachment was already finalized.');
-  return { id, name: safeName, mimeType, size: bytes.byteLength };
 }

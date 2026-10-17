@@ -44,8 +44,16 @@ async function createHighlightsDatabase(): Promise<D1Database> {
       .join('\n'),
   });
   const database = sqliteD1Binding(file);
-  await database.prepare("INSERT INTO users VALUES ('owner','subject','now','now',0)").run();
-  await database.prepare("INSERT INTO users VALUES ('other','other-subject','now','now',0)").run();
+  await database
+    .prepare(
+      "INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('owner','subject','now','now',0)",
+    )
+    .run();
+  await database
+    .prepare(
+      "INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('other','other-subject','now','now',0)",
+    )
+    .run();
   await database
     .prepare(
       "INSERT INTO conversations (id,owner_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('conversation','owner','Title','now','2999-01-01','active','now')",

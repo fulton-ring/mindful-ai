@@ -1,6 +1,7 @@
 import type { Conversation, Note, ProvenanceSpan } from '@walden/contracts';
 import { z } from 'zod';
 import { first } from '../../db/client';
+import type { AppDatabase } from '../../db/database';
 import { HttpError, newId, nowIso } from '../../http';
 import { insertNoteStatement, type NoteRow, toNote } from '../../notes/repository';
 import { loadConversation } from './repository';
@@ -16,7 +17,7 @@ type CapturedNoteRow = Omit<NoteRow, 'title'>;
 const capturedNote = (row: CapturedNoteRow, title: string): Note => toNote({ ...row, title });
 
 const captureReplay = (
-  db: D1Database,
+  db: AppDatabase,
   conversationId: string,
   ownerId: string,
   operationId: string,
@@ -32,7 +33,7 @@ type CaptureInput = z.infer<typeof captureSchema>;
 type CaptureResult = { conversation: Conversation; note: Note; created: boolean };
 
 async function persistCapturedNote(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   conversationId: string,
   conversation: Conversation,
@@ -87,7 +88,7 @@ async function persistCapturedNote(
 }
 
 export async function captureConversation(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   conversationId: string,
   input: CaptureInput,

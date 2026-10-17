@@ -5,10 +5,13 @@ import {
   attachmentKey,
   attachmentWorkspacePath,
   DOCUMENT_TYPES,
+  MAX_ATTACHMENT_BYTES,
 } from '../chat/attachments/attachments';
 import { messageAttachments } from '../chat/messages';
 import type { McpTools } from '../services/mcp';
 import type { AgentTurnInput, ServiceEnv } from '../services/types';
+import { createCloudflareDocumentExtractor } from '../storage/document-extractor';
+import { readObjectBytes } from '../storage/object-store';
 
 type DocumentFile = Pick<LoadedAttachment, 'id' | 'name' | 'mimeType'>;
 
@@ -18,12 +21,16 @@ function isDocumentFile(file: DocumentFile): boolean {
 }
 
 async function extractDocumentMarkdown(
-  env: Pick<ServiceEnv, 'FILES' | 'AI'>,
+  env: Pick<ServiceEnv, 'FILES' | 'AI' | 'DOCUMENT_EXTRACTOR'>,
   ownerId: string,
   conversationId: string,
   file: DocumentFile,
+  signal?: AbortSignal,
 ) {
-  if (!env.FILES || !env.AI) throw new Error('Document extraction is unavailable.');
+  if (!env.FILES) throw new Error('Document extraction is unavailable.');
+  const extractor =
+    env.DOCUMENT_EXTRACTOR ?? (env.AI ? createCloudflareDocumentExtractor(env.AI) : undefined);
+  if (!extractor) throw new Error('Document extraction is unavailable.');
   const sidecarKey = attachmentKey(ownerId, conversationId, `${file.id}.md`);
   const path = `${attachmentWorkspacePath(file.id, file.name)}.md`;
   const cached = await env.FILES.get(sidecarKey);
@@ -31,18 +38,19 @@ async function extractDocumentMarkdown(
     return { path, text: new TextDecoder().decode(await cached.arrayBuffer()), cached: true };
   const original = await env.FILES.get(attachmentKey(ownerId, conversationId, file.id));
   if (!original) throw new Error(`Attached document "${file.name}" is unavailable.`);
-  const bytes = await original.arrayBuffer();
-  const conversion = await env.AI.toMarkdown({
+  const bytes = await readObjectBytes(original, MAX_ATTACHMENT_BYTES);
+  if (bytes.byteLength > MAX_ATTACHMENT_BYTES) throw new Error('Document exceeds the 1 MB limit.');
+  const conversion = await extractor.extract({
     name: file.name,
-    blob: new Blob([bytes], { type: file.mimeType }),
+    mimeType: file.mimeType,
+    bytes: new Uint8Array(bytes),
+    signal,
   });
-  if (conversion.format === 'error' || !conversion.data)
-    throw new Error(`Could not extract text from "${file.name}".`);
-  await env.FILES.put(sidecarKey, conversion.data, {
+  await env.FILES.put(sidecarKey, conversion.markdown, {
     httpMetadata: { contentType: 'text/markdown' },
     customMetadata: { name: `${file.name}.md` },
   });
-  return { path, text: conversion.data, tokens: conversion.tokens };
+  return { path, text: conversion.markdown, tokens: conversion.tokens };
 }
 
 export function createDocumentTools(env: ServiceEnv, input: AgentTurnInput): McpTools {
@@ -65,10 +73,16 @@ export function createDocumentTools(env: ServiceEnv, input: AgentTurnInput): Mcp
       description:
         'Convert an attached PDF, DOCX, or XLSX into searchable Markdown. Returns the Markdown workspace path; use workspace read file or grep to inspect it.',
       inputSchema: z.object({ path: z.string() }),
-      execute: async ({ path }) => {
+      execute: async ({ path }, context) => {
         const file = documents.get(path);
         if (!file) throw new Error('Document is not attached to this thread.');
-        const result = await extractDocumentMarkdown(env, ownerId, conversationId, file);
+        const result = await extractDocumentMarkdown(
+          env,
+          ownerId,
+          conversationId,
+          file,
+          context?.abortSignal,
+        );
         return result.cached
           ? { path: result.path, cached: true }
           : { path: result.path, tokens: result.tokens };

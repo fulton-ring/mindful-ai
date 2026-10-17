@@ -1,4 +1,5 @@
 import { all } from '../../db/client';
+import type { AppDatabase } from '../../db/database';
 import type { Bindings } from '../../types';
 import { turnObject } from './turn-session';
 import { finishTurn, type TurnRow } from './turn-store';
@@ -6,7 +7,7 @@ import { finishTurn, type TurnRow } from './turn-store';
 const DAY_MS = 24 * 60 * 60_000;
 
 /** Cancellation markers only need to outlive any request that could still race them. */
-async function pruneCancellations(db: D1Database) {
+async function pruneCancellations(db: AppDatabase) {
   const week = new Date(Date.now() - 7 * DAY_MS).toISOString();
   await db.batch([
     db.prepare('DELETE FROM turn_cancellations WHERE created_at<?').bind(week),

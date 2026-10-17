@@ -73,7 +73,7 @@ it('exports only current owned transcripts even before cleanup, while preserving
     const db = sqliteD1Binding(file);
     await db
       .prepare(
-        "INSERT INTO users VALUES ('owner','subject','now','now',0),('other','other','now','now',0)",
+        "INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('owner','subject','now','now',0),('other','other','now','now',0)",
       )
       .run();
     await db

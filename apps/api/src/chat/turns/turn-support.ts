@@ -1,4 +1,5 @@
 import { type Conversation, DEFAULT_PERSONAS, type Persona } from '@walden/contracts';
+import type { AppDatabase, AppStatement } from '../../db/database';
 import { HttpError } from '../../http';
 import { loadPersona } from '../../personas/repository';
 import { isInterrupted } from '../messages';
@@ -37,7 +38,7 @@ export function turnReplayDisposition(status: string): 'active' | 'replay' | 'bl
   return 'blocked';
 }
 
-export async function personaFor(db: D1Database, ownerId: string, id: string): Promise<Persona> {
+export async function personaFor(db: AppDatabase, ownerId: string, id: string): Promise<Persona> {
   const builtin = id
     ? DEFAULT_PERSONAS.find((persona) => persona.id === id)
     : DEFAULT_PERSONAS.find((persona) => persona.id === 'thinking-partner');
@@ -47,7 +48,7 @@ export async function personaFor(db: D1Database, ownerId: string, id: string): P
   return persona;
 }
 
-export async function batchIfAny(db: D1Database, statements: D1PreparedStatement[]) {
+export async function batchIfAny(db: AppDatabase, statements: AppStatement[]) {
   if (statements.length > 0) await db.batch(statements);
 }
 

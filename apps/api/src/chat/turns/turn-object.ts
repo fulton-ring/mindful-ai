@@ -1,5 +1,8 @@
 import { DurableObject } from 'cloudflare:workers';
+import { MastraCompositeStore } from '@mastra/core/storage';
 import type { WaldenUIMessageChunk } from '@walden/contracts';
+import { DoWorkflowsStorage } from '../../execution/do-workflows';
+import { DoSqliteCache } from '../../execution/sqlite-cache';
 import type { Bindings } from '../../types';
 import type { TurnSession, TurnState, TurnStorage } from './turn-session';
 
@@ -14,7 +17,8 @@ function objectStorage(storage: DurableObjectStorage): TurnStorage {
         .exec<{ chunk: string }>('SELECT chunk FROM chunks ORDER BY seq')
         .toArray()
         .map(({ chunk }) => JSON.parse(chunk) as WaldenUIMessageChunk),
-    begin: (turnId) => storage.put<TurnState>('turn', { turnId }),
+    begin: (turnId, execution) =>
+      storage.put<TurnState>('turn', { turnId, ...(execution ? { execution } : {}) }),
     append: (seq, chunk) => {
       storage.sql.exec('INSERT INTO chunks(seq,chunk) VALUES(?,?)', seq, JSON.stringify(chunk));
     },
@@ -36,9 +40,20 @@ export class ChatTurn extends DurableObject<Bindings> {
     // Importing this class at startup must not initialize the agent runtime.
     this.session = import('./turn-session').then(
       ({ TurnSession }) =>
-        new TurnSession(env, objectStorage(ctx.storage), (task) => {
-          void task.catch(() => undefined);
-        }),
+        new TurnSession(
+          env,
+          objectStorage(ctx.storage),
+          (task) => {
+            void task.catch(() => undefined);
+          },
+          {
+            storage: new MastraCompositeStore({
+              id: 'walden-turn-execution',
+              domains: { workflows: new DoWorkflowsStorage({ storage: ctx.storage }) },
+            }),
+            cache: new DoSqliteCache({ storage: ctx.storage, ttlMs: 60 * 60_000 }),
+          },
+        ),
     );
   }
 
@@ -52,6 +67,10 @@ export class ChatTurn extends DurableObject<Bindings> {
 
   async stop(turnId: string) {
     return (await this.session).stop(turnId);
+  }
+
+  async purge(turnId: string) {
+    return (await this.session).purge(turnId);
   }
 
   override async alarm() {

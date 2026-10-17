@@ -9,6 +9,19 @@ import { HttpError } from '../../../http';
 import type { Bindings, Variables } from '../../../types';
 import { notesRoutes } from '../../routes';
 
+function testApp() {
+  const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+  app.use('*', async (c, next) => {
+    c.set('userId', 'owner');
+    await next();
+  });
+  app.route('/api/notes', notesRoutes);
+  app.onError((error, c) =>
+    c.json({ error: error.message }, error instanceof HttpError ? error.status : 500),
+  );
+  return app;
+}
+
 async function fixture(markdown: string) {
   const file = join(mkdtempSync(join(tmpdir(), 'walden-rebase-')), 'notes.sqlite');
   const migrations = new URL('../../../../migrations/', import.meta.url);
@@ -19,7 +32,11 @@ async function fixture(markdown: string) {
     .join('\n');
   execFileSync('sqlite3', [file], { input: schema });
   const db = sqliteD1Binding(file);
-  await db.prepare("INSERT INTO users VALUES ('owner','subject','now','now',0)").run();
+  await db
+    .prepare(
+      "INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('owner','subject','now','now',0)",
+    )
+    .run();
   await db
     .prepare(
       "INSERT INTO notes (id,owner_id,markdown,revision,provenance_json,created_at,updated_at) VALUES ('note','owner',?,2,'[]','now','now')",
@@ -46,15 +63,7 @@ async function fixture(markdown: string) {
       "INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,branch_id,generation_key,base_revision,old_text,new_text,reason,status,created_at,updated_at) VALUES ('suggestion','note','owner','conversation','source','branch','source',1,'Keep cash.','Keep cash. Three months of expenses.','Save the target.','pending','1','1')",
     )
     .run();
-  const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
-  app.use('*', async (c, next) => {
-    c.set('userId', 'owner');
-    await next();
-  });
-  app.route('/api/notes', notesRoutes);
-  app.onError((error, c) =>
-    c.json({ error: error.message }, error instanceof HttpError ? error.status : 500),
-  );
+  const app = testApp();
   return {
     db,
     decide: (decision: 'accept' | 'reject', operationId = `${decision}-1`) =>

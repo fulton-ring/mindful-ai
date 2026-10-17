@@ -5,14 +5,17 @@ import {
   type WaldenUIMessageChunk,
 } from '@walden/contracts';
 import { isToolUIPart, readUIMessageStream, type UIMessageChunk } from 'ai';
+import type { SqlDialect } from '../db/database';
 import type { LoadedAttachment } from './attachments/attachments';
 
 type AttachmentRef = Pick<LoadedAttachment, 'id' | 'name' | 'mimeType'>;
 type Part = WaldenUIMessage['parts'][number];
 
 /** SQL predicate: the aliased message row is not an interrupted reply. */
-export const notInterruptedSql = (alias: string) =>
-  `json_extract(${alias}.ui_message,'$.metadata.status') IS NOT 'interrupted'`;
+export const notInterruptedSql = (alias: string, dialect: SqlDialect = 'sqlite') =>
+  dialect === 'postgres'
+    ? `(${alias}.ui_message::jsonb #>> '{metadata,status}') IS DISTINCT FROM 'interrupted'`
+    : `json_extract(${alias}.ui_message,'$.metadata.status') IS NOT 'interrupted'`;
 
 export const isInterrupted = (message: Pick<WaldenUIMessage, 'metadata'>) =>
   message.metadata?.status === 'interrupted';

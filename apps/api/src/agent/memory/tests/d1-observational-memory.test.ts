@@ -206,3 +206,80 @@ it('rejects stale post-deletion writes and initialization without a live parent 
     }),
   ).rejects.toThrow('missing thread');
 });
+
+it('atomically fences D1 observations and reflection writes by application execution generation', async () => {
+  const { withApplicationExecution } = await import('../../../execution/write-guard');
+  const { binding, storage } = await setup();
+  await binding.exec(`CREATE TABLE users(id TEXT PRIMARY KEY,deletion_pending INTEGER);
+    CREATE TABLE conversations(id TEXT PRIMARY KEY,status TEXT,expires_at TEXT);
+    CREATE TABLE conversation_branches(id TEXT PRIMARY KEY,status TEXT);
+    CREATE TABLE turns(id TEXT PRIMARY KEY,conversation_id TEXT,branch_id TEXT,owner_id TEXT,execution_generation INTEGER);
+    INSERT INTO users VALUES('owner',0);
+    INSERT INTO conversations VALUES('conversation','active','2999-01-01');
+    INSERT INTO conversation_branches VALUES('branch','active');
+    INSERT INTO turns VALUES('turn','conversation','branch','owner',2);`);
+  const record = await storage.initializeObservationalMemory({
+    threadId: 'thread-1',
+    resourceId: 'resource-1',
+    scope: 'thread',
+    config: {},
+  });
+  const context = (generation: number) =>
+    ({
+      runId: 'turn',
+      generation,
+    }) as import('../../../execution/native-agent').NativeExecutionContext;
+  const update = () =>
+    storage.updateActiveObservations({
+      id: record.id,
+      observations: 'Protected',
+      tokenCount: 3,
+      lastObservedAt: new Date(),
+    });
+  await expect(withApplicationExecution(context(1), update)).rejects.toThrow('not found');
+  expect((await storage.getObservationalMemory('thread-1', 'resource-1'))?.activeObservations).toBe(
+    '',
+  );
+  await withApplicationExecution(context(2), update);
+  const current = (await storage.getObservationalMemory('thread-1', 'resource-1'))!;
+  expect(current.activeObservations).toBe('Protected');
+  await expect(
+    withApplicationExecution(context(1), () =>
+      storage.createReflectionGeneration({
+        currentRecord: current,
+        reflection: 'Stale',
+        tokenCount: 2,
+      }),
+    ),
+  ).rejects.toThrow('concurrently');
+  await withApplicationExecution(context(2), () =>
+    storage.createReflectionGeneration({
+      currentRecord: current,
+      reflection: 'Current',
+      tokenCount: 2,
+    }),
+  );
+  expect((await storage.getObservationalMemory('thread-1', 'resource-1'))?.activeObservations).toBe(
+    'Current',
+  );
+  await storage.saveThread({
+    thread: {
+      id: 'thread-2',
+      resourceId: 'resource-1',
+      title: 'Other',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  });
+  await binding.prepare('UPDATE users SET deletion_pending=1').run();
+  await expect(
+    withApplicationExecution(context(2), () =>
+      storage.initializeObservationalMemory({
+        threadId: 'thread-2',
+        resourceId: 'resource-1',
+        scope: 'thread',
+        config: {},
+      }),
+    ),
+  ).rejects.toThrow();
+});

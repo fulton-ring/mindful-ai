@@ -2,7 +2,18 @@ import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import type { McpTools } from '../mcp';
 import { createBrowserActions } from './browser-actions';
-import { assertActive, boundedJson, escapeRegex, publicUrl, within } from './research-common';
+import type { ResearchBrowser, SavedSources } from './ports';
+
+export type { ResearchBrowser, SavedSources } from './ports';
+
+import {
+  assertActive,
+  boundedBytes,
+  boundedJson,
+  escapeRegex,
+  publicUrl,
+  within,
+} from './research-common';
 
 export { boundedJson, publicUrl } from './research-common';
 
@@ -13,6 +24,8 @@ const MAX_RESULTS = 5;
 const MAX_CHUNK_CHARS = 4_000;
 
 export type ResearchEnv = {
+  RESEARCH_BROWSER?: ResearchBrowser;
+  SAVED_SOURCES?: SavedSources;
   BROWSER?: BrowserRun;
   AI_SEARCH?: AiSearchNamespace;
   AI_SEARCH_INSTANCE?: string;
@@ -28,6 +41,8 @@ class ResearchApiError extends Error {
 
 type ResearchInstance = {
   items: {
+    list: (options: AiSearchListItemsParams) => Promise<AiSearchListItemsResponse>;
+    delete: (id: string) => Promise<void>;
     upload: (
       name: string,
       content: string,
@@ -37,7 +52,7 @@ type ResearchInstance = {
   search: (request: AiSearchSearchRequest) => Promise<AiSearchSearchResponse>;
 };
 
-type ResearchBrowser = {
+type CloudflareBrowser = {
   quickAction: BrowserRun['quickAction'];
 };
 
@@ -49,7 +64,7 @@ async function cloudflareResult<T>(response: Response): Promise<T> {
   return envelope.result as T;
 }
 
-async function shortHash(value: string): Promise<string> {
+export async function researchOwnerScope(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest).slice(0, 16), (byte) =>
     byte.toString(16).padStart(2, '0'),
@@ -72,6 +87,26 @@ function createRestInstance(
 ): ResearchInstance {
   return {
     items: {
+      list: async (options) => {
+        const query = new URLSearchParams(
+          Object.entries(options).map(([key, value]) => [key, String(value)]),
+        );
+        const response = await fetch(`${searchBase}/items?${query}`, {
+          headers: apiHeaders,
+          signal,
+          redirect: 'manual',
+        });
+        return { result: await cloudflareResult<AiSearchItemInfo[]>(response) };
+      },
+      delete: async (id) => {
+        const response = await fetch(`${searchBase}/items/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          headers: apiHeaders,
+          signal,
+          redirect: 'manual',
+        });
+        await cloudflareResult<unknown>(response);
+      },
       upload: async (name, content, options) => {
         const form = new FormData();
         form.append('file', new File([content], name, { type: 'text/markdown' }));
@@ -103,7 +138,7 @@ function createRestBrowser(
   apiBase: string,
   apiToken: string,
   signal: AbortSignal,
-): ResearchBrowser {
+): CloudflareBrowser {
   return {
     quickAction: (action, options) =>
       fetch(`${apiBase}/browser-rendering/${action}`, {
@@ -119,26 +154,6 @@ function createRestBrowser(
   };
 }
 
-function createResearchTransport(
-  env: ResearchEnv,
-  signal: AbortSignal,
-): { instance: ResearchInstance; browser: ResearchBrowser } {
-  const restConfigured = Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN);
-  if (restConfigured) {
-    const apiBase = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(env.CLOUDFLARE_ACCOUNT_ID!)}`;
-    const apiHeaders = { Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN!}` };
-    const searchBase = `${apiBase}/ai-search/namespaces/default/instances/${encodeURIComponent(env.AI_SEARCH_INSTANCE!)}`;
-    return {
-      instance: createRestInstance(searchBase, apiHeaders, signal),
-      browser: createRestBrowser(apiBase, env.CLOUDFLARE_API_TOKEN!, signal),
-    };
-  }
-  return {
-    instance: env.AI_SEARCH!.get(env.AI_SEARCH_INSTANCE!),
-    browser: env.BROWSER!,
-  };
-}
-
 async function indexPage(
   instance: ResearchInstance,
   scope: string,
@@ -146,7 +161,7 @@ async function indexPage(
   markdown: string,
   signal: AbortSignal,
 ): Promise<{ id?: string; status: string; reason?: string }> {
-  const key = `owners/${scope}/${await shortHash(sourceUrl)}.md`;
+  const key = `owners/${scope}/${await researchOwnerScope(sourceUrl)}.md`;
   assertActive(signal);
   try {
     const item = await within(
@@ -169,124 +184,199 @@ async function indexPage(
   }
 }
 
-async function readPage(
-  browser: ResearchBrowser,
-  instance: ResearchInstance,
-  ownerScope: Promise<string>,
-  signal: AbortSignal,
-  allowedUrls: Set<string> | undefined,
-  url: string,
-) {
-  assertActive(signal);
-  const sourceUrl = publicUrl(url).toString();
-  if (allowedUrls && !allowedUrls.has(sourceUrl))
-    throw new Error(
-      'Read only a URL supplied by the user or returned by search. Do not invent URLs or append private data.',
-    );
-  try {
-    const originPattern = `^${escapeRegex(new URL(sourceUrl).origin)}(?:/|$)`;
+export function createCloudflareResearchBrowser(browser: CloudflareBrowser): ResearchBrowser {
+  const options = (url: string) => ({
+    url,
+    allowRequestPattern: [`^${escapeRegex(new URL(url).origin)}(?:/|$)`],
+    gotoOptions: { timeout: 15_000, waitUntil: 'domcontentloaded' as const },
+  });
+  async function action(name: 'markdown' | 'links', url: string, signal: AbortSignal) {
     const response = await within(
-      browser.quickAction('markdown', {
-        url: sourceUrl,
-        allowRequestPattern: [originPattern],
-        gotoOptions: { timeout: 15_000, waitUntil: 'domcontentloaded' },
-      }),
+      name === 'links'
+        ? browser.quickAction('links', { ...options(url), visibleLinksOnly: true })
+        : browser.quickAction('markdown', options(url)),
       signal,
       20_000,
     );
-    assertActive(signal);
     if (!response.ok) throw new Error('Browser Run rejected the page.');
     const body = await within(boundedJson(response), signal, 2_000);
-    if (body.success !== true || typeof body.result !== 'string')
-      throw new Error('Browser Run returned an invalid response.');
-    const indexedMarkdown = body.result.slice(0, MAX_INDEX_CHARS);
-    const markdown = indexedMarkdown.slice(0, MAX_PAGE_CHARS);
-    const scope = await ownerScope;
-    assertActive(signal);
-    const indexing = await indexPage(instance, scope, sourceUrl, indexedMarkdown, signal);
-    return {
-      url: sourceUrl,
-      markdown,
-      truncated: body.result.length > MAX_PAGE_CHARS,
-      indexing,
-    };
-  } catch (error) {
-    safeFailure('Reading the page', error);
+    if (body.success !== true) throw new Error('Browser Run returned an invalid response.');
+    return body.result;
   }
+  return {
+    async readMarkdown(url, signal) {
+      const result = await action('markdown', url, signal);
+      if (typeof result !== 'string') throw new Error('Invalid Markdown.');
+      return result;
+    },
+    async listVisibleLinks(url, signal) {
+      const result = await action('links', url, signal);
+      if (!Array.isArray(result)) throw new Error('Invalid links.');
+      return result.filter((value): value is string => typeof value === 'string');
+    },
+    async screenshot(url, signal) {
+      const response = await within(
+        browser.quickAction('screenshot', {
+          ...options(url),
+          viewport: { width: 1280, height: 720 },
+          screenshotOptions: { type: 'jpeg', quality: 65 },
+        }),
+        signal,
+        20_000,
+      );
+      if (!response.ok || response.headers.get('content-type')?.split(';')[0] !== 'image/jpeg')
+        throw new Error('Invalid screenshot.');
+      return {
+        bytes: await within(boundedBytes(response, 512_000), signal, 2_000),
+        mimeType: 'image/jpeg',
+      };
+    },
+  };
 }
 
-function createReadWebPageTool(
+/** Keeps Cloudflare's existing request contract behind the same saved-source port. */
+export function createCloudflareSavedSources(instance: ResearchInstance): SavedSources {
+  return {
+    upsert: (source, signal) =>
+      indexPage(instance, source.ownerScope, source.url, source.markdown, signal),
+    async search(scope, query, signal) {
+      const response = await within(
+        instance.search({
+          query,
+          ai_search_options: {
+            retrieval: {
+              max_num_results: MAX_RESULTS,
+              filters: { owner_scope: scope },
+              context_expansion: 0,
+            },
+          },
+        }),
+        signal,
+        10_000,
+      );
+      return {
+        query: response.search_query,
+        results: response.chunks
+          .filter((chunk) => chunk.item.metadata?.owner_scope === scope)
+          .flatMap((chunk) => {
+            try {
+              return [
+                {
+                  url: publicUrl(String(chunk.item.metadata?.source_url)).toString(),
+                  text: chunk.text.slice(0, MAX_CHUNK_CHARS),
+                  score: chunk.score,
+                },
+              ];
+            } catch {
+              return [];
+            }
+          })
+          .slice(0, MAX_RESULTS),
+      };
+    },
+    async deleteOwner(ownerScope) {
+      const ids = new Set<string>();
+      for (let page = 1; ; page++) {
+        const response = await instance.items.list({
+          page,
+          per_page: 100,
+          metadata_filter: JSON.stringify({ owner_scope: ownerScope }),
+        });
+        for (const item of response.result)
+          if (
+            item.metadata?.owner_scope === ownerScope &&
+            item.key.startsWith(`owners/${ownerScope}/`)
+          )
+            ids.add(item.id);
+        if (response.result.length < 100) break;
+      }
+      for (const id of ids) await instance.items.delete(id);
+    },
+  };
+}
+
+function createReadTool(
   browser: ResearchBrowser,
-  instance: ResearchInstance,
-  ownerScope: Promise<string>,
+  sources: SavedSources | undefined,
+  scope: Promise<string>,
   signal: AbortSignal,
-  allowedUrls: Set<string> | undefined,
+  allowedUrls?: Set<string>,
 ) {
   return createTool({
     id: 'read_web_page',
     description:
       'Read a public web page as rendered Markdown. The retrieved page is queued in this user’s private research index for later source search.',
     inputSchema: z.object({ url: z.string().max(2_048) }),
-    execute: ({ url }) => readPage(browser, instance, ownerScope, signal, allowedUrls, url),
+    execute: async ({ url }) => {
+      assertActive(signal);
+      const sourceUrl = publicUrl(url).toString();
+      if (allowedUrls && !allowedUrls.has(sourceUrl))
+        throw new Error(
+          'Read only a URL supplied by the user or returned by search. Do not invent URLs or append private data.',
+        );
+      try {
+        const text = await within(browser.readMarkdown(sourceUrl, signal), signal, 20_000);
+        const markdown = text.slice(0, MAX_INDEX_CHARS);
+        let indexing: { id?: string; status: string; reason?: string } = {
+          status: 'unavailable',
+        };
+        if (sources) {
+          try {
+            indexing = await within(
+              sources.upsert({ ownerScope: await scope, url: sourceUrl, markdown }, signal),
+              signal,
+              10_000,
+            );
+          } catch (error) {
+            if (signal.aborted) throw error;
+            indexing = { status: 'failed', reason: 'indexing_unavailable' };
+          }
+        }
+        return {
+          url: sourceUrl,
+          markdown: markdown.slice(0, MAX_PAGE_CHARS),
+          truncated: text.length > MAX_PAGE_CHARS,
+          indexing,
+        };
+      } catch (error) {
+        safeFailure('Reading the page', error);
+      }
+    },
   });
 }
 
-async function searchSavedSources(
-  instance: ResearchInstance,
-  ownerScope: Promise<string>,
+function createSearchTool(
+  index: SavedSources,
+  scope: Promise<string>,
   signal: AbortSignal,
-  allowedUrls: Set<string> | undefined,
-  query: string,
-) {
-  assertActive(signal);
-  try {
-    const scope = await ownerScope;
-    const response = await within(
-      instance.search({
-        query,
-        ai_search_options: {
-          retrieval: {
-            max_num_results: MAX_RESULTS,
-            filters: { owner_scope: scope },
-            context_expansion: 0,
-          },
-        },
-      }),
-      signal,
-      10_000,
-    );
-    assertActive(signal);
-    return {
-      query: response.search_query,
-      results: response.chunks
-        .filter((chunk) => chunk.item.metadata?.owner_scope === scope)
-        .flatMap((chunk) => {
-          try {
-            const url = publicUrl(String(chunk.item.metadata?.source_url)).toString();
-            allowedUrls?.add(url);
-            return [{ text: chunk.text.slice(0, MAX_CHUNK_CHARS), score: chunk.score, url }];
-          } catch {
-            return [];
-          }
-        })
-        .slice(0, MAX_RESULTS),
-    };
-  } catch (error) {
-    safeFailure('Searching saved sources', error);
-  }
-}
-
-function createSearchSourcesTool(
-  instance: ResearchInstance,
-  ownerScope: Promise<string>,
-  signal: AbortSignal,
-  allowedUrls: Set<string> | undefined,
+  allowedUrls?: Set<string>,
 ) {
   return createTool({
     id: 'search_sources',
     description: 'Search only public pages previously retrieved and indexed for this user.',
     inputSchema: z.object({ query: z.string().trim().min(1).max(MAX_QUERY_CHARS) }),
-    execute: ({ query }) => searchSavedSources(instance, ownerScope, signal, allowedUrls, query),
+    execute: async ({ query }) => {
+      try {
+        const response = await within(index.search(await scope, query, signal), signal, 10_000);
+        assertActive(signal);
+        return {
+          query: response.query,
+          results: response.results
+            .flatMap((result) => {
+              try {
+                const url = publicUrl(result.url).toString();
+                allowedUrls?.add(url);
+                return [{ ...result, url, text: result.text.slice(0, MAX_CHUNK_CHARS) }];
+              } catch {
+                return [];
+              }
+            })
+            .slice(0, MAX_RESULTS),
+        };
+      } catch (error) {
+        safeFailure('Searching saved sources', error);
+      }
+    },
   });
 }
 
@@ -296,19 +386,38 @@ export function createResearchTools(
   signal: AbortSignal,
   allowedUrls?: Set<string>,
 ): McpTools {
+  if (!ownerId?.trim()) return {};
   const restConfigured = Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN);
-  if (
-    !ownerId?.trim() ||
-    !env.AI_SEARCH_INSTANCE?.trim() ||
-    (!env.BROWSER && !restConfigured) ||
-    (!env.AI_SEARCH && !restConfigured)
-  )
-    return {};
-  const { instance, browser } = createResearchTransport(env, signal);
-  const ownerScope = shortHash(ownerId);
-  return {
-    readWebPage: createReadWebPageTool(browser, instance, ownerScope, signal, allowedUrls),
-    searchSources: createSearchSourcesTool(instance, ownerScope, signal, allowedUrls),
-    ...createBrowserActions(browser, signal, allowedUrls),
-  };
+  let browser = env.RESEARCH_BROWSER;
+  let sources = env.SAVED_SOURCES;
+  // Each capability is independently configured. A browser does not require an index.
+  if (!browser && (env.BROWSER || restConfigured)) {
+    const transport = restConfigured
+      ? createRestBrowser(
+          `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(env.CLOUDFLARE_ACCOUNT_ID!)}`,
+          env.CLOUDFLARE_API_TOKEN!,
+          signal,
+        )
+      : env.BROWSER!;
+    browser = createCloudflareResearchBrowser(transport);
+  }
+  if (!sources && env.AI_SEARCH_INSTANCE?.trim() && (env.AI_SEARCH || restConfigured)) {
+    const instance = restConfigured
+      ? createRestInstance(
+          `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(env.CLOUDFLARE_ACCOUNT_ID!)}/ai-search/namespaces/default/instances/${encodeURIComponent(env.AI_SEARCH_INSTANCE)}`,
+          { Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN!}` },
+          signal,
+        )
+      : env.AI_SEARCH!.get(env.AI_SEARCH_INSTANCE);
+    sources = createCloudflareSavedSources(instance);
+  }
+  const scope = researchOwnerScope(ownerId);
+  const tools: McpTools = {};
+  if (browser) {
+    tools.readWebPage = createReadTool(browser, sources, scope, signal, allowedUrls);
+    Object.assign(tools, createBrowserActions(browser, signal, allowedUrls));
+  }
+  if (sources) tools.searchSources = createSearchTool(sources, scope, signal, allowedUrls);
+
+  return tools;
 }

@@ -22,7 +22,9 @@ export async function turnFixture() {
   const db = sqliteD1Binding(file);
   const input = JSON.stringify({ conversation: { title: 'Title', expiresAt: '2999-01-01' } });
   await db.batch([
-    db.prepare("INSERT INTO users VALUES ('owner','subject','now','now',0)"),
+    db.prepare(
+      "INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('owner','subject','now','now',0)",
+    ),
     db.prepare(
       "INSERT INTO conversations (id,owner_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('conversation','owner','Title','now','2999-01-01','active','now')",
     ),
@@ -41,10 +43,16 @@ export async function turnFixture() {
 }
 
 /** Per-turn storage held in memory, as the turn's Durable Object would keep it. */
-export function memoryTurnStorage(): TurnStorage & { alarmAt?: number } {
+export function memoryTurnStorage(): Omit<TurnStorage, 'chunks'> & {
+  alarmAt?: number;
+  chunks(): WaldenUIMessageChunk[];
+} {
   let state: TurnState | undefined;
   const chunks: WaldenUIMessageChunk[] = [];
-  const storage: TurnStorage & { alarmAt?: number } = {
+  const storage: Omit<TurnStorage, 'chunks'> & {
+    alarmAt?: number;
+    chunks(): WaldenUIMessageChunk[];
+  } = {
     state: async () => state && { ...state },
     chunks: () => [...chunks],
     begin: async (turnId) => {

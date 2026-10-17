@@ -2,9 +2,13 @@
 
 A chat-first workspace for thinking with an assistant. Create notes during a conversation when you have something you want to keep. Notes stay; conversations expire after seven days of inactivity. Suggested edits are reviewed inline before they become part of your document.
 
+## Self-hosting
+
+Run Walden as one container with SQLite, or use PostgreSQL, Valkey and S3 with separate runtime roles. See the [self-hosting guide](docs/self-hosting.md), [Compose configuration](compose.yaml), and [Kubernetes chart](deploy/helm/walden/README.md). No Cloudflare account is required for the self-hosted runtime.
+
 ## Development
 
-Requires Node.js 22.13+ and pnpm 10.30.0.
+Requires Node.js 24.15+ and pnpm 10.30.0.
 
 ```sh
 pnpm install

@@ -1,4 +1,5 @@
 import { HttpError } from '../../http';
+import { type ObjectStore, readObjectBytes } from '../../storage/object-store';
 
 export const MAX_ATTACHMENT_BYTES = 1_000_000;
 export const MAX_ATTACHMENTS = 5;
@@ -33,7 +34,7 @@ export function attachmentWorkspacePath(id: string, name: string): string {
 }
 
 export async function deleteAttachmentPrefix(
-  bucket: R2Bucket,
+  bucket: ObjectStore,
   ownerId: string,
   conversationId?: string,
 ) {
@@ -59,7 +60,7 @@ export function validateAttachmentFile(file: File): 'text' | 'image' | 'document
 }
 
 export async function loadAttachments(
-  bucket: R2Bucket,
+  bucket: ObjectStore,
   ownerId: string,
   conversationId: string,
   ids: readonly string[],
@@ -71,11 +72,13 @@ export async function loadAttachments(
       if (!/^[a-f0-9-]{36}$/.test(id) && !/^[a-z0-9-]{1,60}$/.test(id))
         throw new HttpError(400, 'Invalid attachment ID.');
       const object = await bucket.get(attachmentKey(ownerId, conversationId, id));
-      if (!object || object.size > MAX_ATTACHMENT_BYTES)
+      if (!object || object.size > MAX_ATTACHMENT_BYTES) {
+        await object?.body?.cancel();
         throw new HttpError(404, 'An attachment is missing or too large.');
+      }
       const mimeType = object.httpMetadata?.contentType ?? 'application/octet-stream';
       const name = object.customMetadata?.name ?? 'Attachment';
-      const bytes = new Uint8Array(await object.arrayBuffer());
+      const bytes = await readObjectBytes(object, MAX_ATTACHMENT_BYTES);
       const kind = validateAttachmentFile(new File([bytes], name, { type: mimeType }));
       return {
         id,

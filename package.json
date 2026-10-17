@@ -15,7 +15,8 @@
     "db:migrate": "pnpm --filter @walden/api db:migrate",
     "verify": "pnpm typecheck && pnpm exec turbo run test --concurrency=1 && pnpm build",
     "db:generate": "pnpm --filter @walden/api db:generate",
-    "db:check": "pnpm --filter @walden/api db:check"
+    "db:check": "pnpm --filter @walden/api db:check",
+    "build:self-hosted": "pnpm --filter @walden/contracts build && pnpm --filter @walden/domain build && pnpm --filter @walden/web build && pnpm --filter @walden/api build:node"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",

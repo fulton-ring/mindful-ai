@@ -55,7 +55,7 @@ it('loads application runtimes on events, outside Worker startup, and shares eac
   expect(runtime.scheduled).toHaveBeenCalledWith(controller, env, ctx);
   expect(runtime.loaded).toEqual(['http']);
 
-  const state = { storage: { sql: { exec: vi.fn() } } } as unknown as DurableObjectState;
+  const state = { storage: { sql: { exec: vi.fn(() => []) } } } as unknown as DurableObjectState;
   const turn = new ChatTurn(state, env);
   await Promise.all([turn.start('turn-id'), turn.stream('turn-id', 5)]);
   expect(await turn.stop('turn-id')).toBe(true);

@@ -1,23 +1,25 @@
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import {
-  PERSONA_MODELS,
-  type Persona,
-  uiMessageText,
-  type WaldenUIMessage,
-} from '@walden/contracts';
+import { type Persona, uiMessageText, type WaldenUIMessage } from '@walden/contracts';
 import { wrapLanguageModel } from 'ai';
 import { createWorkersAI } from 'workers-ai-provider';
 import { prepareAgentMemory } from '../../agent/memory/memory';
 import { streamNoteProposal } from '../../agent/note-proposals/note-proposal-stream';
 import { agentTrace, annotateResponse, streamAnnotationResponse } from '../../agent/stream-events';
+import { isConversationLive } from '../../chat/turns/turn-store';
+import type { NativeExecutionContext } from '../../execution/native-agent';
 import { ServiceUnavailableError } from '../../http';
+import {
+  DEFAULT_AI_MODEL,
+  getCachedInferenceModel,
+  OPENROUTER_DEFAULT_MODEL,
+  requireInferenceConfig,
+} from '../../inference/config';
 import { createApiTelemetry } from '../../observability';
 import type { AgentService, AgentTurnInput, ServiceEnv } from '../types';
 import { streamTurnChunks } from './agent-stream';
 import { leadingSystemPromptMiddleware } from './leading-system-prompt';
 
-export const DEFAULT_AI_MODEL = PERSONA_MODELS[0].id;
-export const OPENROUTER_DEFAULT_MODEL = 'google/gemma-4-26b-a4b-it';
+export { DEFAULT_AI_MODEL, OPENROUTER_DEFAULT_MODEL };
 
 type ConfiguredModel = {
   modelName: string;
@@ -56,17 +58,16 @@ export function createCloudflareModel(env: ServiceEnv, modelName: string) {
 }
 
 function createProviderModel(env: ServiceEnv, modelName: string) {
-  if ((env.AI_PROVIDER ?? 'cloudflare') === 'openrouter') {
-    if (!env.OPENROUTER_API_KEY)
-      throw new ServiceUnavailableError('AI inference is not configured. Set OPENROUTER_API_KEY.');
-    return createOpenAICompatible({
-      name: 'openrouter',
-      apiKey: env.OPENROUTER_API_KEY,
-      baseURL: 'https://openrouter.ai/api/v1',
-      includeUsage: true,
-    }).chatModel(modelName);
-  }
-  return createCloudflareModel(env, modelName);
+  const config = requireInferenceConfig(env);
+  if (config.provider === 'cloudflare') return createCloudflareModel(env, modelName);
+  return createOpenAICompatible({
+    name: config.provider,
+    apiKey: config.apiKey,
+    baseURL: config.baseURL!,
+    includeUsage: true,
+    supportsStructuredOutputs:
+      getCachedInferenceModel(env, modelName)?.supportsStructuredOutput === true,
+  }).chatModel(modelName);
 }
 
 export function createConfiguredModel(env: ServiceEnv, modelName: string) {
@@ -77,9 +78,12 @@ export function createConfiguredModel(env: ServiceEnv, modelName: string) {
 }
 
 export function modelNameForPersona(env: ServiceEnv, persona: Persona): string {
-  if ((env.AI_PROVIDER ?? 'cloudflare') === 'openrouter')
-    return env.AI_MODEL ?? OPENROUTER_DEFAULT_MODEL;
-  return persona.model ?? env.AI_MODEL ?? DEFAULT_AI_MODEL;
+  const config = requireInferenceConfig(env);
+  return persona.model ?? config.defaultModel;
+}
+
+export function modelNameForBackground(env: ServiceEnv): string {
+  return requireInferenceConfig(env).backgroundModel;
 }
 
 /** Abort on the caller's signal or once `ms` elapses, whichever comes first. */
@@ -195,7 +199,11 @@ const MEMORY_UPDATE_DEADLINE_MS = 90_000;
  * `background` defers telemetry flushes past the response (request handlers
  * pass `waitUntil`); without it they are awaited inline.
  */
-export function createAgentService(env: ServiceEnv, background?: Background): AgentService {
+export function createAgentService(
+  env: ServiceEnv,
+  background?: Background,
+  execution?: NativeExecutionContext,
+): AgentService {
   const configuredModel: ConfigureModel = (persona) => {
     const modelName = modelNameForPersona(env, persona);
     return { modelName, model: createConfiguredModel(env, modelName) };
@@ -203,8 +211,10 @@ export function createAgentService(env: ServiceEnv, background?: Background): Ag
   // Only the reply uses the persona's model. Memory, highlights, and note
   // suggestions are background work, so they run on the default fast model,
   // which is quicker and more reliable than a deliberate one such as Qwen.
-  const backgroundModel = (input: AgentTurnInput) =>
-    configuredModel({ ...input.persona, model: undefined });
+  const backgroundModel = (_input: AgentTurnInput): ConfiguredModel => {
+    const modelName = modelNameForBackground(env);
+    return { modelName, model: createConfiguredModel(env, modelName) };
+  };
   return {
     /**
      * Summarizes the conversation once a reply is saved, so the next reply need not
@@ -215,10 +225,13 @@ export function createAgentService(env: ServiceEnv, background?: Background): Ag
       await prepareAgentMemory(env.DB, input.ownerId, input.conversation, {
         model: backgroundModel(input).model,
         signal: withDeadline(signal, MEMORY_UPDATE_DEADLINE_MS),
+        isActive: () => isConversationLive(env.DB!, input.ownerId!, input.conversation.id),
       });
     },
     async streamTurn(input: AgentTurnInput, signal?: AbortSignal) {
-      const { modelName, model } = configuredModel(input.persona);
+      const { modelName, model } = execution?.model
+        ? { modelName: execution.model, model: createConfiguredModel(env, execution.model) }
+        : configuredModel(input.persona);
       return streamTurnChunks({
         env,
         input,
@@ -227,6 +240,7 @@ export function createAgentService(env: ServiceEnv, background?: Background): Ag
         memoryModel: backgroundModel(input).model,
         signal: withDeadline(signal, TURN_DEADLINE_MS),
         background,
+        execution,
       });
     },
     ...createSecondaryOperations(env, background, backgroundModel),

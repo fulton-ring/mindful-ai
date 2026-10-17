@@ -1,0 +1,165 @@
+# Self-hosting Walden
+
+The same OCI image serves the UI and API, runs durable chat execution, extracts PDF/DOCX/XLSX attachments, reads public web pages with Chromium and searches saved sources using a bundled local embedding model. A standalone instance stores its database and private objects in one persistent volume. PostgreSQL, Valkey and S3 support separate HTTP, worker and scheduler processes. Neither setup requires a Cloudflare account.
+
+Use Node.js 24.15 or newer and pnpm 10.30.0 when building outside Docker. The image pins the Node 24.15 Debian baseline and installs the Chromium version matching Playwright 1.64.1 for its target architecture. The build downloads the pinned embedding model; runtime startup does not download model weights. Model assets and the UI are included in the image. Provider credentials are runtime configuration, never build arguments.
+
+## One container with SQLite
+
+```sh
+cp deploy/self-hosted.env.example .env.self-hosted
+# Configure an inference endpoint/model in .env.self-hosted to enable chat.
+docker compose up --build -d app
+curl --fail http://localhost:3000/health/ready
+```
+
+Open http://localhost:3000. The example binds only to loopback. Without authentication configuration, Walden uses one persistent default account; everyone who reaches that instance shares that account. Configure authentication before exposing the port publicly. A populated protected instance refuses a silent switch to unauthenticated access.
+
+`walden-data` holds `/data/walden.sqlite` (application data), `/data/mastra.sqlite` (Mastra memory and execution state), `/data/execution-cache.sqlite` (local replay/coordination cache), and `/data/files` (private objects). Preserve the entire volume. The default `APP_ROLE=all` applies additive migrations, starts execution recovery and runs the retention scheduler. Do not run multiple independent SQLite containers against this volume. `docker compose down` preserves it; `down --volumes` deletes it.
+
+The provided Compose file supplies Chromium's non-root seccomp profile and shared memory. For direct Docker use:
+
+```sh
+docker build -t walden:local .
+docker run -d --name walden \
+  --security-opt no-new-privileges:true \
+  --security-opt seccomp=deploy/docker/chromium-seccomp.json \
+  --cap-drop ALL --shm-size 512m \
+  --env-file .env.self-hosted --publish 127.0.0.1:3000:3000 \
+  --volume walden-data:/data walden:local
+```
+
+Chromium's sandbox remains enabled. The host must permit unprivileged user namespaces; follow the [Playwright container guidance](https://playwright.dev/docs/docker) when choosing a host security profile. The supplied profile derives from the upstream Playwright v1.64.1 Docker profile, with `chroot` permitted for Chromium’s private user namespace while host capabilities remain dropped. Do not add `--no-sandbox` to make an incompatible host appear healthy.
+
+## Configuration
+
+| Variable | Meaning |
+| --- | --- |
+| `APP_ROLE` | `all`, `http`, `worker`, `scheduler`, or `migrate` |
+| `APP_URL` | Public origin, including scheme; must match browser access and auth URLs |
+| `HOST`, `PORT` | Listener address and port; image defaults to `0.0.0.0:3000` |
+| `DATA_DIR` | Persistent standalone directory; defaults to `/data` in the image |
+| `DATABASE_URL` | PostgreSQL connection URL; unset selects SQLite |
+| `FILES_DIR` | Local object volume directory; defaults to `DATA_DIR/files` |
+| `FILE_STORAGE` | `local` or `s3` |
+| `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET` | S3-compatible service location and private bucket |
+| `S3_PUBLIC_ENDPOINT` | Browser-reachable signing endpoint, when different from `S3_ENDPOINT` |
+| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Least-privilege private object credentials |
+| `S3_FORCE_PATH_STYLE` | `true` for services such as MinIO; `false` for virtual-host buckets |
+| `VALKEY_URL` | Shared coordination/cache URL; required for separate process roles |
+| `AUTH_MODE` | `none`, `better-auth`, or `clerk` |
+| `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` | Stable secret and public URL for built-in authentication |
+| `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY` | Server and browser keys from your own Clerk instance |
+| `CLERK_AUTHORIZED_PARTIES` | Comma-separated browser origins allowed in Clerk session tokens |
+| `AI_PROVIDER`, `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY` | Server-side provider connection and default chat model |
+| `AI_BACKGROUND_MODEL` | Model for background work; defaults to `AI_MODEL` |
+| `AI_MODELS_JSON` | Authoritative catalog: JSON array of model ID strings or metadata objects |
+| `OPENROUTER_API_KEY` | Credential when `AI_PROVIDER=openrouter` |
+| `EMBEDDING_MODEL_DIR` | Bundled local model path, `/app/models/minilm` in the image |
+| `EMBEDDING_MODEL_REVISION` | Pinned model identity; must match the installed assets |
+
+Supply secret values through a private environment file or your orchestrator's secret mechanism. `AI_PROVIDER=openai-compatible` accepts a local or remote OpenAI-compatible service. From Docker Desktop, a host inference server is normally reachable at `http://host.docker.internal:<port>/v1`; native Linux requires an explicit host-gateway mapping or routable service address. Configure the model name your server actually provides. Startup reports available capabilities through `/api/config`; a missing provider does not create a working chat backend.
+
+Model choices are discovered from the configured provider’s `/models` endpoint and cached. If that endpoint is unavailable, the configured default and background IDs remain available. Set `AI_MODELS_JSON` to provide an authoritative catalog, including for local services without `/models`. Both `AI_MODEL` and `AI_BACKGROUND_MODEL` must appear in that list. A simple list is valid:
+
+```dotenv
+AI_PROVIDER=openai-compatible
+AI_BASE_URL=http://host.docker.internal:11434/v1
+AI_MODEL=local-main
+AI_BACKGROUND_MODEL=local-small
+AI_MODELS_JSON='["local-main","local-small"]'
+```
+
+For labels, message-point weights and capability metadata, entries may be objects or strings:
+
+```dotenv
+AI_MODELS_JSON='[{"id":"local-main","name":"Local main","weight":1,"inputModalities":["text"],"outputModalities":["text"],"supportsTools":true,"supportsStructuredOutput":true},"local-small"]'
+```
+
+Set capability fields to match the actual endpoint; catalog metadata does not add support to a model. Weights are integers from 1 to 3. For OpenRouter, use `AI_PROVIDER=openrouter` and `OPENROUTER_API_KEY`; `AI_MODEL`, `AI_BACKGROUND_MODEL` and an optional authoritative catalog work the same way.
+
+## Authentication and administration
+
+Built-in authentication uses email/password accounts with server-side sessions. Configure `AUTH_MODE=better-auth`, a stable random `BETTER_AUTH_SECRET` of at least 32 characters, and `BETTER_AUTH_URL` matching `APP_URL`. Account administration uses the image CLI with the same database and environment as the server; commands arrive as JSON over stdin so passwords do not appear in process arguments.
+
+```sh
+# First create a private JSON file with restrictive permissions:
+# {"command":"bootstrap","email":"owner@example.com","name":"Owner","password":"a-long-random-password"}
+chmod 600 bootstrap.private.json
+cat bootstrap.private.json | docker compose exec -T app node dist/node/cli.js auth
+```
+
+Use `create-account` with the same email/name/password fields to add an account, or `reset-password` with `authUserId` and `password`. There is no automatic account merging by matching email. To retain an existing unauthenticated default account, first use `create-account` to create an unbound authentication user, then use `claim-default` with the explicit `ownerId` and `authUserId`. An auth-mode transition requires an explicit `accept-mode` command with the target `mode`. The `bootstrap` command creates a separate application account, so use the `create-account` sequence when claiming existing data. Record those IDs and review ownership before executing a transition.
+
+```json
+{"command":"claim-default","ownerId":"existing-owner-id","authUserId":"local-auth-user-id"}
+{"command":"accept-mode","mode":"better-auth"}
+```
+
+For Clerk, set `AUTH_MODE=clerk`, `CLERK_SECRET_KEY`, and `CLERK_PUBLISHABLE_KEY` using keys from your own Clerk instance. Set `CLERK_AUTHORIZED_PARTIES` to the browser origin in `APP_URL` (comma-separated for multiple allowed origins), and configure that origin in Clerk. The server exposes only the publishable key to the browser and retains a stable subject-to-owner mapping. Never reuse inference or provisioning credentials for account administration.
+
+## PostgreSQL, Valkey and MinIO example
+
+The `postgres` profile contains disposable local service examples and separate runtime roles. Stop the standalone service before using the same public port:
+
+```sh
+docker compose stop app
+docker compose --profile postgres up --build -d http worker scheduler
+curl --fail http://localhost:3000/health/ready
+# Additional workers share PostgreSQL and Valkey:
+docker compose --profile postgres up -d --scale worker=2 http worker scheduler
+```
+
+The explicitly targeted services start their migration and storage dependencies; they do not start the standalone `app` service. PostgreSQL, Valkey and MinIO have separate named volumes. The local MinIO server and client are built from pinned upstream source commits because their former public image repositories are unavailable. The migration process must succeed before HTTP/workers/scheduler become ready. The MinIO bucket stays private; only short-lived, owner-scoped staging upload URLs leave the application. Its public signing endpoint defaults to `http://localhost:9000`, which is exposed on loopback. Set `S3_PUBLIC_ENDPOINT` for a different browser-reachable endpoint. Local sample passwords are for this loopback example; replace them when configuring another environment.
+
+For a standalone container using an existing PostgreSQL database, set `DATABASE_URL` in `.env.self-hosted`, then:
+
+```sh
+docker compose --env-file .env.self-hosted -f compose.external-postgres.yaml config
+# After reviewing the resolved service configuration:
+docker compose --env-file .env.self-hosted -f compose.external-postgres.yaml up --build -d
+```
+
+The external example provisions no database. It runs `APP_ROLE=all`, persists local files in `walden-postgres-files`, and requires neither Valkey nor S3. Back up PostgreSQL together with this volume, including local files and `execution-cache.sqlite` when Valkey is absent. To switch that standalone runtime to S3, set `FILE_STORAGE=s3` and the S3 variables in the private environment file. Separate HTTP/worker/scheduler roles require PostgreSQL, Valkey and S3 as shown by the `postgres` profile.
+
+When using S3, create a private bucket beforehand and configure CORS to allow `PUT` and `Content-Type` from exactly `APP_URL`; browsers upload to staging objects through two-minute signed URLs. The application validates type, signatures and the 1 MB limit before promotion into the owner's thread. A thread accepts at most five distinct attachment references. PDF/DOCX/XLSX extraction is bounded by worker memory, a 30-second timeout, archive expansion and output limits; scanned PDFs require OCR before upload.
+
+## Kubernetes
+
+Use [the Helm chart](../deploy/helm/walden/README.md) for external PostgreSQL, Valkey and S3. Kubernetes uses the separate `deploy/docker/chromium-oci-seccomp.json` profile; the Docker profile contains runtime-specific conditionals and must not be used as a Kubernetes `Localhost` profile. It creates at least two HTTP replicas, two workers, one scheduler, a pre-rollout migration Job, probes and disruption budgets. It does not create infrastructure or publish images. Review your values and rendered manifests before an explicitly authorized deployment. All runtime roles must use the same auth/model settings and shared services.
+
+Your ingress must pass streaming responses without buffering and allow a 15-minute response lifetime. There is no sticky-session requirement for replay: readers attach by turn and sequence. Readiness fails on missing migrations or unhealthy required dependencies. SIGTERM stops admission and drains for up to 30 seconds; examples allow 60 seconds before forced termination. Durable recovery uses persisted checkpoints and shared coordination after process loss.
+
+## Backups, restore and upgrades
+
+Keep database and object backups from the same stopped checkpoint. A database-only backup omits attachment bytes and saved-source content. In SQLite mode, the main application database, `mastra.sqlite` and `execution-cache.sqlite` must be captured together; preserve the entire stopped data volume. A standalone PostgreSQL instance without Valkey also retains `execution-cache.sqlite` in its local data volume. Protect exports and backups as private account data.
+
+For standalone SQLite:
+
+```sh
+# Create a database snapshot while the container is running:
+docker compose exec app node dist/node/cli.js backup /data/backup.sqlite
+# Stop every process before copying a matched database/object checkpoint:
+docker compose stop app
+mkdir -p backups
+chmod 700 backups
+docker compose cp app:/data backups/checkpoint
+```
+
+The copied directory contains the live database/WAL and local objects from a stopped checkpoint; retain the CLI snapshot as a separate checked database copy. Restore a checkpoint into a new empty volume, with the application stopped, then start the same image version and verify `/health/ready` before upgrading. The CLI `restore <snapshot.sqlite>` restores to an absent SQLite database path and refuses to overwrite an existing database; restore matching local objects separately. `check` runs database integrity checks. `export <file.json>` and `import <file.json>` transfer portable application data only when all turns are settled: finish or cancel active turns first. Logical transfer omits native Mastra checkpoints and refuses streaming turns before mutation. Use a physical database backup for complete durable execution and Mastra state.
+
+For PostgreSQL, stop admission and workers for a consistent database/object checkpoint, use `pg_dump` and `pg_restore` with your managed service's backup procedures, and retain a matching private bucket snapshot/version checkpoint. Valkey is coordination/cache state; PostgreSQL remains authoritative. Do not restore different replicas to different checkpoints.
+
+Before an upgrade, make and validate a backup, build/pull the intended image, and run its migration role against the intended database. Standalone `all` applies migrations on startup; distributed roles require a successful migration job and refuse an outdated schema. Migrations are additive and transactional where supported. Retain the prior image and database backup; a binary rollback alone does not undo schema changes.
+
+## Verification
+
+```sh
+pnpm install --frozen-lockfile
+pnpm build:self-hosted
+pnpm --filter @walden/api exec playwright install --with-deps chromium
+node apps/api/scripts/download-embedding-model.mjs .cache/models/minilm
+EMBEDDING_MODEL_DIR="$PWD/.cache/models/minilm" pnpm --filter @walden/api start:node
+```
+
+The manual/release `Self-hosted image` CI workflow builds and smokes native amd64 and arm64 images, checks non-root sandboxed Chromium, and exercises first-start readiness, UI assets and runtime configuration. It does not push images or deploy infrastructure. A complete operator smoke test additionally signs in when enabled, starts a note/chat, reconnects to its event stream, restarts a worker during an active turn, exercises Stop and retry, uploads/extracts a document, reads a public page, searches saved sources, and validates backup/restore against a disposable instance.

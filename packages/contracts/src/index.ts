@@ -89,19 +89,15 @@ export const PERSONA_MODELS = [
   { id: '@cf/google/gemma-4-26b-a4b-it', label: 'Gemma 4', weight: 1 },
   { id: '@cf/qwen/qwen3.8-27b', label: 'Qwen 3.8', weight: 2 },
 ] as const;
-export type PersonaModel = (typeof PERSONA_MODELS)[number]['id'];
+export type PersonaModel = string;
 /** Models outside the persona list (such as a development provider override) cost 1. */
 export const modelWeight = (modelId: string): number =>
   PERSONA_MODELS.find(({ id }) => id === modelId)?.weight ?? 1;
-const personaModelIds = PERSONA_MODELS.map((model) => model.id) as [
-  PersonaModel,
-  ...PersonaModel[],
-];
 export const personaSchema = z.object({
   id: z.string(),
   name: z.string().min(1).max(80),
   prompt: z.string().max(4000),
-  model: z.enum(personaModelIds).optional(),
+  model: z.string().trim().min(1).max(500).optional(),
   icon: personaIconSchema.optional(),
   brevity: z.enum(['brief', 'balanced', 'detailed']),
   challenge: z.enum(['gentle', 'balanced', 'direct']),
@@ -193,6 +189,7 @@ export type WaldenDataParts = {
   intervention: Intervention;
   'learning-check-response': LearningCheckResponse;
   status: { text: string };
+  'turn-replace': { turnId: string; generation: number };
   turn: {
     conversationId: string;
     branchId: string;
@@ -208,6 +205,7 @@ export const dataPartSchemas = {
     (value) => typeof value === 'object' && value !== null,
   ),
   status: z.object({ text: z.string() }),
+  'turn-replace': z.object({ turnId: z.string(), generation: z.number().int().nonnegative() }),
   turn: z.object({
     conversationId: z.string(),
     branchId: z.string(),
@@ -343,10 +341,47 @@ export const messageFollowupRequestSchema = z
       });
   });
 export type MessageFollowupRequest = z.infer<typeof messageFollowupRequestSchema>;
+export type AuthMode = 'none' | 'clerk' | 'better-auth';
+export type PublicAuthConfig =
+  | { mode: 'none' }
+  | { mode: 'clerk'; publishableKey: string }
+  | { mode: 'better-auth' };
+export type InferenceModel = {
+  id: string;
+  name: string;
+  description?: string;
+  weight: number;
+  inputModalities: string[];
+  outputModalities: string[];
+  supportsTools: boolean | null;
+  supportsStructuredOutput: boolean | null;
+};
+export type PublicInferenceConfig = {
+  configured: boolean;
+  provider?: 'cloudflare' | 'openrouter' | 'openai-compatible';
+  defaultModel?: string;
+  models: InferenceModel[];
+  catalogSource: 'builtin' | 'discovered' | 'configured' | 'unavailable';
+  catalogStale: boolean;
+};
+export type RuntimeCapabilities = {
+  documentExtraction: boolean;
+  documentTypes: string[];
+  renderedPageRead: boolean;
+  pageLinks: boolean;
+  pageScreenshot: boolean;
+  savedSourceSearch: boolean;
+  webSearch: boolean;
+};
 export type AppConfig = {
+  /** Compatibility fields for tabs opened before runtime configuration was versioned. */
   authConfigured: boolean;
   modelConfigured: boolean;
   clerkPublishableKey?: string;
+  auth?: PublicAuthConfig;
+  inference?: PublicInferenceConfig;
+  capabilities?: RuntimeCapabilities;
+  turnProtocolVersion?: 2;
   telemetry?: { key: string; host: string };
 };
 /** The anchored message budget: the first message opens a window that resets in full. */

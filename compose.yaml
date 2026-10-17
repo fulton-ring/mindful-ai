@@ -1,0 +1,151 @@
+x-runtime: &runtime
+  image: walden:local
+  build: .
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt:
+    - no-new-privileges:true
+    - seccomp:./deploy/docker/chromium-seccomp.json
+  tmpfs:
+    - /tmp:mode=1777,size=512m
+  shm_size: 512mb
+  stop_grace_period: 60s
+  env_file:
+    - path: .env.self-hosted
+      required: false
+
+x-distributed-env: &distributed-env
+  APP_URL: ${APP_URL:-http://localhost:3000}
+  DATABASE_URL: postgres://walden:${POSTGRES_PASSWORD:-walden-local}@postgres:5432/walden
+  VALKEY_URL: redis://valkey:6379
+  FILE_STORAGE: s3
+  S3_ENDPOINT: http://minio:9000
+  S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:9000}
+  S3_REGION: us-east-1
+  S3_BUCKET: walden
+  S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-walden-local}
+  S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-walden-local-password}
+  S3_FORCE_PATH_STYLE: 'true'
+
+x-distributed-depends: &distributed-depends
+  migrate:
+    condition: service_completed_successfully
+  valkey:
+    condition: service_healthy
+  minio-init:
+    condition: service_completed_successfully
+
+services:
+  app:
+    <<: *runtime
+    ports: ['127.0.0.1:${PORT:-3000}:3000']
+    environment:
+      APP_ROLE: all
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      FILE_STORAGE: local
+    volumes: [walden-data:/data]
+
+  postgres:
+    profiles: [postgres]
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: walden
+      POSTGRES_USER: walden
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-walden-local}
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U walden -d walden']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  valkey:
+    profiles: [postgres]
+    image: valkey/valkey:8-bookworm
+    restart: unless-stopped
+    command: [valkey-server, --appendonly, 'yes']
+    volumes: [valkey-data:/data]
+    healthcheck:
+      test: [CMD, valkey-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    profiles: [postgres]
+    image: walden-minio:local
+    build:
+      context: deploy/docker
+      dockerfile: minio.Dockerfile
+    restart: unless-stopped
+    command: [server, /data]
+    ports: ['127.0.0.1:9000:9000']
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-walden-local}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-walden-local-password}
+      MINIO_API_CORS_ALLOW_ORIGIN: ${APP_URL:-http://localhost:3000}
+    volumes: [minio-data:/data]
+
+  minio-init:
+    profiles: [postgres]
+    image: walden-mc:local
+    build:
+      context: deploy/docker
+      dockerfile: mc.Dockerfile
+    restart: 'no'
+    depends_on: [minio]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-walden-local}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-walden-local-password}
+    entrypoint: [/bin/sh, -ec]
+    command:
+      - >-
+        until mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"; do sleep 2; done;
+        mc mb --ignore-existing local/walden;
+        mc anonymous set none local/walden
+
+  migrate:
+    <<: *runtime
+    profiles: [postgres]
+    restart: 'no'
+    environment:
+      <<: *distributed-env
+      APP_ROLE: migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+
+  http:
+    <<: *runtime
+    profiles: [postgres]
+    ports: ['127.0.0.1:${PORT:-3000}:3000']
+    environment:
+      <<: *distributed-env
+      APP_ROLE: http
+    depends_on: *distributed-depends
+
+  worker:
+    <<: *runtime
+    profiles: [postgres]
+    environment:
+      <<: *distributed-env
+      APP_ROLE: worker
+    depends_on: *distributed-depends
+
+  scheduler:
+    <<: *runtime
+    profiles: [postgres]
+    environment:
+      <<: *distributed-env
+      APP_ROLE: scheduler
+    depends_on: *distributed-depends
+
+volumes:
+  walden-data:
+  postgres-data:
+  valkey-data:
+  minio-data:

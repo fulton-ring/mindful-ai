@@ -22,8 +22,12 @@ async function fixture() {
       .join('\n'),
   });
   const DB = sqliteD1Binding(file);
-  await DB.prepare("INSERT INTO users VALUES ('owner','subject','now','now',0)").run();
-  await DB.prepare("INSERT INTO users VALUES ('other','other','now','now',0)").run();
+  await DB.prepare(
+    "INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('owner','subject','now','now',0)",
+  ).run();
+  await DB.prepare(
+    "INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('other','other','now','now',0)",
+  ).run();
   await DB.prepare(
     "INSERT INTO conversations (id,owner_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('chat','owner','Title','now','2999-01-01','active','now')",
   ).run();
@@ -34,6 +38,7 @@ async function fixture() {
   const objects = turnObjects(() => env);
   const env = {
     DB,
+    AI: {} as Ai,
     CHAT_TURN: {
       idFromName: (name: string) => name,
       get: (turnId: string) => ({
@@ -111,7 +116,7 @@ it('admits one immutable turn, protects replay, and persists Stop', async () => 
     (
       await app.request(
         `/api/chat/turns/${turnId}/events`,
-        { headers: { 'x-owner': 'other' } },
+        { headers: { 'x-owner': 'other', 'X-Walden-Turn-Protocol': '2' } },
         env,
       )
     ).status,
@@ -127,7 +132,13 @@ it('admits one immutable turn, protects replay, and persists Stop', async () => 
       ?.request_id,
   ).toBe('same');
   // Stop leaves an interrupted reply, and its stream replays to a terminal [DONE].
-  const events = await (await app.request(`/api/chat/turns/${turnId}/events`, {}, env)).text();
+  const events = await (
+    await app.request(
+      `/api/chat/turns/${turnId}/events`,
+      { headers: { 'X-Walden-Turn-Protocol': '2' } },
+      env,
+    )
+  ).text();
   expect(events).toContain('"type":"error"');
   expect(events.trimEnd().endsWith('data: [DONE]')).toBe(true);
 });
@@ -166,4 +177,30 @@ it('reports the send that used up the budget and each send refused at the limit'
     weight: 1,
   });
   expect(events[1]?.properties).toMatchObject({ used: 1, ms_until_reset: expect.any(Number) });
+});
+it('rejects an unsupported default model before storing or charging a turn', async () => {
+  const { DB, env, start } = await fixture();
+  Object.assign(env, {
+    AI_PROVIDER: 'openai-compatible',
+    AI_BASE_URL: 'http://localhost:1234/v1',
+    AI_MODEL: 'embedding-only',
+    AI_MODELS_JSON: JSON.stringify([
+      {
+        id: 'embedding-only',
+        inputModalities: ['text'],
+        outputModalities: ['embeddings'],
+        supportsTools: false,
+      },
+    ]),
+  });
+  const response = await start('unsupported-model');
+  expect(response.status).toBe(422);
+  expect(await response.json()).toMatchObject({
+    error: expect.stringMatching(/text conversations with tools/),
+  });
+  expect(await DB.prepare('SELECT COUNT(*) AS count FROM message_windows').first()).toEqual({
+    count: 0,
+  });
+  expect(await DB.prepare('SELECT COUNT(*) AS count FROM turns').first()).toEqual({ count: 0 });
+  expect(await DB.prepare('SELECT COUNT(*) AS count FROM messages').first()).toEqual({ count: 0 });
 });

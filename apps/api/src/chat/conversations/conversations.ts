@@ -2,6 +2,7 @@ import { type Context, Hono } from 'hono';
 import { z } from 'zod';
 import { deleteAgentMemoryThread } from '../../agent/memory/memory';
 import { all, first } from '../../db/client';
+import { purgeConversationExecution } from '../../execution/privacy';
 import { HttpError, jsonBody, nowIso, parseBody } from '../../http';
 import type { Bindings, Variables } from '../../types';
 import { deleteAttachmentPrefix } from '../attachments/attachments';
@@ -47,8 +48,22 @@ conversationRoutes.get('/conversations', async (c) => {
   const terms = query.match(/[\p{L}\p{N}]+/gu) ?? [];
   if (terms.length > 8) throw new HttpError(400, 'Use fewer search terms');
   const searchConditions = terms
-    .map(
-      () => `AND (
+    .map(() =>
+      c.env.DB.dialect === 'postgres'
+        ? `AND (
+        strpos(lower(c.title),lower(?))>0
+        OR strpos(lower(COALESCE(n.title,'')),lower(?))>0
+        OR strpos(lower(COALESCE(n.markdown,'')),lower(?))>0
+        OR EXISTS (
+          SELECT 1 FROM messages searched
+          WHERE searched.conversation_id=c.id AND searched.owner_id=c.owner_id
+            AND EXISTS (
+              SELECT 1 FROM jsonb_array_elements(searched.ui_message::jsonb -> 'parts') part(value)
+              WHERE part.value ->> 'type'='text'
+                AND strpos(lower(part.value ->> 'text'),lower(?))>0)
+        )
+      )`
+        : `AND (
         instr(lower(c.title),lower(?))>0
         OR instr(lower(COALESCE(n.title,'')),lower(?))>0
         OR instr(lower(COALESCE(n.markdown,'')),lower(?))>0
@@ -208,6 +223,10 @@ conversationRoutes.delete('/conversations/:id', async (c) => {
   const conversation = await requireConversation(c.env.DB, ownerId, c.req.param('id'));
   if (c.env.FILES) await deleteAttachmentPrefix(c.env.FILES, ownerId, conversation.id);
   const keepNote = c.req.query('keepNote') === '1';
+  await c.env.DB.prepare("UPDATE conversations SET status='expired' WHERE id=? AND owner_id=?")
+    .bind(conversation.id, ownerId)
+    .run();
+  await purgeConversationExecution(c.env, ownerId, conversation.id);
   await deleteAgentMemoryThread(c.env.DB, ownerId, conversation.id);
   const results = await c.env.DB.batch(
     keepNote

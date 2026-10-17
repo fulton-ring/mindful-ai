@@ -23,6 +23,7 @@ it('validates a staged PDF before promoting it and removes the reusable staging 
   const put = vi.fn(async () => undefined);
   const remove = vi.fn(async () => undefined);
   const bucket = {
+    head: vi.fn(async () => ({ size: bytes.length })),
     get: vi.fn(async () => ({
       size: bytes.length,
       httpMetadata: { contentType: 'application/pdf' },
@@ -53,6 +54,7 @@ it('rejects oversized staged bytes before storing the final attachment', async (
   const put = vi.fn();
   const remove = vi.fn();
   const bucket = {
+    head: vi.fn(async () => ({ size: 1_000_001 })),
     get: vi.fn(async () => ({ size: 1_000_001, httpMetadata: { contentType: 'application/pdf' } })),
     put,
     delete: remove,
@@ -61,5 +63,66 @@ it('rejects oversized staged bytes before storing the final attachment', async (
     '1 MB',
   );
   expect(put).not.toHaveBeenCalled();
+  expect(remove).toHaveBeenCalledOnce();
+});
+
+it('checks staged metadata before fetching oversized bodies', async () => {
+  const get = vi.fn();
+  const remove = vi.fn();
+  const bucket = { head: vi.fn(async () => ({ size: 1_000_001 })), get, delete: remove };
+  await expect(completeUpload(bucket as never, 'owner', 'thread', id, 'paper.pdf')).rejects.toThrow(
+    '1 MB',
+  );
+  expect(get).not.toHaveBeenCalled();
+  expect(remove).toHaveBeenCalledOnce();
+});
+it('cancels staged streams whose actual bytes exceed their declared length', async () => {
+  const cancel = vi.fn();
+  const put = vi.fn();
+  const remove = vi.fn();
+  const bucket = {
+    head: async () => ({ size: 10 }),
+    get: async () => ({
+      size: 10,
+      httpMetadata: { contentType: 'application/pdf' },
+      body: new ReadableStream({
+        pull(controller) {
+          controller.enqueue(new Uint8Array(600_000));
+        },
+        cancel,
+      }),
+    }),
+    put,
+    delete: remove,
+  };
+  await expect(completeUpload(bucket as never, 'owner', 'thread', id, 'paper.pdf')).rejects.toThrow(
+    'limit',
+  );
+  expect(cancel).toHaveBeenCalledOnce();
+  expect(put).not.toHaveBeenCalled();
+  expect(remove).toHaveBeenCalledOnce();
+});
+
+it('does not sign an empty checksum into legacy R2 URLs', async () => {
+  expect(
+    new URL(await presignUpload(config, 'owner', 'thread', id, 'text/plain')).searchParams.has(
+      'x-amz-checksum-crc32',
+    ),
+  ).toBe(false);
+});
+it('cancels and removes staged bytes when MIME detection throws', async () => {
+  const cancel = vi.fn();
+  const remove = vi.fn();
+  const bucket = {
+    head: async () => ({ size: 5 }),
+    get: async () => ({
+      size: 5,
+      httpMetadata: { contentType: 'application/octet-stream' },
+      body: new ReadableStream({ cancel }),
+    }),
+    delete: remove,
+  };
+  await expect(completeUpload(bucket as never, 'owner', 'thread', id, 'bad.exe')).rejects.toThrow();
+  expect(cancel).toHaveBeenCalledOnce();
   expect(remove).toHaveBeenCalledOnce();
 });

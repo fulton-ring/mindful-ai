@@ -9,7 +9,11 @@ import { conversationTitle } from '@walden/domain';
 import type { ChatInit, DataUIPart } from 'ai';
 import { type RefObject, useState } from 'react';
 
-import { type ActiveTurn, DurableTurnTransport } from '../../../../../lib/durable-turn-transport';
+import {
+  type ActiveTurn,
+  DurableTurnTransport,
+  type TurnReplacement,
+} from '../../../../../lib/durable-turn-transport';
 import { id } from '../../../../../lib/ids';
 import { track } from '../../../../../lib/telemetry';
 import type { TurnArgs } from './turn-args';
@@ -103,6 +107,7 @@ export function adoptResumedTurn(args: TurnArgs, turn: ActiveTurn) {
 function createTransport(argsRef: RefObject<TurnArgs | null>) {
   const args = () => argsRef.current!;
   return new DurableTurnTransport({
+    onReplace: (replacement) => restartDecoder(argsRef, replacement),
     prepare: ({ editing, abortSignal }) => prepareTurn(args(), editing, abortSignal),
     locate: () => {
       const conversation = args().props.conversation;
@@ -133,6 +138,26 @@ const schemas = { messageMetadataSchema } as unknown as Pick<
   ChatInit<WaldenUIMessage>,
   'messageMetadataSchema'
 >;
+
+/** resumeStream creates a fresh SDK decoder; clearing UI parts alone does not. */
+function restartDecoder(argsRef: RefObject<TurnArgs | null>, replacement: TurnReplacement) {
+  const args = argsRef.current!;
+  const live = args.runtime.live.current;
+  if (!live || live.turnId !== replacement.turnId) return;
+  args.runtime.abortReason.current = 'replace';
+  void args.chat.stop();
+  args.chat.setMessages((messages) =>
+    messages.filter((message) => message.role !== 'assistant' || message.id !== replacement.turnId),
+  );
+  args.display.setStatus('Reconnecting…');
+  // Finish aborting the old decoder before resuming after the replacement marker.
+  setTimeout(() => {
+    if (args.runtime.mounted.current && args.runtime.live.current === live)
+      void argsRef.current!.chat.resumeStream({
+        body: { turnId: replacement.turnId, after: replacement.after },
+      });
+  }, 0);
+}
 
 /** The panel's AI SDK chat: one instance for the panel's life, fed by durable server turns. */
 export function useChatSession(

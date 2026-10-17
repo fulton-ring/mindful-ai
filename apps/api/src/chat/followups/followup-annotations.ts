@@ -4,6 +4,7 @@ import {
   uiMessageText,
   type WaldenUIMessage,
 } from '@walden/contracts';
+import type { AppDatabase } from '../../db/database';
 import { nowIso } from '../../http';
 import { mergeAnnotationsPreservingExisting } from '../../services/annotations/annotations';
 import type { AgentService, AgentTurnInput } from '../../services/types';
@@ -11,7 +12,7 @@ import { agentHighlightStatements } from '../highlights/agent-highlights';
 import { createBackgroundSseStream } from '../sse';
 
 type AnnotationGeneration = {
-  db: D1Database;
+  db: AppDatabase;
   ownerId: string;
   input: AgentTurnInput;
   assistantMessage: WaldenUIMessage;

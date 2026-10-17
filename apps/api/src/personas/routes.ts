@@ -2,7 +2,9 @@ import { DEFAULT_PERSONAS, personaSchema } from '@walden/contracts';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { all, first } from '../db/client';
+import type { AppDatabase } from '../db/database';
 import { HttpError, newId, nowIso, parseBody } from '../http';
+import { assertInferenceModelAvailable } from '../inference/config';
 import type { Bindings, Variables } from '../types';
 import { loadPersonaRow, PERSONA_COLUMNS, type PersonaRow, toPersona } from './repository';
 
@@ -11,7 +13,9 @@ const createSchema = personaFieldsSchema.extend({
   replacesPersonaId: z.string().min(1).optional(),
 });
 // Which built-in a persona replaces is fixed at creation; a patch cannot move it.
-const updateSchema = personaFieldsSchema.partial();
+const updateSchema = personaFieldsSchema
+  .partial()
+  .extend({ model: personaSchema.shape.model.nullable() });
 export const personaRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 personaRoutes.get('/', async (c) => {
@@ -43,6 +47,7 @@ personaRoutes.get('/', async (c) => {
 });
 personaRoutes.post('/', async (c) => {
   const { replacesPersonaId, ...values } = await parseBody(c, createSchema, 'Invalid persona');
+  if (values.model) await assertInferenceModelAvailable(c.env, values.model);
   const replaces =
     replacesPersonaId && DEFAULT_PERSONAS.some((persona) => persona.id === replacesPersonaId)
       ? replacesPersonaId
@@ -79,10 +84,11 @@ personaRoutes.patch('/:id', async (c) => {
   const changes = await parseBody(c, updateSchema, 'Invalid persona');
   const current = await loadPersonaRow(c.env.DB, c.get('userId'), c.req.param('id'));
   if (!current) throw new HttpError(404, 'Persona not found');
+  if (changes.model) await assertInferenceModelAvailable(c.env, changes.model);
   const next: PersonaRow = {
     ...current,
     ...changes,
-    model: changes.model ?? current.model,
+    model: changes.model === undefined ? current.model : changes.model,
     icon: changes.icon ?? current.icon,
   };
   await c.env.DB.prepare(
@@ -105,10 +111,10 @@ personaRoutes.patch('/:id', async (c) => {
 });
 // Check remaining choices in the mutation itself so concurrent deletes cannot
 // both succeed after observing the same list. Built-ins live outside the DB.
-const remainingPersona = `(
+const remainingPersona = (dialect?: 'sqlite' | 'postgres') => `(
   EXISTS (SELECT 1 FROM personas WHERE owner_id=? AND id<>?)
   OR EXISTS (
-    SELECT value FROM json_each(?) AS defaults
+    SELECT value FROM ${dialect === 'postgres' ? 'jsonb_array_elements_text(?::jsonb) AS defaults(value)' : 'json_each(?) AS defaults'}
     WHERE value<>? AND NOT EXISTS (
       SELECT 1 FROM hidden_personas WHERE owner_id=? AND persona_id=defaults.value
     )
@@ -119,35 +125,38 @@ const defaultIds = JSON.stringify(DEFAULT_PERSONAS.map((p) => p.id));
 personaRoutes.delete('/:id', async (c) => {
   const owner = c.get('userId');
   const id = c.req.param('id');
-  if (DEFAULT_PERSONAS.some((persona) => persona.id === id)) {
-    const result = await c.env.DB.prepare(
-      `INSERT INTO hidden_personas (owner_id,persona_id,created_at)
-       SELECT ?,?,? WHERE ${remainingPersona}
+  const remove = async (db: AppDatabase) => {
+    if (DEFAULT_PERSONAS.some((persona) => persona.id === id)) {
+      const result = await db
+        .prepare(
+          `INSERT INTO hidden_personas (owner_id,persona_id,created_at)
+       SELECT ?,?,? WHERE ${remainingPersona(db.dialect)}
        ON CONFLICT(owner_id,persona_id) DO NOTHING`,
-    )
-      .bind(owner, id, nowIso(), owner, id, defaultIds, id, owner)
+        )
+        .bind(owner, id, nowIso(), owner, id, defaultIds, id, owner)
+        .run();
+      if (!result.meta.changes) {
+        const hidden = await first(
+          db
+            .prepare('SELECT persona_id FROM hidden_personas WHERE owner_id=? AND persona_id=?')
+            .bind(owner, id),
+        );
+        if (!hidden) throw new HttpError(409, 'Keep at least one persona.');
+      }
+      return c.body(null, 204);
+    }
+    const result = await db
+      .prepare(`DELETE FROM personas WHERE id=? AND owner_id=? AND ${remainingPersona(db.dialect)}`)
+      .bind(id, owner, owner, id, defaultIds, id, owner)
       .run();
-    if (!result.meta.changes) {
-      const hidden = await first(
-        c.env.DB.prepare(
-          'SELECT persona_id FROM hidden_personas WHERE owner_id=? AND persona_id=?',
-        ).bind(owner, id),
+    if (result.meta.changes !== 1) {
+      const existing = await first(
+        db.prepare('SELECT id FROM personas WHERE id=? AND owner_id=?').bind(id, owner),
       );
-      if (!hidden) throw new HttpError(409, 'Keep at least one persona.');
+      if (existing) throw new HttpError(409, 'Keep at least one persona.');
+      throw new HttpError(404, 'Persona not found');
     }
     return c.body(null, 204);
-  }
-  const result = await c.env.DB.prepare(
-    `DELETE FROM personas WHERE id=? AND owner_id=? AND ${remainingPersona}`,
-  )
-    .bind(id, owner, owner, id, defaultIds, id, owner)
-    .run();
-  if (result.meta.changes !== 1) {
-    const existing = await first(
-      c.env.DB.prepare('SELECT id FROM personas WHERE id=? AND owner_id=?').bind(id, owner),
-    );
-    if (existing) throw new HttpError(409, 'Keep at least one persona.');
-    throw new HttpError(404, 'Persona not found');
-  }
-  return c.body(null, 204);
+  };
+  return c.env.DB.transaction ? c.env.DB.transaction(remove, [`owner:${owner}`]) : remove(c.env.DB);
 });

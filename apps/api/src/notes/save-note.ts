@@ -1,6 +1,7 @@
 import { type ProvenanceSpan, saveNoteSchema } from '@walden/contracts';
 import type { z } from 'zod';
 import { first } from '../db/client';
+import type { AppDatabase, AppStatement } from '../db/database';
 import { HttpError, newId, nowIso } from '../http';
 import { dismissChange, hasNoteEdit } from './operations';
 import { type NoteRow, selectNote, toNote } from './repository';
@@ -20,7 +21,7 @@ export function assertValidProvenance(markdown: string, provenance: ProvenanceSp
 }
 
 const loadDismissedSuggestionIds = async (
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   noteId: string,
   input: SaveNoteInput,
@@ -41,7 +42,7 @@ const loadDismissedSuggestionIds = async (
 };
 
 const buildSaveStatements = (
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   noteId: string,
   current: NoteRow,
@@ -104,15 +105,15 @@ const buildSaveStatements = (
 };
 
 /** A save that already landed (a retry, or a concurrent duplicate) answers with the current note. */
-async function replaySavedNote(db: D1Database, ownerId: string, noteId: string) {
+async function replaySavedNote(db: AppDatabase, ownerId: string, noteId: string) {
   const replay = await selectNote(db, ownerId, noteId);
   if (!replay) throw new HttpError(404, 'Note not found');
   return toNote(replay);
 }
 
 async function runSaveBatch(
-  db: D1Database,
-  statements: D1PreparedStatement[],
+  db: AppDatabase,
+  statements: AppStatement[],
   key: { ownerId: string; noteId: string; operationId: string },
 ) {
   try {
@@ -123,8 +124,8 @@ async function runSaveBatch(
   }
 }
 
-export async function saveNote(
-  db: D1Database,
+async function saveNoteInTransaction(
+  db: AppDatabase,
   ownerId: string,
   noteId: string,
   input: SaveNoteInput,
@@ -163,4 +164,18 @@ export async function saveNote(
     revision: current.revision + 1,
     updated_at: now,
   });
+}
+
+export async function saveNote(
+  db: AppDatabase,
+  ownerId: string,
+  noteId: string,
+  input: SaveNoteInput,
+) {
+  return db.transaction
+    ? db.transaction(
+        (connection) => saveNoteInTransaction(connection, ownerId, noteId, input),
+        [`owner:${ownerId}`],
+      )
+    : saveNoteInTransaction(db, ownerId, noteId, input);
 }

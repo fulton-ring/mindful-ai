@@ -210,11 +210,17 @@ function* visibleChunks(
   }
 }
 
-async function* readStream<T>(stream: ReadableStream<T>): AsyncGenerator<T> {
+async function* readStream<T>(stream: ReadableStream<T>, signal?: AbortSignal): AsyncGenerator<T> {
   const reader = stream.getReader();
+  const abort = () => {
+    void reader.cancel(signal?.reason).catch(() => undefined);
+  };
+  signal?.addEventListener('abort', abort, { once: true });
+  if (signal?.aborted) abort();
   try {
     for (let next = await reader.read(); !next.done; next = await reader.read()) yield next.value;
   } finally {
+    signal?.removeEventListener('abort', abort);
     reader.releaseLock();
   }
 }
@@ -223,8 +229,9 @@ async function* readStream<T>(stream: ReadableStream<T>): AsyncGenerator<T> {
 async function* observeModelChunks(
   stream: ReadableStream<ChunkType>,
   state: UIStreamState,
+  signal?: AbortSignal,
 ): AsyncGenerator<ChunkType> {
-  for await (const chunk of readStream(stream)) {
+  for await (const chunk of readStream(stream, signal)) {
     if (
       (chunk.type === 'finish' || chunk.type === 'step-finish') &&
       isLengthLimitedFinalChunk(chunk)
@@ -261,9 +268,10 @@ export async function* agentUIChunks(
   turnId: string,
   state: UIStreamState,
   onRecoveredCall: OnRecoveredCall,
+  signal?: AbortSignal,
 ): AsyncGenerator<Chunk> {
   const model = fullStream as unknown as ReadableStream<ChunkType>;
-  const source = { fullStream: toStream(observeModelChunks(model, state)) };
+  const source = { fullStream: toStream(observeModelChunks(model, state, signal)) };
   const ui = toAISdkStream(source as unknown as MastraModelOutput<unknown>, {
     from: 'agent',
     version: 'v6',
@@ -273,5 +281,6 @@ export async function* agentUIChunks(
     sendReasoning: true,
     sendSources: true,
   }) as unknown as ReadableStream<Chunk>;
-  for await (const chunk of readStream(ui)) yield* visibleChunks(chunk, state, onRecoveredCall);
+  for await (const chunk of readStream(ui, signal))
+    yield* visibleChunks(chunk, state, onRecoveredCall);
 }

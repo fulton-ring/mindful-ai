@@ -2,6 +2,7 @@ import type { Usage } from '@walden/contracts';
 import { Hono } from 'hono';
 import { loadMessageBudget, messageLimitFrom } from '../chat/turns/message-limit';
 import { first } from '../db/client';
+import { prepareQuery } from '../db/database';
 import type { Bindings, Variables } from '../types';
 
 export const metricsRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -22,11 +23,14 @@ metricsRoutes.get('/usage', async (c) => {
     // reply records the persona name it was written with, so a renamed or
     // deleted persona still reports something meaningful.
     first<{ persona_name: string }>(
-      c.env.DB.prepare(
-        `SELECT json_extract(ui_message,'$.metadata.personaName') AS persona_name FROM messages
+      prepareQuery(c.env.DB, {
+        sqlite: `SELECT json_extract(ui_message,'$.metadata.personaName') AS persona_name FROM messages
          WHERE owner_id=? AND role='assistant' AND persona_name IS NOT NULL
          GROUP BY persona_name ORDER BY COUNT(DISTINCT conversation_id) DESC, MAX(created_at) DESC LIMIT 1`,
-      ).bind(ownerId),
+        postgres: `SELECT ui_message::jsonb #>> '{metadata,personaName}' AS persona_name FROM messages
+         WHERE owner_id=? AND role='assistant' AND ui_message::jsonb #>> '{metadata,personaName}' IS NOT NULL
+         GROUP BY persona_name ORDER BY COUNT(DISTINCT conversation_id) DESC, MAX(created_at) DESC LIMIT 1`,
+      }).bind(ownerId),
     ),
   ]);
   return c.json({

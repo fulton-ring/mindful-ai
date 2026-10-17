@@ -38,6 +38,7 @@ function rejectPrivateQuery(query: string): void {
 
 async function requestWebSearch(
   apiKey: string,
+  modelName: string,
   signal: AbortSignal,
   query: string,
 ): Promise<Response> {
@@ -50,7 +51,7 @@ async function requestWebSearch(
     signal: AbortSignal.any([signal, AbortSignal.timeout(25_000)]),
     redirect: 'manual',
     body: JSON.stringify({
-      model: 'google/gemma-4-26b-a4b-it',
+      model: modelName,
       messages: [
         {
           role: 'system',
@@ -99,6 +100,7 @@ function sourceResults(body: z.infer<typeof responseSchema>, allowedUrls: Set<st
 
 async function executeWebSearch(
   apiKey: string,
+  modelName: string,
   signal: AbortSignal,
   allowedUrls: Set<string> | undefined,
   state: SearchState,
@@ -107,11 +109,11 @@ async function executeWebSearch(
   signal.throwIfAborted();
   rejectPrivateQuery(query);
   if (++state.calls > 2) throw new Error('Web search limit reached for this turn.');
-  let response = await requestWebSearch(apiKey, signal, query);
+  let response = await requestWebSearch(apiKey, modelName, signal, query);
   // The search provider behind OpenRouter fails transiently (upstream 502s).
   if (response.status >= 500) {
     await response.body?.cancel();
-    response = await requestWebSearch(apiKey, signal, query);
+    response = await requestWebSearch(apiKey, modelName, signal, query);
   }
   if (!response.ok) {
     await response.body?.cancel();
@@ -125,6 +127,7 @@ async function executeWebSearch(
 
 function createSearchWebTool(
   apiKey: string,
+  modelName: string,
   signal: AbortSignal,
   allowedUrls: Set<string> | undefined,
   state: SearchState,
@@ -134,18 +137,24 @@ function createSearchWebTool(
     description:
       'Search the public web for current facts and news. Returns source URLs and excerpts. Use concise public-topic queries; never send private notes, messages, personal identifiers, or credentials.',
     inputSchema: z.object({ query: z.string().trim().min(1).max(500) }),
-    execute: ({ query }) => executeWebSearch(apiKey, signal, allowedUrls, state, query),
+    execute: ({ query }) => executeWebSearch(apiKey, modelName, signal, allowedUrls, state, query),
   });
 }
 
 export function createWebSearchTools(
-  env: { OPENROUTER_API_KEY?: string },
+  env: { OPENROUTER_API_KEY?: string; OPENROUTER_SEARCH_MODEL?: string },
   signal: AbortSignal,
   allowedUrls?: Set<string>,
 ): McpTools {
   if (!env.OPENROUTER_API_KEY) return {};
   const state = { calls: 0 };
   return {
-    searchWeb: createSearchWebTool(env.OPENROUTER_API_KEY, signal, allowedUrls, state),
+    searchWeb: createSearchWebTool(
+      env.OPENROUTER_API_KEY,
+      env.OPENROUTER_SEARCH_MODEL?.trim() || 'google/gemma-4-26b-a4b-it',
+      signal,
+      allowedUrls,
+      state,
+    ),
   };
 }

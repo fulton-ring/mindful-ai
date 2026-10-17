@@ -1,4 +1,6 @@
 import type { WaldenUIMessageChunk } from '@walden/contracts';
+import type { AppDatabase } from '../../db/database';
+import { claimNativeFinalization, type NativeExecutionContext } from '../../execution/native-agent';
 import { captureChatFailure, captureTurnLifecycle } from '../../observability';
 import { createAgentService, modelNameForPersona } from '../../services/agent/agent';
 import { aiFailureCode, aiProviderErrorMessage } from '../../services/ai-errors/ai-errors';
@@ -19,12 +21,12 @@ const ENDED: Chunk = { type: 'error', errorText: 'Turn has ended. Reload the con
 const INCOMPLETE = 'The response could not finish. Please try again.';
 
 /** Deletion or expiry of the conversation or branch ends the turn within a couple of seconds. */
-function watchActive(db: D1Database, turnId: string, controller: AbortController) {
+function watchActive(db: AppDatabase, row: TurnRow, controller: AbortController) {
   let checking = false;
   return setInterval(() => {
     if (checking) return;
     checking = true;
-    void isTurnActive(db, turnId)
+    void isTurnActive(db, row.id, row.execution_generation)
       .then((active) => {
         if (!active) controller.abort('Turn is no longer active');
       })
@@ -55,7 +57,7 @@ function trackProgress(progress: Progress, chunk: Chunk) {
 }
 
 /** The stream's opening chunks: the assistant message id is the turn id. */
-function openingChunks(row: TurnRow, input: TurnInput, model: string): Chunk[] {
+export function openingChunks(row: TurnRow, input: TurnInput, model: string): Chunk[] {
   return [
     {
       type: 'start',
@@ -86,15 +88,25 @@ async function generateTurn(
   log: ChunkLog,
   progress: Progress,
   background: Background,
+  execution?: NativeExecutionContext,
 ) {
   const input = await loadInput(env, row);
   progress.model = modelNameForPersona(env, input.persona);
-  const agent = createAgentService(env, background);
-  log.append(...openingChunks(row, input, progress.model));
-  for await (const chunk of await agent.streamTurn(input, signal)) {
-    signal.throwIfAborted();
-    trackProgress(progress, chunk);
-    log.append(chunk);
+  const agent = createAgentService(env, background, execution);
+  if (!execution) await log.append(...openingChunks(row, input, progress.model));
+  const stream = await agent.streamTurn(input, signal);
+  const iterator = stream[Symbol.asyncIterator]();
+  try {
+    while (true) {
+      signal.throwIfAborted();
+      const next = await iterator.next();
+      if (next.done) break;
+      signal.throwIfAborted();
+      trackProgress(progress, next.value);
+      await log.append(next.value);
+    }
+  } finally {
+    await iterator.return?.();
   }
   return input;
 }
@@ -108,12 +120,13 @@ async function updateMemoryAfterReply(
   row: TurnRow,
   input: TurnInput,
   background: Background,
+  signal: AbortSignal,
 ) {
   try {
     const conversation = await loadConversation(env.DB, row.owner_id, row.conversation_id, {
       branchId: row.branch_id,
     });
-    await createAgentService(env, background).updateMemory({ ...input, conversation });
+    await createAgentService(env, background).updateMemory({ ...input, conversation }, signal);
   } catch {
     console.warn('Memory update after reply failed', { turnId: row.id });
   }
@@ -161,7 +174,14 @@ async function endTurn(
   progress: Progress,
   background: Background,
 ) {
-  if (signal.reason === STOPPED)
+  const cancelled =
+    signal.reason === STOPPED ||
+    Boolean(
+      await env.DB.prepare('SELECT 1 FROM turn_cancellations WHERE owner_id=? AND request_id=?')
+        .bind(row.owner_id, row.request_id)
+        .first(),
+    );
+  if (cancelled)
     return finishTurn(env.DB, row, log.chunks, 'cancelled', 'Turn cancelled', 'cancelled');
   return recordFailure(env, row, log, error, progress, background);
 }
@@ -177,6 +197,7 @@ export async function runTurn(
   log: ChunkLog,
   controller: AbortController,
   background: Background,
+  execution?: NativeExecutionContext,
 ): Promise<string> {
   background(
     captureTurnLifecycle(env, 'chat_turn_started', {
@@ -189,28 +210,35 @@ export async function runTurn(
       queueMs: Date.now() - Date.parse(row.created_at),
     }),
   );
-  const watcher = watchActive(env.DB, row.id, controller);
+  const watcher = watchActive(env.DB, row, controller);
   const progress: Progress = { model: 'unknown', partialResponse: false, toolIds: new Set() };
   let end: Chunk[] | null;
   let input: TurnInput | undefined;
   let completed = false;
   try {
-    input = await generateTurn(env, row, controller.signal, log, progress, background);
+    input = await generateTurn(env, row, controller.signal, log, progress, background, execution);
     // An aborted agent stream can end without throwing; what streamed is not a whole reply.
     controller.signal.throwIfAborted();
+    if (execution?.draining) throw new Error('Turn host is draining');
     end = await completeTurn(env.DB, row, log.chunks);
     completed = end !== null;
     end ??= await finishTurn(env.DB, row, log.chunks, 'failed', INCOMPLETE);
   } catch (error) {
+    if (execution?.draining || isNativeOwnerActive(error)) throw error;
+    // A reconstructed contender inherits the current row generation, not its ownership.
+    // Claim atomically before an early setup failure can write a terminal result.
+    if (execution && !execution.claimed) await claimNativeFinalization(execution);
     end = await endTurn(env, row, log, controller.signal, error, progress, background).catch(
       () => null,
     );
   } finally {
     clearInterval(watcher);
+    await execution?.releaseOwnership?.();
   }
-  log.append(...(end ?? [ENDED]));
+  await log.append(...(end ?? [ENDED]));
   log.end();
-  if (completed && input) await updateMemoryAfterReply(env, row, input, background);
+  if (completed && input)
+    await updateMemoryAfterReply(env, row, input, background, controller.signal);
   return terminalStatus(env, row, background);
 }
 
@@ -231,7 +259,7 @@ export async function sealInterruptedTurn(
     stopped ? 'cancelled' : 'internal_error',
   );
   if (!log.isEnded) {
-    log.append(...(end ?? [ENDED]));
+    await log.append(...(end ?? [ENDED]));
     log.end();
   }
   return terminalStatus(env, row, background);
@@ -253,4 +281,17 @@ async function terminalStatus(env: Bindings, row: TurnRow, background: Backgroun
     }),
   );
   return status;
+}
+
+function isNativeOwnerActive(error: unknown): boolean {
+  for (let depth = 0; depth < 8 && error && typeof error === 'object'; depth++) {
+    const current = error as { id?: string; cause?: unknown };
+    if (
+      current.id === 'DURABLE_AGENT_RUN_ACTIVE' ||
+      current.id === 'DURABLE_AGENT_RECOVER_RUN_ACTIVE_LOCALLY'
+    )
+      return true;
+    error = current.cause;
+  }
+  return false;
 }

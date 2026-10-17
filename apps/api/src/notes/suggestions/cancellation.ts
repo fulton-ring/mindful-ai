@@ -1,4 +1,6 @@
+import { notInterruptedSql } from '../../chat/messages';
 import { first } from '../../db/client';
+import type { AppDatabase } from '../../db/database';
 import { HttpError, newId, nowIso } from '../../http';
 import { dismissChange, hasNoteEdit } from '../operations';
 
@@ -13,21 +15,21 @@ type CancelSuggestionInput = {
 type PendingSuggestion = { id: string; note_id: string };
 
 async function markSuggestionAttemptCancelled(
-  db: D1Database,
+  db: AppDatabase,
   input: CancelSuggestionInput,
   now: string,
 ): Promise<void> {
   const marker = await db
     .prepare(
-      `INSERT OR IGNORE INTO note_suggestion_cancellations
+      `INSERT INTO note_suggestion_cancellations
        (owner_id,attempt_id,conversation_id,branch_id,source_message_id,created_at)
        SELECT ?,?,?,?,?,? WHERE EXISTS (
          SELECT 1 FROM conversations c
          JOIN conversation_branches b ON b.conversation_id=c.id AND b.owner_id=c.owner_id
          JOIN messages m ON m.conversation_id=c.id AND m.owner_id=c.owner_id
          WHERE c.id=? AND c.owner_id=? AND b.id=? AND m.id=?
-           AND m.role='assistant' AND json_extract(m.ui_message,'$.metadata.status') IS NOT 'interrupted'
-       )`,
+           AND m.role='assistant' AND ${notInterruptedSql('m', db.dialect)}
+       ) ON CONFLICT DO NOTHING`,
     )
     .bind(
       input.ownerId,
@@ -60,7 +62,7 @@ async function markSuggestionAttemptCancelled(
 }
 
 async function loadPendingSuggestions(
-  db: D1Database,
+  db: AppDatabase,
   input: CancelSuggestionInput,
 ): Promise<PendingSuggestion[]> {
   const pending = await db
@@ -91,7 +93,7 @@ const INSERT_CANCELLATION_EDIT = (ids: string[]) => `INSERT INTO note_edits
          AND (SELECT COUNT(*) FROM note_suggestions WHERE note_id=n.id AND owner_id=n.owner_id AND status='pending' AND id IN (${ids.map(() => '?').join(',')}))=?`;
 
 async function applySuggestionCancellation(
-  db: D1Database,
+  db: AppDatabase,
   input: CancelSuggestionInput,
   now: string,
   noteId: string,
@@ -137,8 +139,8 @@ async function applySuggestionCancellation(
     throw new HttpError(409, 'Suggestion batch changed');
 }
 
-export async function cancelNoteSuggestionAttempt(
-  db: D1Database,
+async function cancelNoteSuggestionAttemptInTransaction(
+  db: AppDatabase,
   input: CancelSuggestionInput,
 ): Promise<{ noteId: string | null; cancelledSuggestionIds: string[] }> {
   const now = nowIso();
@@ -154,4 +156,13 @@ export async function cancelNoteSuggestionAttempt(
   const ids = pending.map(({ id }) => id);
   await applySuggestionCancellation(db, input, now, noteId, ids);
   return { noteId, cancelledSuggestionIds: ids };
+}
+
+export async function cancelNoteSuggestionAttempt(db: AppDatabase, input: CancelSuggestionInput) {
+  return db.transaction
+    ? db.transaction(
+        (connection) => cancelNoteSuggestionAttemptInTransaction(connection, input),
+        [`owner:${input.ownerId}`],
+      )
+    : cancelNoteSuggestionAttemptInTransaction(db, input);
 }

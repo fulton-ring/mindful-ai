@@ -19,9 +19,9 @@ export function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
           <h2>Information used by Walden</h2>
           <p>
             Walden stores your account identifier, notes, personas, conversation history, and usage
-            information to provide the app. Clerk handles sign-in. Your messages and relevant
-            conversation and note context are sent to the configured AI provider to generate
-            responses.
+            information to provide the app. The configured authentication provider handles sign-in.
+            Your messages and relevant conversation and note context are sent to the configured AI
+            provider to generate responses.
           </p>
           <h2>Service providers</h2>
           <p>

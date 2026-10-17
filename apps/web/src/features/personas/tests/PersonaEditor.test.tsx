@@ -35,3 +35,43 @@ it('saves the chosen icon and renders it for a custom persona', async () => {
   );
   expect(picker.container.querySelector('[data-icon="book"]')).toBeTruthy();
 });
+it('shows the deployment catalog and requires reselecting an unavailable saved model', async () => {
+  const { setRuntimeConfig } = await import('../../../lib/runtime-config');
+  setRuntimeConfig({
+    authConfigured: true,
+    modelConfigured: true,
+    inference: {
+      configured: true,
+      defaultModel: 'local',
+      provider: 'openai-compatible',
+      catalogSource: 'configured',
+      catalogStale: false,
+      models: [
+        {
+          id: 'local',
+          name: 'Local model',
+          weight: 3,
+          inputModalities: ['text'],
+          outputModalities: ['text'],
+          supportsTools: true,
+          supportsStructuredOutput: true,
+        },
+      ],
+    },
+  });
+  try {
+    const view = render(
+      <PersonaEditor
+        persona={{ ...DEFAULT_PERSONAS[0]!, model: 'retired/model' }}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(view.getByText(/unavailable on this instance/)).toBeTruthy();
+    expect(view.getByRole('button', { name: 'Save persona' }).hasAttribute('disabled')).toBe(true);
+    expect(view.getByRole('combobox', { name: 'Model' }).textContent).toContain('retired/model');
+    expect(view.queryByText('GLM 5.3 Flash')).toBeNull();
+  } finally {
+    setRuntimeConfig(undefined);
+  }
+});

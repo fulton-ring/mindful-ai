@@ -1,6 +1,7 @@
 import { noteHistoryActionSchema } from '@walden/contracts';
 import type { z } from 'zod';
 import { first, parseJson } from '../../db/client';
+import type { AppDatabase } from '../../db/database';
 import { HttpError, nowIso } from '../../http';
 import {
   assertReplayMatches,
@@ -32,7 +33,7 @@ type HistoryMove = {
 };
 
 async function loadHistoryEdit(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   noteId: string,
   direction: HistoryDirection,
@@ -55,7 +56,7 @@ function readSuggestionChanges(edit: HistoryEdit) {
 }
 
 async function assertSuggestionStatuses(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   noteId: string,
   direction: HistoryDirection,
@@ -79,7 +80,7 @@ async function assertSuggestionStatuses(
 }
 
 const buildHistoryStatements = (
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   noteId: string,
   move: HistoryMove,
@@ -147,7 +148,7 @@ const buildHistoryStatements = (
 };
 
 const buildSuggestionUpdates = (
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   noteId: string,
   move: HistoryMove,
@@ -178,7 +179,12 @@ const buildSuggestionUpdates = (
       );
   });
 
-async function runHistoryBatch(db: D1Database, ownerId: string, noteId: string, move: HistoryMove) {
+async function runHistoryBatch(
+  db: AppDatabase,
+  ownerId: string,
+  noteId: string,
+  move: HistoryMove,
+) {
   const statements = buildHistoryStatements(db, ownerId, noteId, move, nowIso());
   await runIdempotentBatch(db, statements, {
     key: { ownerId, noteId, operationId: move.input.operationId },
@@ -188,8 +194,8 @@ async function runHistoryBatch(db: D1Database, ownerId: string, noteId: string, 
   });
 }
 
-export async function moveNoteHistory(
-  db: D1Database,
+async function moveNoteHistoryInTransaction(
+  db: AppDatabase,
   ownerId: string,
   noteId: string,
   direction: HistoryDirection,
@@ -224,4 +230,19 @@ export async function moveNoteHistory(
     changes,
   });
   return loadNoteState(db, ownerId, noteId);
+}
+
+export async function moveNoteHistory(
+  db: AppDatabase,
+  ownerId: string,
+  noteId: string,
+  direction: HistoryDirection,
+  input: HistoryInput,
+) {
+  return db.transaction
+    ? db.transaction(
+        (connection) => moveNoteHistoryInTransaction(connection, ownerId, noteId, direction, input),
+        [`owner:${ownerId}`],
+      )
+    : moveNoteHistoryInTransaction(db, ownerId, noteId, direction, input);
 }

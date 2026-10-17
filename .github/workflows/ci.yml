@@ -13,16 +13,40 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24.15.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:ci
       - run: pnpm verify
 
-  # Which deployables a push to main touched, so each Worker deploys only when it
-  # changed. Redeploying the app Worker ends any chat reply in progress.
+  self-hosted-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ONNXRUNTIME_NODE_INSTALL: skip
+      WALDEN_TEST_POSTGRES: '1'
+      WALDEN_TEST_BROWSER: '1'
+      WALDEN_TEST_WORKER_BUNDLE: '1'
+      WALDEN_TEST_NATIVE_PURGE_BROKER: '1'
+      EMBEDDING_MODEL_DIR: /tmp/walden-minilm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.15.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @walden/contracts build && pnpm --filter @walden/domain build
+      - run: node apps/api/scripts/download-embedding-model.mjs /tmp/walden-minilm
+      - run: pnpm --filter @walden/api exec playwright install --with-deps chromium
+      - run: pnpm build:self-hosted
+      - run: pnpm --filter @walden/api build
+      - run: pnpm --filter @walden/api exec vitest run src/platform/node src/execution/production-worker.workerd.test.ts src/execution/purge.test.ts --maxWorkers=2
+
+  # Manual deployment selects the changed deployables. Main pushes only run checks.
   changes:
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     outputs:
       app: ${{ steps.filter.outputs.app }}
@@ -46,7 +70,7 @@ jobs:
   # db:migrate:remote` by hand before pushing code that needs them.
   deploy-app:
     needs: [verify, changes]
-    if: needs.changes.outputs.app == 'true' || github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-app
@@ -64,7 +88,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24.15.0
           cache: pnpm
       - if: env.CLOUDFLARE_API_TOKEN != ''
         run: pnpm install --frozen-lockfile
@@ -77,7 +101,7 @@ jobs:
 
   deploy-landing:
     needs: [verify, changes]
-    if: needs.changes.outputs.landing == 'true' || github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-landing
@@ -95,7 +119,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24.15.0
           cache: pnpm
       - if: env.CLOUDFLARE_API_TOKEN != ''
         run: pnpm install --frozen-lockfile

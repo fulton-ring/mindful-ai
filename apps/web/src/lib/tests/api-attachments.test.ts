@@ -1,7 +1,15 @@
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { beginIdentitySession, bindAccountIdentity } from '../account-identity';
 import { uploadAttachment } from '../api';
 
-afterEach(() => vi.unstubAllGlobals());
+beforeEach(() => {
+  beginIdentitySession();
+  bindAccountIdentity('internal-account');
+});
+afterEach(() => {
+  beginIdentitySession();
+  vi.unstubAllGlobals();
+});
 
 it('uploads bytes directly to a presigned R2 URL before completing the attachment', async () => {
   const calls: Array<[string, RequestInit | undefined]> = [];
@@ -28,6 +36,7 @@ it('uploads bytes directly to a presigned R2 URL before completing the attachmen
   ]);
   expect(calls[1]?.[1]).toMatchObject({ method: 'PUT', body: file });
   expect(new Headers(calls[1]?.[1]?.headers).get('authorization')).toBeNull();
+  expect(new Headers(calls[1]?.[1]?.headers).get('X-Walden-Account-Id')).toBeNull();
 });
 
 it('reports transfer progress and completes only after storage confirms the file', async () => {

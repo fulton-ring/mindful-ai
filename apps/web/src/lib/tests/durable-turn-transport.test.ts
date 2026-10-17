@@ -228,3 +228,35 @@ describe('reconnecting', () => {
     expect(urls(fetchMock).at(-1)).toBe('/api/chat/turns/t-2/events?after=0');
   });
 });
+it('hands a newer generation to a fresh decoder at its numeric cursor and ignores repeated markers', async () => {
+  const onReplace = vi.fn();
+  const target = new DurableTurnTransport({
+    prepare: async () => context,
+    locate: () => null,
+    onReplace,
+  });
+  const replacement = {
+    type: 'data-turn-replace',
+    transient: true,
+    data: { turnId: 'turn-1', generation: 1 },
+  };
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ turnId: 'turn-1' }))
+    .mockResolvedValueOnce(
+      new Response(`${text(1, 'old')}${frame(2, replacement)}${text(3, 'new')}`),
+    )
+    .mockResolvedValueOnce(
+      new Response(`${frame(3, replacement)}${text(4, 'new')}data: [DONE]\n\n`),
+    );
+  vi.stubGlobal('fetch', fetchMock);
+  expect(await read(await send(target))).toHaveLength(1);
+  expect(onReplace).toHaveBeenCalledWith({ turnId: 'turn-1', generation: 1, after: 2 });
+  expect(
+    await read(
+      await target.reconnectToStream({ chatId: 'chat', body: { turnId: 'turn-1', after: 2 } }),
+    ),
+  ).toHaveLength(1);
+  expect(urls(fetchMock).at(-1)).toBe('/api/chat/turns/turn-1/events?after=2');
+  expect(onReplace).toHaveBeenCalledTimes(1);
+});

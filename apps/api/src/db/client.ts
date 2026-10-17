@@ -1,8 +1,10 @@
-export async function first<T>(statement: D1PreparedStatement): Promise<T | null> {
+import type { AppStatement } from './database';
+
+export async function first<T>(statement: AppStatement): Promise<T | null> {
   return (await statement.first<T>()) ?? null;
 }
 
-export async function all<T>(statement: D1PreparedStatement): Promise<T[]> {
+export async function all<T>(statement: AppStatement): Promise<T[]> {
   return (await statement.all<T>()).results;
 }
 

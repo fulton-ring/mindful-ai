@@ -9,6 +9,7 @@ import { agentTrace } from '../../agent/stream-events';
 import { loadAttachments } from '../../chat/attachments/attachments';
 import { messageAttachments } from '../../chat/messages';
 import { isConversationLive } from '../../chat/turns/turn-store';
+import type { NativeExecutionContext } from '../../execution/native-agent';
 import { type ApiTelemetry, createApiTelemetry } from '../../observability';
 import { captureConversation, contentPreference } from '../../privacy/content-telemetry';
 import { createMcpService, type McpTools } from '../mcp';
@@ -20,6 +21,7 @@ import { streamMemoryPreparation } from './agent-memory-stream';
 type AgentModel = Parameters<typeof prepareAgentMemory>[3]['model'];
 
 type TurnStreamOptions = {
+  execution?: NativeExecutionContext;
   env: ServiceEnv;
   input: AgentTurnInput;
   modelName: string;
@@ -74,6 +76,7 @@ async function* prepareTurnMemory(
   input: AgentTurnInput,
   model: AgentModel,
   signal: AbortSignal,
+  execution?: NativeExecutionContext,
 ): AsyncGenerator<
   WaldenUIMessageChunk,
   Awaited<ReturnType<typeof prepareAgentMemory>> | undefined
@@ -86,6 +89,7 @@ async function* prepareTurnMemory(
         model,
         signal,
         onLifecycle,
+        deferWrites: Boolean(execution),
         isActive: () => isConversationLive(env.DB!, ownerId, input.conversation.id),
       }),
   );
@@ -175,7 +179,12 @@ async function createPrimaryStream(
     signal,
     tools,
     trace: agentTrace(telemetry, input.telemetryUserId, modelName),
-    runtime: { memory, workspace, onToolResult: restoreSearchUrls(allowedUrls) },
+    runtime: {
+      memory,
+      workspace,
+      onToolResult: restoreSearchUrls(allowedUrls),
+      execution: options.execution,
+    },
   });
 }
 
@@ -226,7 +235,13 @@ export async function* streamTurnChunks(
   let visibleResponse = '';
   let completed = false;
   try {
-    const memory = yield* prepareTurnMemory(env, input, memoryModel, options.signal);
+    const memory = yield* prepareTurnMemory(
+      env,
+      input,
+      memoryModel,
+      options.signal,
+      options.execution,
+    );
     const workspace = createTurnWorkspace(env, input);
     const stream = await createPrimaryStream(options, memory, workspace, telemetry);
     options.signal.throwIfAborted();

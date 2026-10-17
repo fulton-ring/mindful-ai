@@ -2,6 +2,8 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    // Integration fixtures start workerd, parser workers and native stores.
+    maxWorkers: 2,
     // Several suites spawn sqlite3 and build a full migration chain per fixture.
     // That runs close to the 5s default and tipped over under the parallel
     // workspace run, producing failures in a different file each time.

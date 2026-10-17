@@ -16,5 +16,8 @@
   },
   "dependencies": {
     "@walden/contracts": "workspace:*"
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }

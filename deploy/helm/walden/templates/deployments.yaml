@@ -1,0 +1,81 @@
+{{- range $role := list "http" "worker" "scheduler" }}
+{{- $settings := index $.Values $role }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "walden.name" $ }}-{{ $role }}
+  labels:
+    {{- include "walden.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $role }}
+spec:
+  replicas: {{ if eq $role "scheduler" }}1{{ else }}{{ $settings.replicas }}{{ end }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: {{ $role }}
+  template:
+    metadata:
+      labels:
+        {{- include "walden.labels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $role }}
+    spec:
+      terminationGracePeriodSeconds: {{ $.Values.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- include "walden.security" $ | nindent 8 }}
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: walden
+          image: {{ include "walden.image" $ | quote }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          ports: [{ name: http, containerPort: 3000 }]
+          env:
+            - name: APP_ROLE
+              value: {{ $role }}
+            {{- include "walden.env" $ | nindent 12 }}
+          envFrom:
+            - secretRef: { name: {{ $.Values.externalSecretName | quote }} }
+          startupProbe:
+            httpGet: { path: /health/ready, port: http }
+            failureThreshold: 60
+            periodSeconds: 5
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 15
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml $settings.resources | nindent 12 }}
+          volumeMounts:
+            - { name: scratch, mountPath: /data }
+            - { name: tmp, mountPath: /tmp }
+            - { name: shm, mountPath: /dev/shm }
+      volumes:
+        - name: scratch
+          emptyDir: { sizeLimit: 256Mi }
+        - name: tmp
+          emptyDir: { sizeLimit: 1Gi }
+        - name: shm
+          emptyDir: { medium: Memory, sizeLimit: 512Mi }
+      {{- with $.Values.nodeSelector }}
+      nodeSelector: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.tolerations }}
+      tolerations: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.affinity }}
+      affinity: {{ toYaml . | nindent 8 }}
+      {{- end }}
+---
+{{ end -}}

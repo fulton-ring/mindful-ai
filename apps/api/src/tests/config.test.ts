@@ -7,6 +7,8 @@ it('exposes only a public PostHog project token, never personal or application s
     POSTHOG_API_KEY: 'phc_public',
     OPENROUTER_API_KEY: 'private-model-key',
     CLERK_SECRET_KEY: 'private-auth-key',
+    CLERK_PUBLISHABLE_KEY: 'pk_public',
+    AI_MODELS_JSON: '["google/gemma-4-26b-a4b-it"]',
   } as Bindings);
   const body = await response.json();
   expect(body).toMatchObject({

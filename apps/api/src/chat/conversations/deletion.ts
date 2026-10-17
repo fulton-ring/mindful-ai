@@ -1,6 +1,8 @@
 import { deleteAgentMemoryThread } from '../../agent/memory/memory';
 import { all } from '../../db/client';
+import type { AppDatabase, AppResult } from '../../db/database';
 import { nowIso } from '../../http';
+import type { ObjectStore } from '../../storage/object-store';
 import { deleteAttachmentPrefix } from '../attachments/attachments';
 
 export const EXPLICIT_DELETE_CONVERSATION_SQL = `DELETE FROM conversations
@@ -10,10 +12,14 @@ export const EXPLICIT_ARCHIVE_CONVERSATION_SQL = `DELETE FROM conversations
   WHERE id=? AND owner_id=?`;
 export const EXPLICIT_DELETE_NOTE_SQL = `DELETE FROM notes
   WHERE owner_id=? AND id=(SELECT note_id FROM conversations WHERE id=? AND owner_id=?)`;
-export const conversationDeleteSucceeded = (result: D1Result | undefined) =>
+export const conversationDeleteSucceeded = (result: AppResult<unknown> | undefined) =>
   (result?.meta.changes ?? 0) > 0;
 
-export async function purgeExpiredConversations(db: D1Database, files?: R2Bucket): Promise<number> {
+export async function purgeExpiredConversations(
+  db: AppDatabase,
+  files?: ObjectStore,
+  purgeExecution?: (ownerId: string, conversationId: string) => Promise<void>,
+): Promise<number> {
   const expiredAt = nowIso();
   const expired = await all<{ id: string; owner_id: string }>(
     // Note-backed threads keep an 'expired' shell; skip ones already purged.
@@ -23,6 +29,7 @@ export async function purgeExpiredConversations(db: D1Database, files?: R2Bucket
       )
       .bind(expiredAt),
   );
+  if (purgeExecution) for (const row of expired) await purgeExecution(row.owner_id, row.id);
   if (files)
     await Promise.all(
       expired.map(({ id, owner_id }) => deleteAttachmentPrefix(files, owner_id, id)),
