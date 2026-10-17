@@ -1,0 +1,32 @@
+Core 1.78.0; Postgres store 1.31.2; Postgres 17 and Valkey; command exits 0
+
+✔ durable: disconnect detaches; another observer replays and follows the same run (1537.428542ms)
+✔ durable: Stop aborts the model and preserves partial output (1090.523167ms)
+✔ durable: Stop during a tool prevents a later write (1171.397583ms)
+✔ durable: SIGKILL leaves a discoverable snapshot; recovery reissues the interrupted model call (2365.01825ms)
+✔ durable: crash after a tool write can repeat an external effect (3746.082583ms)
+✔ durable: crash after a tool write requires an idempotency key to avoid duplication (4866.134584ms)
+✔ durable: recovery must not rerun a completed tool (5090.385ms)
+✔ evented: disconnect detaches; another observer replays and follows the same run (2826.327958ms)
+✔ evented: Stop aborts the model and preserves partial output (2064.461834ms)
+✔ evented: Stop during a tool prevents a later write (1577.357166ms)
+✔ evented: SIGKILL leaves a discoverable snapshot; recovery reissues the interrupted model call (2057.737209ms)
+✔ evented: crash after a tool write can repeat an external effect (4252.262333ms)
+✔ evented: crash after a tool write requires an idempotency key to avoid duplication (6078.133542ms)
+✔ evented: recovery must not rerun a completed tool (5893.611667ms)
+✔ durable distributed: a separate process replays, follows, and stops the owner through Valkey (4016.766917ms)
+✔ durable distributed: persistent stream history survives owner SIGKILL (2490.725ms)
+✔ durable distributed: recovery must not take over a healthy owner (1158.234125ms)
+✔ durable distributed: recovered output must not append a replayed partial answer twice (1398.497042ms)
+✔ evented distributed: a separate process replays, follows, and stops the owner through Valkey (1267.164958ms)
+✔ evented distributed: persistent stream history survives owner SIGKILL (1227.221458ms)
+✔ evented distributed: recovery must not take over a healthy owner (1346.561458ms)
+✔ evented distributed: recovered output must not append a replayed partial answer twice (1433.478958ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 58994.758042

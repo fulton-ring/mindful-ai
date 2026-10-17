@@ -1,0 +1,6 @@
+Opt-in API core substitution 1.78.0; existing dependencies otherwise unchanged; exits 1
+
+ FAIL  src/agent/tests/r2-workspace.test.ts > lists and searches extension-aware R2 files and converted sidecars under plain tool names
+ FAIL  src/agent/tests/tools/research-tools.test.ts > sends attached image bytes to the model as image content
+ Test Files  2 failed | 78 passed | 5 skipped (85)
+      Tests  2 failed | 415 passed | 12 skipped (429)
