@@ -58,3 +58,6 @@ A subsequent Helm upgrade (revision 3) re-ran the pre-upgrade migration hook and
 rolled all five application pods successfully. Both replacement HTTP pods read
 the saved note, all four migration ledger entries were unchanged, and replacement
 pods had zero restarts. All eight acceptance/upgrade assertions passed.
+
+The disposable `walden-selfhost-test` cluster was deleted after evidence capture.
+No application images were pushed and no production deployment was performed.
