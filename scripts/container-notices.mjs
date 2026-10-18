@@ -11,6 +11,7 @@ import {
   stat,
   writeFile,
 } from 'node:fs/promises';
+import { get } from 'node:https';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
@@ -198,6 +199,21 @@ async function collectRuntime(output) {
   await verifyFiles(output, files);
 }
 
+const httpsBody = (url, redirects = 5) =>
+  new Promise((resolve, reject) => {
+    get(url, (response) => {
+      const { statusCode, headers } = response;
+      if (statusCode >= 300 && statusCode < 400 && headers.location && redirects > 0) {
+        response.resume();
+        resolve(httpsBody(new URL(headers.location, url).href, redirects - 1));
+      } else if (statusCode === 200) resolve(response);
+      else {
+        response.resume();
+        reject(new Error(`Download failed (${statusCode}): ${url}`));
+      }
+    }).on('error', reject);
+  });
+
 async function fetchSources(output) {
   const manifest = JSON.parse(await readFile(join(nativeDirectory, 'sources.json'), 'utf8'));
   await mkdir(output, { recursive: true });
@@ -211,9 +227,7 @@ async function fetchSources(output) {
       if (error.code !== 'ENOENT') throw error;
     }
     if (alreadyValid) return;
-    const response = await fetch(file.source);
-    if (!response.ok) throw new Error(`Download failed (${response.status}): ${file.source}`);
-    await pipeline(response.body, createWriteStream(path));
+    await pipeline(await httpsBody(file.source), createWriteStream(path));
     await verifyFiles(output, [file]);
   };
   for (let i = 0; i < manifest.files.length; i += 6)

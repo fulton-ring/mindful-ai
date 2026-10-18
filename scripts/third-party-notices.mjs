@@ -77,13 +77,18 @@ async function supplementNotice(identity, supplement, supplementDirectory) {
   return lines.join('\n');
 }
 
-async function packageNotice(path, metadataLicense, supplements, supplementDirectory) {
+async function packageNotice(path, metadataLicense, supplements, supplementDirectory, workspace) {
   const pkg = JSON.parse(await readFile(join(path, 'package.json'), 'utf8'));
   const files = await noticeFiles(path);
   const identity = `${pkg.name}@${pkg.version}`;
   const lines = [`Package: ${identity}`, `Declared license: ${metadataLicense}`];
   if (pkg.homepage) lines.push(`Upstream: ${pkg.homepage}`);
-  if (!files.some((file) => /^(licen[cs]e|copying)/i.test(file.split('/').at(-1)))) {
+  const hasLicense = files.some((file) => /^(licen[cs]e|copying)/i.test(file.split('/').at(-1)));
+  if (!hasLicense && workspace.has(identity)) {
+    lines.push(
+      `\n--- Walden repository LICENSE ---\n${(await readFile(join(repository, 'LICENSE'), 'utf8')).trim()}`,
+    );
+  } else if (!hasLicense) {
     const supplement = supplements[identity];
     if (supplement) {
       lines.push(await supplementNotice(identity, supplement, supplementDirectory));
@@ -101,7 +106,7 @@ async function packageNotice(path, metadataLicense, supplements, supplementDirec
 
 export async function generateNotices(
   inventory,
-  { supplementDirectory = join(repository, 'licenses/npm') } = {},
+  { supplementDirectory = join(repository, 'licenses/npm'), workspacePackages = new Set() } = {},
 ) {
   const supplements = JSON.parse(
     await readFile(join(supplementDirectory, 'manifest.json'), 'utf8'),
@@ -110,7 +115,9 @@ export async function generateNotices(
   for (const [license, packages] of Object.entries(inventory)) {
     for (const pkg of packages) {
       for (const path of pkg.paths)
-        blocks.add(await packageNotice(path, license, supplements, supplementDirectory));
+        blocks.add(
+          await packageNotice(path, license, supplements, supplementDirectory, workspacePackages),
+        );
     }
   }
   return [
@@ -124,45 +131,100 @@ export async function generateNotices(
   ].join('\n');
 }
 
+async function packageDirectories(modules) {
+  const paths = [];
+  for (const entry of await readdir(modules, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const path = join(modules, entry.name);
+    if (!entry.name.startsWith('@')) paths.push(path);
+    else {
+      for (const scoped of await readdir(path, { withFileTypes: true }))
+        if (scoped.isDirectory()) paths.push(join(path, scoped.name));
+    }
+  }
+  return paths;
+}
+
+function declaredLicense(pkg) {
+  if (typeof pkg.license === 'string') return pkg.license;
+  if (pkg.license?.type) return pkg.license.type;
+  if (Array.isArray(pkg.licenses))
+    return pkg.licenses.map((license) => license.type ?? license).join(' OR ');
+  return 'Unknown';
+}
+
+export async function addDeployedPackages(inventory, nodeModules) {
+  const listed = new Set(
+    Object.values(inventory)
+      .flat()
+      .flatMap((pkg) => pkg.versions.map((version) => `${pkg.name}@${version}`)),
+  );
+  const store = join(nodeModules, '.pnpm');
+  for (const entry of await readdir(store, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name === 'node_modules') continue;
+    for (const path of await packageDirectories(join(store, entry.name, 'node_modules'))) {
+      const pkg = JSON.parse(await readFile(join(path, 'package.json'), 'utf8'));
+      if (!pkg.name || !pkg.version || listed.has(`${pkg.name}@${pkg.version}`)) continue;
+      const license = declaredLicense(pkg);
+      inventory[license] = [
+        ...(inventory[license] ?? []),
+        { name: pkg.name, versions: [pkg.version], paths: [path] },
+      ];
+    }
+  }
+  return inventory;
+}
+
+const usage =
+  'Usage: third-party-notices.mjs [--filter=WORKSPACE] [--deployed=NODE_MODULES] OUTPUT [OUTPUT...]';
+
 export function parseNoticeArguments(args) {
   const filters = [];
   const outputs = [];
+  let deployed;
   for (const arg of args) {
     if (arg.startsWith('--filter=')) filters.push(arg.slice('--filter='.length));
-    else if (arg.startsWith('--'))
-      throw new Error('Usage: third-party-notices.mjs [--filter=WORKSPACE] OUTPUT [OUTPUT...]');
+    else if (arg.startsWith('--deployed=') && !deployed) deployed = arg.slice('--deployed='.length);
+    else if (arg.startsWith('--')) throw new Error(usage);
     else outputs.push(arg);
   }
-  if (!outputs.length || filters.some((filter) => !filter.trim())) {
-    throw new Error('Usage: third-party-notices.mjs [--filter=WORKSPACE] OUTPUT [OUTPUT...]');
+  if (!outputs.length || filters.some((filter) => !filter.trim()) || deployed === '') {
+    throw new Error(usage);
   }
-  return { filters, outputs };
+  return { filters, outputs, deployed };
 }
 
+const pnpmJson = (args) =>
+  JSON.parse(
+    execFileSync('pnpm', args, {
+      cwd: repository,
+      encoding: 'utf8',
+      maxBuffer: 32 * 1024 * 1024,
+    }),
+  );
+
 async function main() {
-  const { filters, outputs } = parseNoticeArguments(process.argv.slice(2));
-  const inventory = JSON.parse(
-    execFileSync(
-      'pnpm',
-      [
-        ...filters.flatMap((filter) => ['--filter', filter]),
-        'licenses',
-        'list',
-        '--prod',
-        '--json',
-      ],
-      {
-        cwd: repository,
-        encoding: 'utf8',
-        maxBuffer: 32 * 1024 * 1024,
-      },
-    ),
+  const { filters, outputs, deployed } = parseNoticeArguments(process.argv.slice(2));
+  const inventory = pnpmJson([
+    ...filters.flatMap((filter) => ['--filter', filter]),
+    'licenses',
+    'list',
+    '--prod',
+    '--json',
+  ]);
+  if (deployed) await addDeployedPackages(inventory, resolve(deployed));
+  const workspacePackages = new Set(
+    deployed
+      ? pnpmJson(['ls', '--recursive', '--depth=-1', '--json']).map(
+          (pkg) => `${pkg.name}@${pkg.version}`,
+        )
+      : [],
   );
   const content = [
     'WALDEN LICENSE AND ATTRIBUTION',
     await readFile(join(repository, 'LICENSE'), 'utf8'),
     await readFile(join(repository, 'NOTICE'), 'utf8'),
-    await generateNotices(inventory),
+    await generateNotices(inventory, { workspacePackages }),
   ].join('\n');
   for (const output of outputs) {
     const path = resolve(output);

@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { inspectImageRoot } from './public-image-check.mjs';
 import * as noticeCommand from './third-party-notices.mjs';
 
-const { generateNotices, parseNoticeArguments } = noticeCommand;
+const { addDeployedPackages, generateNotices, parseNoticeArguments } = noticeCommand;
 
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), 'walden-licenses-'));
@@ -29,10 +29,21 @@ test('notice command scopes the production inventory with explicit workspace fil
     {
       filters: ['@walden/api', '@walden/web'],
       outputs: ['out.txt', 'public/out.txt'],
+      deployed: undefined,
     },
   );
-  assert.deepEqual(parseNoticeArguments(['out.txt']), { filters: [], outputs: ['out.txt'] });
-  for (const args of [[], ['--filter=', 'out.txt'], ['--unknown', 'out.txt']]) {
+  assert.deepEqual(parseNoticeArguments(['--deployed=/out/node_modules', 'out.txt']), {
+    filters: [],
+    outputs: ['out.txt'],
+    deployed: '/out/node_modules',
+  });
+  for (const args of [
+    [],
+    ['--filter=', 'out.txt'],
+    ['--unknown', 'out.txt'],
+    ['--deployed=', 'out.txt'],
+    ['--deployed=a', '--deployed=b', 'out.txt'],
+  ]) {
     assert.throws(() => parseNoticeArguments(args), /Usage:/);
   }
 });
@@ -68,6 +79,75 @@ test('packages without a license retain upstream README and explicitly flag miss
   const result = await generateNotices({ Unknown: [{ name: 'missing', paths: [root] }] });
   assert.match(result, /MISSING_LICENSE_TEXT: missing@2/);
   assert.match(result, /Upstream licensing information/);
+});
+
+test('deployed package stores add unlisted packages and workspace packages keep the project license', async (t) => {
+  const root = await fixture(t);
+  const store = join(root, 'node_modules', '.pnpm');
+  const write = async (entry, name, metadata, files = {}) => {
+    const path = join(store, entry, 'node_modules', name);
+    await mkdir(path, { recursive: true });
+    await writeFile(join(path, 'package.json'), JSON.stringify({ name, ...metadata }));
+    for (const [file, text] of Object.entries(files)) await writeFile(join(path, file), text);
+    return path;
+  };
+  const listedPath = await write(
+    'listed@1.0.0',
+    'listed',
+    { version: '1.0.0', license: 'MIT' },
+    {
+      LICENSE: 'Listed license',
+    },
+  );
+  await write(
+    '@scope+deployed@2.0.0',
+    '@scope/deployed',
+    { version: '2.0.0', license: 'ISC' },
+    {
+      LICENSE: 'Deployed scoped license',
+    },
+  );
+  await write(
+    'legacy@3.0.0',
+    'legacy',
+    { version: '3.0.0', licenses: [{ type: 'BSD-2-Clause' }] },
+    {
+      'LICENSE.md': 'Legacy license',
+    },
+  );
+  await write('unknown@4.0.0', 'unknown', { version: '4.0.0' });
+  await write('@walden+contracts@0.0.0', '@walden/contracts', {
+    version: '0.0.0',
+    license: 'Apache-2.0',
+  });
+  const inventory = await addDeployedPackages(
+    { MIT: [{ name: 'listed', versions: ['1.0.0'], paths: [listedPath] }] },
+    join(root, 'node_modules'),
+  );
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(inventory).map(([license, packages]) => [
+        license,
+        packages.map((pkg) => `${pkg.name}@${pkg.versions.join()}`).sort(),
+      ]),
+    ),
+    {
+      MIT: ['listed@1.0.0'],
+      ISC: ['@scope/deployed@2.0.0'],
+      'BSD-2-Clause': ['legacy@3.0.0'],
+      Unknown: ['unknown@4.0.0'],
+      'Apache-2.0': ['@walden/contracts@0.0.0'],
+    },
+  );
+  const result = await generateNotices(inventory, {
+    workspacePackages: new Set(['@walden/contracts@0.0.0']),
+  });
+  assert.equal(result.match(/Package: listed@1.0.0/g).length, 1);
+  assert.match(result, /Package: @scope\/deployed@2.0.0\nDeclared license: ISC/);
+  assert.match(result, /Deployed scoped license/);
+  assert.match(result, /Package: @walden\/contracts@0.0.0[^=]+Walden repository LICENSE/);
+  assert.doesNotMatch(result, /MISSING_LICENSE_TEXT: @walden\/contracts/);
+  assert.match(result, /MISSING_LICENSE_TEXT: unknown@4.0.0/);
 });
 
 async function supplementFixture(t) {
