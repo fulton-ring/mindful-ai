@@ -28,7 +28,7 @@
 
 - [x] Add an explicit public-image check that reports enterprise modules/chunks, missing notice artifacts, and missing model license files. Use fixture tests and inspect the real built image.
 - [x] Keep existing application and private Docker behavior intact. Do not downgrade Mastra, remove permission checks, or introduce an enterprise shim.
-- [x] Document the pinned release's enterprise imports and the required upstream resolution before publishing images.
+- [x] Document the pinned release's enterprise imports and upstream clarification for bundled packages with enterprise features disabled.
 
 ## 4. Verify and ship the cleanup
 
@@ -42,9 +42,13 @@
 - `pnpm verify`: 1,108 tests passed (697 API, 370 web, 41 domain); 54 opt-in tests skipped. An initial local turn-store/worker timeout passed on the unchanged focused suite and full rerun.
 - `pnpm test:licenses`: four tests passed, including nested attribution, absent license text, enterprise detection, and avoiding the MIT `ee-first` false positive.
 - Provider browser/API matrix: 24 passed, three intentional mixed-policy skips, across Node, Cloudflare, and disposable SeaweedFS. Chromium required execution outside the filesystem sandbox.
-- Docker build and readiness, API config, note create/edit/export/delete, and served notices passed. The explicit public-image check correctly rejected retained Mastra enterprise files and missing upstream license texts.
+- Docker build and readiness, API config, note create/edit/export/delete, and served notices passed. The initial public-image check rejected retained Mastra enterprise files and missing upstream license texts; the Mastra file-presence blocker is superseded by the clarification below.
 - Both private hosted profiles remain byte-identical to the original configurations and mode `0600`; their Wrangler dry runs passed. Production environment configuration secrets and public URL variables are installed.
 - Gitleaks scanned all reachable commits: six previously reviewed false positives, zero confirmed credentials. Private profiles remain ignored.
 - User selected preserving Mastra and gating public image publication. Repository visibility and image publication are unchanged.
 - Final landing review: default, `.env`, and shell-precedence builds verified canonical URLs, links and all five redirects; the `.env` file is a tested Turbo cache input. No dependency changes were needed.
 - Served license artifact also retains the exact project `LICENSE` and `NOTICE`; both files are Turbo cache inputs.
+
+## Mastra policy correction
+
+Upstream [issue #22113](https://github.com/mastra-ai/mastra/issues/22113#issuecomment-5405270073) contains a maintainer's clarification for publishing ordinary applications with bundled, unused enterprise files. After reviewing this evidence, the user accepted keeping Mastra and removing the blanket file-presence blocker. The check now reports bundled Mastra files as informational warnings while retaining errors for missing attribution, missing upstream license texts, and other enterprise payloads requiring review. Five fixture tests cover successful CLI exit with bundled Mastra files and continued attribution failures. Runtime dependencies and application behavior are unchanged.

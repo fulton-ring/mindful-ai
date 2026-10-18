@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { inspectImageRoot } from './public-image-check.mjs';
 import { generateNotices } from './third-party-notices.mjs';
 
@@ -60,14 +62,17 @@ async function imageFixture(t) {
   return root;
 }
 
-test('image guard rejects enterprise payloads and unresolved/missing notices', async (t) => {
+test('image guard reports bundled Mastra files while rejecting unresolved/missing notices', async (t) => {
   const root = await imageFixture(t);
-  assert.deepEqual(await inspectImageRoot(root), []);
+  assert.deepEqual(await inspectImageRoot(root), { issues: [], warnings: [] });
   await writeFile(join(root, 'node_modules/@mastra/core/dist/ee-example.js'), 'enterprise');
+  await mkdir(join(root, 'node_modules/another-package/ee'), { recursive: true });
   await writeFile(join(root, 'THIRD_PARTY_LICENSES.txt'), 'MISSING_LICENSE_TEXT: missing@2');
   await rm(join(root, 'models/minilm/LICENSE'));
-  const issues = await inspectImageRoot(root);
-  assert.ok(issues.some((issue) => issue.includes('ee-example.js')));
+  const { issues, warnings } = await inspectImageRoot(root);
+  assert.ok(warnings.some((warning) => warning.includes('ee-example.js')));
+  assert.ok(issues.every((issue) => !issue.includes('ee-example.js')));
+  assert.ok(issues.some((issue) => issue.includes('another-package/ee')));
   assert.ok(issues.some((issue) => issue.includes('MISSING_LICENSE_TEXT')));
   assert.ok(issues.some((issue) => issue.includes('models/minilm/LICENSE')));
   assert.equal(
@@ -80,5 +85,19 @@ test('image guard does not mistake the MIT ee-first package for enterprise code'
   const root = await imageFixture(t);
   await mkdir(join(root, 'node_modules/ee-first'));
   await writeFile(join(root, 'node_modules/ee-first/index.js'), 'MIT licensed helper');
-  assert.deepEqual(await inspectImageRoot(root), []);
+  assert.deepEqual(await inspectImageRoot(root), { issues: [], warnings: [] });
+});
+
+test('bundled Mastra enterprise files alone do not fail the image-check command', async (t) => {
+  const root = await imageFixture(t);
+  await mkdir(join(root, 'node_modules/@mastra/core/dist/auth/ee'), { recursive: true });
+  await writeFile(join(root, 'node_modules/@mastra/core/dist/ee-example.js'), 'bundled helper');
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL('./public-image-check.mjs', import.meta.url)), '--root', root],
+    { encoding: 'utf8' },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /Bundled Mastra enterprise file.*ee-example\.js/);
+  assert.match(result.stderr, /Bundled Mastra enterprise file.*auth\/ee/);
 });
