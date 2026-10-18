@@ -2,6 +2,10 @@
 
 A chat-first workspace for thinking with an assistant. Create notes during a conversation when you have something you want to keep. Notes stay; conversations expire after seven days of inactivity. Suggested edits are reviewed inline before they become part of your document.
 
+## License
+
+Walden's original code and documentation are licensed under [Apache-2.0](LICENSE). See [NOTICE](NOTICE) for copyright attribution and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for dependency and distribution licensing details. Third-party components retain their own licenses.
+
 ## Self-hosting
 
 Run Walden as one container with SQLite, or use PostgreSQL, Valkey and S3 with separate runtime roles. See the [self-hosting guide](docs/self-hosting.md), [Compose configuration](compose.yaml), and [Kubernetes chart](deploy/helm/walden/README.md). No Cloudflare account is required for the self-hosted runtime.

@@ -1,6 +1,7 @@
 {
   "name": "walden",
   "private": true,
+  "license": "Apache-2.0",
   "packageManager": "pnpm@10.30.0",
   "scripts": {
     "dev": "node --env-file-if-exists=.env scripts/dev.mjs",

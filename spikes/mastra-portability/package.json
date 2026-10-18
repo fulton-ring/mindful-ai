@@ -1,6 +1,7 @@
 {
   "name": "walden-mastra-portability-spike",
   "private": true,
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "test": "node --test --test-concurrency=1 portability.test.mjs",

@@ -42,6 +42,8 @@ ENV NODE_ENV=production \
 WORKDIR /app
 COPY --from=prod-dependencies /out/node_modules/ /app/node_modules/
 COPY --from=models /models/ /app/models/
+COPY LICENSE /app/models/minilm/LICENSE
+COPY LICENSE NOTICE THIRD_PARTY_NOTICES.md /app/
 COPY --from=build /workspace/apps/api/dist/node/ /app/dist/node/
 COPY --from=build /workspace/apps/api/public/ /app/public/
 COPY --from=build /workspace/apps/api/migrations/ /app/migrations/
