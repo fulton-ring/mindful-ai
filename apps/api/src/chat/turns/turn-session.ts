@@ -14,6 +14,7 @@ import {
 import { resolveInferenceConfig } from '../../inference/config';
 import { modelNameForPersona } from '../../services/agent/agent';
 import type { Bindings } from '../../types';
+import { syncAccountRetention } from '../conversations/retention';
 import { ChunkLog } from './chunk-log';
 import {
   type Background,
@@ -189,6 +190,7 @@ export class TurnSession {
   private async drive(turnId: string, recover: boolean, saved?: ExecutionDescriptor) {
     const row = await loadTurn(this.env.DB, turnId);
     if (!row || row.status !== 'streaming') return this.seal(turnId, false);
+    await syncAccountRetention(this.env, row.owner_id);
     const input = JSON.parse(row.input_json ?? '{}') as TurnInput;
     const model = saved?.model ?? modelNameForPersona(this.env, input.persona);
     const config = this.executionHost ? resolveInferenceConfig(this.env) : undefined;

@@ -3,11 +3,12 @@ import ExcelJS from 'exceljs';
 import mammoth from 'mammoth';
 import TurndownService from 'turndown';
 import { gfm } from 'turndown-plugin-gfm';
-import { DOCUMENT_TYPES, MAX_ATTACHMENT_BYTES } from '../../../chat/attachments/attachments';
+import { DOCUMENT_TYPES } from '../../../chat/attachments/attachments';
 import type {
   DocumentExtraction,
   DocumentExtractionInput,
 } from '../../../storage/document-extractor';
+import { validateDocumentInput } from './limits';
 
 const MAX_OUTPUT = 4_000_000;
 export function htmlToMarkdown(html: string): string {
@@ -96,8 +97,7 @@ function tableCell(value: string) {
 }
 export async function convertDocument(input: DocumentExtractionInput): Promise<DocumentExtraction> {
   input.signal?.throwIfAborted();
-  if (input.bytes.byteLength < 1 || input.bytes.byteLength > MAX_ATTACHMENT_BYTES)
-    throw new Error('Documents must be between 1 byte and 1 MB.');
+  validateDocumentInput(input.bytes);
   const extension = /\.([a-z0-9]+)$/i.exec(input.name)?.[1]?.toLowerCase();
   if (!extension || DOCUMENT_TYPES[extension] !== input.mimeType)
     throw new Error('Unsupported document format. Use PDF, DOCX, or XLSX.');

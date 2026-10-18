@@ -9,6 +9,7 @@ import { all, first, parseJson } from '../../db/client';
 import type { AppDatabase } from '../../db/database';
 import { HttpError, newId, nowIso } from '../../http';
 import { parseStoredMessage } from '../messages';
+import { DEFAULT_RETENTION_DAYS, retentionExpiry } from './retention';
 
 export const RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -17,6 +18,7 @@ type ConversationRow = {
   title: string;
   note_id: string | null;
   expires_at: string;
+  retention_disabled: number;
   learning_checks_enabled: number;
   web_search_enabled: number;
   status: string;
@@ -26,6 +28,7 @@ type BranchRow = {
   head_message_id: string | null;
   forked_from_message_id: string | null;
   expires_at: string;
+  retention_disabled: number;
   status: string;
 };
 type MessageRow = {
@@ -39,22 +42,32 @@ async function purgeConversationState(
   db: AppDatabase,
   ownerId: string,
   conversationId: string,
-): Promise<void> {
+  expectedExpiry: string,
+): Promise<string | null> {
+  const token = newId();
+  const claim = await db
+    .prepare(`UPDATE conversations SET status='purging',purge_started_at=?,purge_token=?
+    WHERE id=? AND owner_id=? AND status IN ('active','expired') AND retention_disabled=0
+      AND expires_at=? AND expires_at<=? RETURNING id`)
+    .bind(nowIso(), token, conversationId, ownerId, expectedExpiry, nowIso())
+    .first();
+  if (!claim) return null;
   await deleteAgentMemoryThread(db, ownerId, conversationId);
+  const guard =
+    "SELECT id FROM conversations WHERE id=? AND owner_id=? AND status='purging' AND purge_token=?";
   await db.batch([
+    ...['interventions', 'messages', 'turns'].map((table) =>
+      db
+        .prepare(`DELETE FROM ${table} WHERE conversation_id IN (${guard})`)
+        .bind(conversationId, ownerId, token),
+    ),
     db
-      .prepare('DELETE FROM interventions WHERE conversation_id=? AND owner_id=?')
-      .bind(conversationId, ownerId),
-    db
-      .prepare('DELETE FROM messages WHERE conversation_id=? AND owner_id=?')
-      .bind(conversationId, ownerId),
-    db
-      .prepare('DELETE FROM turns WHERE conversation_id=? AND owner_id=?')
-      .bind(conversationId, ownerId),
-    db
-      .prepare("UPDATE conversations SET status='expired' WHERE id=? AND owner_id=?")
-      .bind(conversationId, ownerId),
+      .prepare(
+        `UPDATE conversations SET status='expired',purge_started_at=NULL WHERE id IN (${guard})`,
+      )
+      .bind(conversationId, ownerId, token),
   ]);
+  return token;
 }
 
 async function loadConversationRow(
@@ -66,7 +79,7 @@ async function loadConversationRow(
     db
       .prepare(
         // Same ownership rule as the list: the note names the thread.
-        `SELECT c.id,COALESCE(NULLIF(TRIM(n.title),''),c.title) AS title,c.note_id,c.expires_at,c.learning_checks_enabled,c.web_search_enabled,c.status
+        `SELECT c.id,COALESCE(NULLIF(TRIM(n.title),''),c.title) AS title,c.note_id,c.expires_at,c.retention_disabled,c.learning_checks_enabled,c.web_search_enabled,c.status
            FROM conversations c
            LEFT JOIN notes n ON n.id=c.note_id AND n.owner_id=c.owner_id
            WHERE c.id=? AND c.owner_id=?`,
@@ -74,6 +87,7 @@ async function loadConversationRow(
       .bind(id, ownerId),
   );
   if (!row) throw new HttpError(404, 'Conversation not found');
+  if (row.status === 'purging') throw new HttpError(410, 'Conversation deletion in progress');
   return row;
 }
 
@@ -86,7 +100,7 @@ async function loadConversationBranches(
     db
       .prepare(
         // Branches share their conversation's retention window.
-        `SELECT b.id,b.head_message_id,b.forked_from_message_id,c.expires_at,b.status
+        `SELECT b.id,b.head_message_id,b.forked_from_message_id,c.expires_at,c.retention_disabled,b.status
            FROM conversation_branches b JOIN conversations c ON c.id=b.conversation_id
            WHERE b.conversation_id=? AND b.owner_id=? ORDER BY b.is_default DESC,b.created_at`,
       )
@@ -94,8 +108,8 @@ async function loadConversationBranches(
   );
 }
 
-const isActiveBranch = ({ status, expires_at }: BranchRow) =>
-  status === 'active' && expires_at > nowIso();
+const isActiveBranch = ({ status, expires_at, retention_disabled }: BranchRow) =>
+  status === 'active' && (retention_disabled === 1 || expires_at > nowIso());
 
 type ResolvedBranch = {
   branch: BranchRow;
@@ -110,27 +124,36 @@ async function renewConversation(
   id: string,
   branch: BranchRow,
   branches: BranchRow[],
+  idleDays: number | null,
+  token: string,
 ): Promise<ResolvedBranch> {
-  await purgeConversationState(db, ownerId, id);
   const renewedAt = nowIso();
-  const renewedExpiry = new Date(Date.now() + RETENTION_MS).toISOString();
-  await db.batch([
+  const expiry = retentionExpiry(idleDays, renewedAt);
+  const renewedExpiry = expiry.storedExpiresAt;
+  const guard =
+    "SELECT id FROM conversations WHERE id=? AND owner_id=? AND status='active' AND purge_token=?";
+  const results = await db.batch([
     db
       .prepare(
-        "UPDATE conversation_branches SET status=CASE WHEN id=? THEN 'active' ELSE 'expired' END,head_message_id=NULL,forked_from_message_id=NULL WHERE conversation_id=? AND owner_id=?",
+        "UPDATE conversations SET status='active',last_user_activity_at=?,expires_at=?,retention_disabled=? WHERE id=? AND owner_id=? AND status='expired' AND purge_token=?",
       )
-      .bind(branch.id, id, ownerId),
+      .bind(renewedAt, renewedExpiry, expiry.retentionDisabled, id, ownerId, token),
     db
       .prepare(
-        "UPDATE conversations SET status='active',last_user_activity_at=?,expires_at=? WHERE id=? AND owner_id=?",
+        `UPDATE conversation_branches SET status=CASE WHEN id=? THEN 'active' ELSE 'expired' END,head_message_id=NULL,forked_from_message_id=NULL WHERE conversation_id IN (${guard})`,
       )
-      .bind(renewedAt, renewedExpiry, id, ownerId),
+      .bind(branch.id, id, ownerId, token),
+    db
+      .prepare(`UPDATE conversations SET purge_token=NULL WHERE id IN (${guard})`)
+      .bind(id, ownerId, token),
   ]);
+  if (!results[0]?.meta.changes) throw new HttpError(410, 'Conversation changed during renewal');
   const renewedBranch = {
     ...branch,
     status: 'active',
     head_message_id: null,
     expires_at: renewedExpiry,
+    retention_disabled: expiry.retentionDisabled,
   };
   return {
     branch: renewedBranch,
@@ -146,25 +169,51 @@ async function resolveConversationBranch(
   id: string,
   row: ConversationRow,
   branches: BranchRow[],
-  options: { renewExpired?: boolean; branchId?: string },
+  options: { renewExpired?: boolean; branchId?: string; retentionIdleDays?: number | null },
 ): Promise<ResolvedBranch> {
   const branch = options.branchId
     ? branches.find(({ id: branchId }) => branchId === options.branchId)
     : (branches.find(isActiveBranch) ?? branches[0]);
   if (!branch) throw new HttpError(404, 'Branch not found');
-  if (branch.status === 'active' && branch.expires_at > nowIso()) return { branch, branches };
+  if (isActiveBranch(branch)) return { branch, branches };
 
   const hasActiveBranch = branches.some(isActiveBranch);
   // A new message may restart a fully expired note-backed conversation, even
   // when the client supplies the branch shown in its empty transcript.
   if (options.branchId && (!options.renewExpired || row.note_id === null || hasActiveBranch))
     throw new HttpError(410, 'Branch expired');
+  const token = await purgeConversationState(db, ownerId, id, row.expires_at);
+  if (!token) {
+    const current = await loadConversationRow(db, ownerId, id);
+    if (
+      current.status === row.status &&
+      current.expires_at === row.expires_at &&
+      current.retention_disabled === row.retention_disabled
+    )
+      throw new HttpError(410, 'Conversation expired');
+    Object.assign(row, current);
+    return resolveConversationBranch(
+      db,
+      ownerId,
+      id,
+      row,
+      await loadConversationBranches(db, ownerId, id),
+      options,
+    );
+  }
   if (row.note_id === null || !options.renewExpired) {
-    if (!hasActiveBranch) await purgeConversationState(db, ownerId, id);
     if (row.note_id === null) throw new HttpError(410, 'Conversation expired');
     return { branch, branches: [], expired: true };
   }
-  return renewConversation(db, ownerId, id, branch, branches);
+  return renewConversation(
+    db,
+    ownerId,
+    id,
+    branch,
+    branches,
+    options.retentionIdleDays === undefined ? DEFAULT_RETENTION_DAYS : options.retentionIdleDays,
+    token,
+  );
 }
 
 /** The stored message with its user highlights and agent annotations attached. */
@@ -242,7 +291,7 @@ function buildConversation(
     title: row.title,
     noteId: row.note_id,
     messages,
-    expiresAt: branch.expires_at,
+    expiresAt: branch.retention_disabled === 1 ? null : branch.expires_at,
     learningChecksEnabled: Boolean(row.learning_checks_enabled),
     webSearchEnabled: row.web_search_enabled !== 0,
     branchId: branch.id,
@@ -250,7 +299,7 @@ function buildConversation(
       id: item.id,
       forkedFromMessageId: item.forked_from_message_id,
       headMessageId: item.head_message_id,
-      expiresAt: item.expires_at,
+      expiresAt: item.retention_disabled === 1 ? null : item.expires_at,
     })),
   };
 }
@@ -259,7 +308,7 @@ export async function loadConversation(
   db: AppDatabase,
   ownerId: string,
   id: string,
-  options: { renewExpired?: boolean; branchId?: string } = {},
+  options: { renewExpired?: boolean; branchId?: string; retentionIdleDays?: number | null } = {},
 ): Promise<Conversation> {
   const row = await loadConversationRow(db, ownerId, id);
   const resolved = await resolveConversationBranch(
@@ -281,15 +330,17 @@ export async function createConversation(
   ownerId: string,
   noteId: string | null,
   body: { personaId?: string },
+  idleDays: number | null = DEFAULT_RETENTION_DAYS,
 ): Promise<Conversation> {
   const createdAt = nowIso();
-  const expiresAt = new Date(Date.now() + RETENTION_MS).toISOString();
+  const expiry = retentionExpiry(idleDays, createdAt);
+  const expiresAt = expiry.expiresAt;
   const id = newId();
   const branchId = newId();
   await db.batch([
     db
       .prepare(
-        'INSERT INTO conversations (id,owner_id,note_id,persona_id,title,last_user_activity_at,expires_at,status,created_at) VALUES (?,?,?,?,?,?,?,?,?)',
+        'INSERT INTO conversations (id,owner_id,note_id,persona_id,title,last_user_activity_at,expires_at,retention_disabled,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
       )
       .bind(
         id,
@@ -298,7 +349,8 @@ export async function createConversation(
         body.personaId ?? 'thinking-partner',
         'New thread',
         createdAt,
-        expiresAt,
+        expiry.storedExpiresAt,
+        expiry.retentionDisabled,
         'active',
         createdAt,
       ),
@@ -337,11 +389,13 @@ export async function requireConversation(
           .prepare(
             `SELECT c.id,c.note_id FROM conversations c
              JOIN conversation_branches b ON b.conversation_id=c.id AND b.owner_id=c.owner_id
-             WHERE c.id=? AND c.owner_id=? AND b.id=?`,
+             WHERE c.id=? AND c.owner_id=? AND b.id=? AND c.status<>'purging'`,
           )
           .bind(id, ownerId, branchId)
       : db
-          .prepare('SELECT id,note_id FROM conversations WHERE id=? AND owner_id=?')
+          .prepare(
+            "SELECT id,note_id FROM conversations WHERE id=? AND owner_id=? AND status<>'purging'",
+          )
           .bind(id, ownerId),
   );
   if (!row) throw new HttpError(404, 'Conversation not found');

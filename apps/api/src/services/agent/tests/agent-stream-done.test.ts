@@ -25,6 +25,7 @@ describe('turn stream completion', () => {
     for await (const event of streamTurnChunks({
       env: {},
       input: {
+        ownerId: 'owner',
         turnId: 'turn',
         requestId: 'request',
         conversation: {

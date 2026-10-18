@@ -6,6 +6,7 @@ export type DocumentExtractionInput = {
 };
 export type DocumentExtraction = { markdown: string; tokens?: number };
 export interface DocumentExtractor {
+  readonly maxInputBytes?: number;
   extract(input: DocumentExtractionInput): Promise<DocumentExtraction>;
 }
 /** Cloudflare's optional extraction capability stays behind the same portable contract. */
@@ -16,6 +17,7 @@ export function createCloudflareDocumentExtractor(ai: {
   }): Promise<{ format: string; data?: string; tokens?: number }>;
 }): DocumentExtractor {
   return {
+    maxInputBytes: MAX_DOCUMENT_INPUT_BYTES,
     async extract(input) {
       input.signal?.throwIfAborted();
       const result = await ai.toMarkdown({
@@ -29,3 +31,5 @@ export function createCloudflareDocumentExtractor(ai: {
     },
   };
 }
+/** Physical buffer protection, independent of account upload entitlements. */
+export const MAX_DOCUMENT_INPUT_BYTES = 32_000_000;

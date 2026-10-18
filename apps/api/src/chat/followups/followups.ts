@@ -85,7 +85,8 @@ async function loadTarget(
   const conversation = await loadConversation(c.env.DB, ownerId, request.conversationId, {
     branchId: request.branchId,
   });
-  if (conversation.expiresAt <= nowIso()) throw new HttpError(410, 'Conversation expired');
+  if (conversation.expiresAt !== null && conversation.expiresAt <= nowIso())
+    throw new HttpError(410, 'Conversation expired');
   const index = conversation.messages.findIndex(
     (message) => message.id === requestParam(c, 'messageId'),
   );

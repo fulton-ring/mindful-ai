@@ -1,4 +1,5 @@
 import type {
+  AccountPolicy,
   AnnotationEvent,
   ChatRequest,
   Conversation,
@@ -329,6 +330,7 @@ async function streamError(response: Response, fallback: string): Promise<never>
 }
 
 export const api = {
+  accountPolicy: () => request<AccountPolicy>('/api/account/policy'),
   accountPrivacy: () =>
     request<{ enabled: boolean; acknowledged: boolean; version: string }>('/api/account/privacy'),
   setAccountPrivacy: (enabled: boolean, version: string) =>

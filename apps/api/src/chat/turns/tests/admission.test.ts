@@ -263,3 +263,33 @@ it('rejects an unsupported default model before storing or charging a turn', asy
   expect(await DB.prepare('SELECT COUNT(*) AS count FROM turns').first()).toEqual({ count: 0 });
   expect(await DB.prepare('SELECT COUNT(*) AS count FROM messages').first()).toEqual({ count: 0 });
 });
+
+it('uses trusted account plans for admission and keeps usage when switching to and from unlimited', async () => {
+  const { DB, env, start } = await fixture();
+  let plan = 'small';
+  const getPlan = vi.fn(async () => plan);
+  env.APP_PLANS_JSON = JSON.stringify({
+    small: { messages: { limit: 1 } },
+    unlimited: { messages: { limit: null } },
+    larger: { messages: { limit: 3 } },
+  });
+  env.ENTITLEMENTS = { getPlan };
+  const first = await start('first-plan-send');
+  expect(first.status).toBe(200);
+  expect(((await first.json()) as TurnStart).budget).toMatchObject({ used: 1, limit: 1 });
+  expect(getPlan.mock.calls).toEqual([['owner']]);
+  await DB.prepare("UPDATE turns SET status='completed'").run();
+  expect((await start('blocked-plan-send')).status).toBe(429);
+  plan = 'unlimited';
+  const unlimited = await start('unlimited-plan-send');
+  expect(unlimited.status).toBe(200);
+  expect(((await unlimited.json()) as TurnStart).budget).toMatchObject({ used: 2, limit: null });
+  await DB.prepare("UPDATE turns SET status='completed'").run();
+  plan = 'small';
+  expect((await start('downgraded-plan-send')).status).toBe(429);
+  expect(await DB.prepare('SELECT used FROM message_windows').first()).toEqual({ used: 2 });
+  plan = 'larger';
+  const upgraded = await start('upgraded-plan-send');
+  expect(upgraded.status).toBe(200);
+  expect(((await upgraded.json()) as TurnStart).budget).toMatchObject({ used: 3, limit: 3 });
+});

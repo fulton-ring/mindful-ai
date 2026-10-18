@@ -13,7 +13,7 @@ import { PRIVACY_VERSION } from './content-telemetry';
 const privacySchema = z.object({ enabled: z.boolean(), version: z.literal(PRIVACY_VERSION) });
 /** Conversations whose transcripts still exist, the scope of everything exported below. */
 const LIVE_CONVERSATIONS =
-  "SELECT id FROM conversations WHERE owner_id=? AND expires_at>? AND status='active'";
+  "SELECT id FROM conversations WHERE owner_id=? AND (retention_disabled=1 OR expires_at>?) AND status='active'";
 
 export const accountRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 accountRoutes.get('/account/privacy', async (c) => {
@@ -57,7 +57,7 @@ accountRoutes.get('/account/export', async (c) => {
         ownerId,
       ),
       rows(
-        "SELECT id,title,note_id,learning_checks_enabled,web_search_enabled,last_user_activity_at,expires_at,status,created_at FROM conversations WHERE owner_id=? AND expires_at>? AND status='active'",
+        "SELECT id,title,note_id,learning_checks_enabled,web_search_enabled,last_user_activity_at,CASE WHEN retention_disabled=1 THEN NULL ELSE expires_at END AS expires_at,status,created_at FROM conversations WHERE owner_id=? AND (retention_disabled=1 OR expires_at>?) AND status='active'",
         ownerId,
         now,
       ),
@@ -80,7 +80,7 @@ accountRoutes.get('/account/export', async (c) => {
          FROM message_highlights h
          JOIN messages m ON m.id=h.message_id AND m.owner_id=h.owner_id
          JOIN conversations c ON c.id=m.conversation_id AND c.owner_id=m.owner_id
-         WHERE h.owner_id=? AND c.status='active' AND c.expires_at>?
+         WHERE h.owner_id=? AND c.status='active' AND (c.retention_disabled=1 OR c.expires_at>?)
          ORDER BY h.message_id,h.origin,h.updated_at,h.start,h."end"`,
         ownerId,
         now,

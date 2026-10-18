@@ -43,7 +43,7 @@ const INSERT_SUGGESTION = (
        SELECT 1 FROM notes n JOIN conversations c ON c.note_id=n.id AND c.owner_id=n.owner_id
        JOIN conversation_branches b ON b.conversation_id=c.id AND b.owner_id=c.owner_id
        WHERE n.id=? AND n.owner_id=? AND n.revision=? AND n.markdown=? AND c.id=?
-       AND b.id=? AND b.status='active' AND c.expires_at>?
+       AND b.id=? AND b.status='active' AND (c.retention_disabled=1 OR c.expires_at>?)
        AND EXISTS (SELECT 1 FROM messages m WHERE m.id=? AND m.conversation_id=c.id
          AND m.owner_id=c.owner_id AND m.role='assistant' AND ${notInterruptedSql('m', db.dialect)})
      )`;
@@ -54,7 +54,7 @@ const NEW_NOTE_GUARD = (db: AppDatabase) => `NOT EXISTS (
          ) AND EXISTS (
            SELECT 1 FROM conversations c JOIN conversation_branches b ON b.conversation_id=c.id AND b.owner_id=c.owner_id
            WHERE c.id=? AND c.owner_id=? AND c.note_id IS NULL AND b.id=?
-           AND b.status='active' AND c.expires_at>?
+           AND b.status='active' AND (c.retention_disabled=1 OR c.expires_at>?)
            AND EXISTS (SELECT 1 FROM messages m WHERE m.id=? AND m.conversation_id=c.id
              AND m.owner_id=c.owner_id AND m.role='assistant' AND ${notInterruptedSql('m', db.dialect)})
          )`;
@@ -76,7 +76,7 @@ async function loadSuggestionBaseline(
         `SELECT c.note_id,c.title,n.markdown,n.revision FROM conversations c
          JOIN conversation_branches b ON b.conversation_id=c.id AND b.owner_id=c.owner_id
          LEFT JOIN notes n ON n.id=c.note_id AND n.owner_id=c.owner_id
-         WHERE c.id=? AND c.owner_id=? AND b.id=? AND b.status='active' AND c.expires_at>?
+         WHERE c.id=? AND c.owner_id=? AND b.id=? AND b.status='active' AND (c.retention_disabled=1 OR c.expires_at>?)
          AND EXISTS (SELECT 1 FROM messages m WHERE m.id=? AND m.conversation_id=c.id
            AND m.owner_id=c.owner_id AND m.role='assistant' AND ${notInterruptedSql('m', db.dialect)})`,
       )

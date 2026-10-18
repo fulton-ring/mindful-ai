@@ -34,7 +34,7 @@ async function healthy(url, diagnostics) {
   throw new Error(`Stack did not become ready: ${url} ${last}\n${diagnostics()}`);
 }
 
-async function startNode(state, port, inference, logs, mixed) {
+async function startNode(state, port, inference, logs, mixed, environment) {
   const model = resolve(process.env.EMBEDDING_MODEL_DIR ?? join(root, '.cache/models/minilm'));
   await access(join(model, 'onnx/model_quantized.onnx'));
   const env = {
@@ -51,6 +51,7 @@ async function startNode(state, port, inference, logs, mixed) {
     AUTH_MODE: 'none',
     MESSAGE_LIMIT: '1000',
     ...inference,
+    ...environment,
   };
   if (mixed)
     Object.assign(env, {
@@ -63,6 +64,7 @@ async function startNode(state, port, inference, logs, mixed) {
       S3_FORCE_PATH_STYLE: 'true',
       S3_REGION: 'us-east-1',
     });
+  for (const key of Object.keys(env)) if (env[key] === undefined) delete env[key];
   const child = spawn(process.execPath, [join(api, 'dist/node/server.js')], {
     cwd: root,
     env,
@@ -83,7 +85,7 @@ async function startNode(state, port, inference, logs, mixed) {
   };
 }
 
-async function startCloudflare(state, port, inference) {
+async function startCloudflare(state, port, inference, environment) {
   const wranglerRequire = createRequire(require.resolve('wrangler/package.json'));
   const { Miniflare, convertV4MiniflareOptions } = wranglerRequire('miniflare');
   const bundle = join(api, 'dist/worker.js');
@@ -104,12 +106,15 @@ async function startCloudflare(state, port, inference) {
     compatibilityDate: '2026-09-18',
     compatibilityFlags: ['nodejs_compat'],
     resourcePersistencePath: state,
-    bindings: {
-      AUTH_MODE: 'none',
-      MESSAGE_LIMIT: '1000',
-      UPLOAD_LOCAL_FALLBACK: 'true',
-      ...inference,
-    },
+    bindings: Object.fromEntries(
+      Object.entries({
+        AUTH_MODE: 'none',
+        MESSAGE_LIMIT: '1000',
+        UPLOAD_LOCAL_FALLBACK: 'true',
+        ...inference,
+        ...environment,
+      }).filter(([, value]) => value !== undefined),
+    ),
     d1Databases: { DB: 'provider-matrix' },
     r2Buckets: ['FILES'],
     durableObjects: { CHAT_TURN: { className: 'ChatTurn', useSQLite: true } },
@@ -197,8 +202,8 @@ export async function startStack(name, overrides = {}) {
   const boot = async () => {
     stop =
       name === 'cloudflare'
-        ? await startCloudflare(state, port, inference)
-        : await startNode(state, port, inference, logs, name === 'mixed');
+        ? await startCloudflare(state, port, inference, overrides.environment)
+        : await startNode(state, port, inference, logs, name === 'mixed', overrides.environment);
     await healthy(baseURL, () => logs.join(''));
   };
   const close = async () => {

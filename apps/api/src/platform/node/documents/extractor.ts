@@ -1,10 +1,11 @@
 import { Worker } from 'node:worker_threads';
-import { MAX_ATTACHMENT_BYTES } from '../../../chat/attachments/attachments';
 import type {
   DocumentExtraction,
   DocumentExtractionInput,
   DocumentExtractor,
 } from '../../../storage/document-extractor';
+import { MAX_DOCUMENT_INPUT_BYTES } from '../../../storage/document-extractor';
+import { validateDocumentInput } from './limits';
 export type NodeDocumentExtractorOptions = {
   workerUrl?: URL;
   timeoutMs?: number;
@@ -29,10 +30,10 @@ export function createNodeDocumentExtractor(
   let active = 0;
   const queue: (() => void)[] = [];
   return {
+    maxInputBytes: MAX_DOCUMENT_INPUT_BYTES,
     async extract(input: DocumentExtractionInput): Promise<DocumentExtraction> {
       input.signal?.throwIfAborted();
-      if (input.bytes.byteLength < 1 || input.bytes.byteLength > MAX_ATTACHMENT_BYTES)
-        throw new Error('Documents must be between 1 byte and 1 MB.');
+      validateDocumentInput(input.bytes);
       if (active >= maxConcurrent) {
         if (queue.length >= maxQueued)
           throw new Error('Document extraction is busy. Try again shortly.');

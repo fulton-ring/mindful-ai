@@ -10,14 +10,16 @@ import type { AppDatabase } from '../../db/database';
 import { HttpError, jsonBody, nowIso } from '../../http';
 import { getPublicInferenceConfig, validateInferenceModel } from '../../inference/config';
 import { captureServerEvent } from '../../observability';
+import { getRequestAccountPolicy } from '../../policy/request';
 import { modelNameForPersona } from '../../services/agent/agent';
 import type { Bindings, Variables } from '../../types';
 import {
   attachmentKey,
   loadAttachments,
-  MAX_ATTACHMENT_BYTES,
   stagingAttachmentKey,
+  validateAttachmentCount,
   validateAttachmentFile,
+  validateAttachmentSize,
 } from '../attachments/attachments';
 import {
   attachmentMimeType,
@@ -27,7 +29,7 @@ import {
 } from '../attachments/presign';
 import { requireConversation } from '../conversations/repository';
 import { parseStoredMessage } from '../messages';
-import { limitWindowStats, loadMessageBudget, messageLimitFrom } from './message-limit';
+import { limitWindowStats, loadMessageBudget } from './message-limit';
 import { type PreparedTurn, prepareTurn } from './turn-lifecycle';
 import { turnObject } from './turn-session';
 import type { TurnRow } from './turn-store';
@@ -38,15 +40,11 @@ chatRoutes.post('/attachments/:conversationId/initiate', async (c) => {
   const conversationId = c.req.param('conversationId');
   const ownerId = c.get('userId');
   await requireConversation(c.env.DB, ownerId, conversationId);
+  const { policy } = await getRequestAccountPolicy(c);
+  validateAttachmentCount(1, policy.uploads.maxFiles);
   const body = await jsonBody<{ name?: string; mimeType?: string; size?: number }>(c);
-  if (
-    !body.name ||
-    body.name.length > 180 ||
-    !Number.isInteger(body.size) ||
-    (body.size ?? 0) < 1 ||
-    (body.size ?? 0) > MAX_ATTACHMENT_BYTES
-  )
-    throw new HttpError(413, 'Files must be between 1 byte and 1 MB.');
+  if (!body.name || body.name.length > 180) throw new HttpError(400, 'Invalid file name.');
+  validateAttachmentSize(body.size ?? 0, policy.uploads.maxBytes);
   const mimeType = attachmentMimeType(body.name, body.mimeType ?? '');
   const id = crypto.randomUUID();
   if (c.env.FILES.presignPut) {
@@ -87,8 +85,41 @@ chatRoutes.post('/attachments/:conversationId/:attachmentId/complete', async (c)
   if (!/^[a-f0-9-]{36}$/.test(id)) throw new HttpError(404, 'Uploaded file not found.');
   const body = await jsonBody<{ name?: string }>(c);
   if (!body.name || body.name.length > 180) throw new HttpError(400, 'Invalid file name.');
-  return c.json(await completeUpload(c.env.FILES, ownerId, conversationId, id, body.name));
+  const { policy } = await getRequestAccountPolicy(c);
+  return c.json(
+    await completeUpload(c.env.FILES, ownerId, conversationId, id, body.name, policy.uploads),
+  );
 });
+
+async function readUploadForm(request: Request, maxBytes: number | null): Promise<FormData> {
+  const reader = request.body?.getReader();
+  if (!reader) throw new HttpError(400, 'Choose a file to upload.');
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.byteLength;
+      if (maxBytes !== null && length > maxBytes + 65_536) {
+        await reader.cancel();
+        throw new HttpError(413, 'Upload exceeds the account file size limit.');
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const payload = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    payload.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new Response(payload, {
+    headers: { 'content-type': request.headers.get('content-type') ?? '' },
+  }).formData();
+}
 
 chatRoutes.post('/attachments/:conversationId', async (c) => {
   if (c.env.FILES?.uploadMode !== 'direct' && c.env.UPLOAD_LOCAL_FALLBACK !== 'true')
@@ -97,32 +128,14 @@ chatRoutes.post('/attachments/:conversationId', async (c) => {
   const conversationId = c.req.param('conversationId');
   const ownerId = c.get('userId');
   await requireConversation(c.env.DB, ownerId, conversationId);
-  const reader = c.req.raw.body?.getReader();
-  if (!reader) throw new HttpError(400, 'Choose a file to upload.');
-  const chunks: Uint8Array[] = [];
-  let length = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    length += value.byteLength;
-    if (length > MAX_ATTACHMENT_BYTES + 65_536) {
-      await reader.cancel();
-      throw new HttpError(413, 'Files must be between 1 byte and 1 MB.');
-    }
-    chunks.push(value);
-  }
-  const payload = new Uint8Array(length);
-  let offset = 0;
-  for (const chunk of chunks) {
-    payload.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  const form = await new Response(payload, {
-    headers: { 'content-type': c.req.header('content-type') ?? '' },
-  }).formData();
+  const { policy } = await getRequestAccountPolicy(c);
+  validateAttachmentCount(1, policy.uploads.maxFiles);
+  const form = await readUploadForm(c.req.raw, policy.uploads.maxBytes);
+  validateAttachmentCount(form.getAll('file').length, policy.uploads.maxFiles);
+  if (form.getAll('file').length !== 1) throw new HttpError(400, 'Upload one file at a time.');
   const file = form.get('file');
   if (!(file instanceof File)) throw new HttpError(400, 'Choose a file to upload.');
-  validateAttachmentFile(file);
+  validateAttachmentFile(file, policy.uploads);
   const bytes = new Uint8Array(await file.arrayBuffer());
   const id = crypto.randomUUID();
   const name = file.name.slice(0, 180);
@@ -175,6 +188,8 @@ function captureLimit(
   model: string | null,
   weight: number,
 ) {
+  const limit = budget.limit;
+  if (limit === null) return;
   const ownerId = c.get('userId');
   inBackground(
     c,
@@ -182,6 +197,7 @@ function captureLimit(
       .then((stats) =>
         captureServerEvent(c.env, event, c.get('authSubject'), {
           ...stats,
+          limit,
           model: model ?? 'default',
           weight,
         }),
@@ -192,8 +208,13 @@ function captureLimit(
 
 /** The budget after an admitted turn's charge; the send that used it up is recorded. */
 async function chargedBudget(c: ChatContext, turn: PreparedTurn) {
-  const budget = await loadMessageBudget(c.env.DB, c.get('userId'), messageLimitFrom(c.env));
-  if (budget.used >= budget.limit && budget.used - turn.weight < budget.limit)
+  const { policy } = await getRequestAccountPolicy(c);
+  const budget = await loadMessageBudget(c.env.DB, c.get('userId'), policy.messages);
+  if (
+    budget.limit !== null &&
+    budget.used >= budget.limit &&
+    budget.used - turn.weight < budget.limit
+  )
     captureLimit(c, 'message_limit_reached', budget, turn.model, turn.weight);
   return budget;
 }
@@ -202,7 +223,8 @@ async function recordRefusal(c: ChatContext, error: unknown) {
   const details =
     error instanceof HttpError ? (error.details as { code?: string; weight?: number }) : null;
   if (details?.code !== 'message_limit') return;
-  const budget = await loadMessageBudget(c.env.DB, c.get('userId'), messageLimitFrom(c.env));
+  const { policy } = await getRequestAccountPolicy(c);
+  const budget = await loadMessageBudget(c.env.DB, c.get('userId'), policy.messages);
   captureLimit(c, 'message_limit_blocked', budget, null, details.weight ?? 1);
 }
 
@@ -249,13 +271,15 @@ function turnInput(
 }
 
 async function admissionRuntime(c: ChatContext, ownerId: string) {
+  const { policy } = await getRequestAccountPolicy(c);
   const catalog = await getPublicInferenceConfig(c.env);
   if (!catalog.configured) throw new HttpError(503, 'AI inference is not configured.');
   const models = new Map(catalog.models.map((model) => [model.id, model]));
   return {
     db: c.env.DB,
     ownerId,
-    messageLimit: messageLimitFrom(c.env),
+    messageLimit: policy.messages,
+    retentionIdleDays: policy.retention.idleDays,
     modelWeightFor: (model: string) => models.get(model)?.weight ?? 1,
     modelFor: (persona: import('@walden/contracts').Persona) => {
       const model = modelNameForPersona(c.env, persona);
@@ -289,6 +313,7 @@ chatRoutes.post('/turns', async (c) => {
         ownerId,
         request.conversationId,
         request.attachmentIds,
+        (await getRequestAccountPolicy(c)).policy.uploads,
       )
     : [];
   const runtime = await admissionRuntime(c, ownerId);

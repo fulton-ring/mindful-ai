@@ -58,7 +58,7 @@ async function persistCapturedNote(
       {
         where: `EXISTS (
            SELECT 1 FROM conversations c WHERE c.id=? AND c.owner_id=? AND c.note_id IS NULL
-           AND c.status='active' AND c.expires_at>?
+           AND c.status='active' AND (c.retention_disabled=1 OR c.expires_at>?)
            AND NOT EXISTS (SELECT 1 FROM turns t WHERE t.conversation_id=c.id AND t.owner_id=c.owner_id AND t.status='streaming')
          )`,
         params: [conversationId, ownerId, now],
@@ -78,7 +78,7 @@ async function persistCapturedNote(
     db
       .prepare(
         `UPDATE conversations SET note_id=? WHERE id=? AND owner_id=? AND note_id IS NULL
-         AND status='active' AND expires_at>?
+         AND status='active' AND (retention_disabled=1 OR expires_at>?)
          AND NOT EXISTS (SELECT 1 FROM turns WHERE conversation_id=conversations.id AND owner_id=conversations.owner_id AND status='streaming')
          AND EXISTS (SELECT 1 FROM notes WHERE id=? AND owner_id=? AND revision=1)`,
       )

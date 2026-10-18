@@ -12,7 +12,7 @@ The runner builds the web app, native Node entry, and production Wrangler worker
 Use `--skip-build` after those artifacts have already been built. Set `EMBEDDING_MODEL_DIR` to
 reuse an installed model; inference and the tests never download model weights.
 
-The same six scenarios run against:
+The six baseline scenarios run against:
 
 | Project | Application runtime | App database | Private files | Native turn persistence |
 | --- | --- | --- | --- | --- |
@@ -32,6 +32,23 @@ output; browser file upload, note creation and editing; browser reload/resume wi
 user messages or inference calls; and completed replay after a real application host restart.
 Browser reload tests keep inference active across detachment; host restart tests cover terminal
 durability. These tests do not claim abrupt in-flight process-crash coverage.
+
+Three additional policy scenarios run against both `node` and `cloudflare`, each with a fresh
+account and isolated server configuration. They check defaults without billing configuration;
+an operator-selected `APP_PLANS_JSON` plan with tiny usage/upload quotas, no expiry and disabled
+features; and unlimited usage/upload size/count with six actual browser uploads including a file
+over 1 MB. API rejection, browser limits, account plan display, unlimited usage presentation and
+nullable public conversation expiry are checked against the real backend. The feature test uses
+a dummy OpenRouter key only to advertise physical search availability; the disabled account never
+receives the search tool and no external provider is called. Run just these checks after rebuilding:
+
+```sh
+node tests/provider-matrix/run.mjs --skip-build --grep 'account policy|tiny quotas|six files'
+```
+
+The policy cases do not run against the optional external `mixed` storage project; its baseline
+upload and replay checks still run. Optional billing-provider injection is covered by the native
+runtime integration tests, while this matrix tests server-configured plans on both runtimes.
 
 Both default projects use ephemeral loopback ports and isolated temporary state, removed when
 the worker fixture closes. They do not load `.env`, `.data`, or an existing app server. Browser

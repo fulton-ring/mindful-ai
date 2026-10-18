@@ -163,7 +163,11 @@ function RetentionNotice({ thread, value }: { thread: ConversationSummary; value
     <span
       className="conversation-retention"
       id={`thread-retention-${thread.id}`}
-      title={`After seven days without a message from you, ${consequence}. Expiry: ${new Date(thread.expiresAt).toLocaleString()}.`}
+      title={
+        thread.expiresAt === null
+          ? 'This thread does not expire automatically.'
+          : `At expiry, ${consequence}. Expiry: ${new Date(thread.expiresAt).toLocaleString()}.`
+      }
     >
       {value}
     </span>

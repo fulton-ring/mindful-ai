@@ -115,7 +115,11 @@ async function latestProposalNote(
     (message) =>
       message.id === assistantMessage.id && message.role === 'assistant' && !isInterrupted(message),
   );
-  if (!sourceStillExists || latest.expiresAt <= nowIso() || latest.noteId !== conversation.noteId) {
+  if (
+    !sourceStillExists ||
+    (latest.expiresAt !== null && latest.expiresAt <= nowIso()) ||
+    latest.noteId !== conversation.noteId
+  ) {
     emit({ type: 'done', proposal: null });
     return null;
   }

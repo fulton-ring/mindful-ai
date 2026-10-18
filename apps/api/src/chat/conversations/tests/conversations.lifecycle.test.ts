@@ -170,7 +170,7 @@ describe('conversation title and expiry behavior', () => {
     expect(renewed.id).toBe('conversation');
     expect(renewed.noteId).toBe('note');
     expect(renewed.messages).toEqual([]);
-    expect(Date.parse(renewed.expiresAt)).toBeGreaterThan(Date.now());
+    expect(Date.parse(renewed.expiresAt!)).toBeGreaterThan(Date.now());
     expect(db.conversations[0]?.status).toBe('active');
   });
 });

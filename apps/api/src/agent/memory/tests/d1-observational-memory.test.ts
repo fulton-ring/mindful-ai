@@ -211,11 +211,11 @@ it('atomically fences D1 observations and reflection writes by application execu
   const { withApplicationExecution } = await import('../../../execution/write-guard');
   const { binding, storage } = await setup();
   await binding.exec(`CREATE TABLE users(id TEXT PRIMARY KEY,deletion_pending INTEGER);
-    CREATE TABLE conversations(id TEXT PRIMARY KEY,status TEXT,expires_at TEXT);
+    CREATE TABLE conversations(id TEXT PRIMARY KEY,status TEXT,expires_at TEXT,retention_disabled INTEGER DEFAULT 0);
     CREATE TABLE conversation_branches(id TEXT PRIMARY KEY,status TEXT);
     CREATE TABLE turns(id TEXT PRIMARY KEY,conversation_id TEXT,branch_id TEXT,owner_id TEXT,execution_generation INTEGER);
     INSERT INTO users VALUES('owner',0);
-    INSERT INTO conversations VALUES('conversation','active','2999-01-01');
+    INSERT INTO conversations VALUES('conversation','active','2999-01-01',0);
     INSERT INTO conversation_branches VALUES('branch','active');
     INSERT INTO turns VALUES('turn','conversation','branch','owner',2);`);
   const record = await storage.initializeObservationalMemory({

@@ -76,6 +76,7 @@ class NodeTurns {
   private readonly readers = new Map<PersistedTurnStream, Reader>();
   private readonly polls = new Set<Promise<void>>();
   private lastPrune = 0;
+  private pruneTask?: Promise<void>;
   private scanning = false;
   private closed = false;
   private timer?: ReturnType<typeof setInterval>;
@@ -173,8 +174,8 @@ class NodeTurns {
     this.scanning = true;
     try {
       const now = Date.now();
-      await this.alarms(now);
       await this.prune(now);
+      await this.alarms(now);
       const rows = (
         await this.env.DB.prepare(
           `SELECT t.id FROM turns t LEFT JOIN turn_execution_state s ON s.turn_id=t.id WHERE t.status='streaming' AND t.input_json IS NOT NULL AND (s.turn_id IS NULL OR s.alarm_at IS NULL OR s.alarm_at<=?) ORDER BY t.created_at LIMIT 100`,
@@ -220,10 +221,16 @@ class NodeTurns {
         this.sessions.delete(alarm.turn_id);
     }
   }
-  private async prune(now: number) {
-    if (now - this.lastPrune < 60_000) return;
-    this.lastPrune = now;
-    await sweepNativeRuns(this.env.DB, this.host);
+  private prune(now: number) {
+    if (!this.pruneTask || now - this.lastPrune >= 60_000) {
+      this.lastPrune = now;
+      this.pruneTask = this.pruneNative();
+    }
+    // Retain failures until the next refresh so stale policy never permits recovery in between.
+    return this.pruneTask;
+  }
+  private async pruneNative() {
+    await sweepNativeRuns(this.env.DB, this.host, this.env);
     if ('prune' in this.host.cache && typeof this.host.cache.prune === 'function')
       await this.host.cache.prune();
     await this.host.storage.prune({

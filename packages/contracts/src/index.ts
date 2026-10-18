@@ -1,6 +1,8 @@
 import type { InferUIMessageChunk, UIMessage } from 'ai';
 import { z } from 'zod';
 
+export * from './policy';
+
 export const provenanceSpanSchema = z.object({
   from: z.number().int().nonnegative(),
   to: z.number().int().nonnegative(),
@@ -195,7 +197,7 @@ export type WaldenDataParts = {
     branchId: string;
     userMessageId?: string;
     title?: string;
-    expiresAt?: string;
+    expiresAt?: string | null;
     failureCode?: ChatFailureCode;
   };
 };
@@ -211,7 +213,7 @@ export const dataPartSchemas = {
     branchId: z.string(),
     userMessageId: z.string().optional(),
     title: z.string().optional(),
-    expiresAt: z.string().optional(),
+    expiresAt: z.string().nullable().optional(),
     failureCode: z.string().optional(),
   }),
 } satisfies { [K in keyof WaldenDataParts]: z.ZodType<unknown> };
@@ -226,14 +228,14 @@ export type ConversationBranch = {
   id: string;
   forkedFromMessageId: string | null;
   headMessageId: string | null;
-  expiresAt: string;
+  expiresAt: string | null;
 };
 export type Conversation = {
   id: string;
   title: string;
   noteId: string | null;
   messages: WaldenUIMessage[];
-  expiresAt: string;
+  expiresAt: string | null;
   /** False only when the user has turned learning checks off for this thread. */
   learningChecksEnabled: boolean;
   /** Defaults to on for existing conversations. */
@@ -248,7 +250,7 @@ export type ConversationSummary = {
   noteId: string | null;
   title: string;
   updatedAt: string;
-  expiresAt: string;
+  expiresAt: string | null;
 };
 export type ChatFailureCode =
   | 'cancelled'
@@ -281,7 +283,7 @@ export const chatRequestSchema = z
     branchId: z.string().min(1),
     noteRevision: z.number().int().nonnegative().nullable(),
     message: z.string().max(16000),
-    attachmentIds: z.array(z.string().uuid()).max(5).optional(),
+    attachmentIds: z.array(z.string().uuid()).optional(),
     learningCheckResponse: z
       .object({
         checkId: z.string().min(1).max(200),
@@ -387,7 +389,7 @@ export type AppConfig = {
 /** The anchored message budget: the first message opens a window that resets in full. */
 export type MessageBudget = {
   used: number;
-  limit: number;
+  limit: number | null;
   windowHours: number;
   /** When the current window ends, or null when no window is open. */
   resetsAt: string | null;

@@ -9,6 +9,42 @@ const config = {
 };
 const id = '00112233-4455-6677-8899-aabbccddeeff';
 
+it('uses the current account byte limit before fetching staged bodies', async () => {
+  const get = vi.fn();
+  const remove = vi.fn();
+  const bucket = { head: async () => ({ size: 5 }), get, delete: remove };
+  await expect(
+    completeUpload(bucket as never, 'owner', 'thread', id, 'notes.txt', {
+      maxBytes: 3,
+      maxFiles: 1,
+    }),
+  ).rejects.toThrow();
+  expect(get).not.toHaveBeenCalled();
+  expect(remove).toHaveBeenCalledOnce();
+});
+
+it('promotes uploads above the old default when the account byte limit is unlimited', async () => {
+  const bytes = new Uint8Array(1_000_001).fill(120);
+  const put = vi.fn();
+  const bucket = {
+    head: async () => ({ size: bytes.length }),
+    get: async () => ({
+      size: bytes.length,
+      httpMetadata: { contentType: 'text/plain' },
+      arrayBuffer: async () => bytes.buffer,
+    }),
+    put,
+    delete: vi.fn(),
+  };
+  expect(
+    await completeUpload(bucket as never, 'owner', 'thread', id, 'notes.txt', {
+      maxBytes: null,
+      maxFiles: null,
+    }),
+  ).toMatchObject({ size: bytes.length });
+  expect(put).toHaveBeenCalledOnce();
+});
+
 it('signs a short-lived PUT for the caller-scoped staging object', async () => {
   const url = new URL(await presignUpload(config, 'owner', 'thread', id, 'application/pdf'));
   expect(url.hostname).toBe('walden-test.1234567890abcdef.r2.cloudflarestorage.com');

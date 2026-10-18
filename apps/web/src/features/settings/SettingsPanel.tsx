@@ -190,6 +190,13 @@ function Usage() {
 }
 
 function MessageBudgetMeter({ budget }: { budget: MessageBudget }) {
+  if (budget.limit === null)
+    return (
+      <div className="message-budget">
+        <p>Unlimited messages</p>
+        <p className="muted">{budget.used.toLocaleString()} message points used in this window.</p>
+      </div>
+    );
   const remaining = Math.max(0, budget.limit - budget.used);
   return (
     <div className="message-budget">
@@ -201,7 +208,7 @@ function MessageBudgetMeter({ budget }: { budget: MessageBudget }) {
         aria-valuemax={budget.limit}
         aria-valuenow={remaining}
       >
-        <span style={{ width: `${(remaining / budget.limit) * 100}%` }} />
+        <span style={{ width: `${(budget.limit === 0 ? 0 : remaining / budget.limit) * 100}%` }} />
       </div>
       {budget.resetsAt && <p className="muted">Resets at {resetTime(budget.resetsAt)}</p>}
     </div>

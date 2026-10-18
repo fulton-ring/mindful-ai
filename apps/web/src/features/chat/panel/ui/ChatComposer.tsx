@@ -3,6 +3,7 @@ import { ArrowUp, Square } from 'lucide-react';
 import type { ComponentProps, DragEvent, RefObject } from 'react';
 import { useRef, useState } from 'react';
 import { Attachments } from '../../../../components/ai-elements/attachments';
+import { accountPolicy, uploadPolicyError, useAccountPolicy } from '../../../../lib/account-policy';
 import { inferenceConfig, runtimeConfig, useRuntimeConfig } from '../../../../lib/runtime-config';
 import { fileAnalytics, track } from '../../../../lib/telemetry';
 
@@ -17,7 +18,10 @@ const FILE_ACCEPT =
 const acceptedFileTypes = FILE_ACCEPT.split(',');
 const documentExtensions = ['.pdf', '.docx', '.xlsx'];
 function documentFilesUnavailable() {
-  return runtimeConfig()?.capabilities?.documentExtraction === false;
+  return (
+    !accountPolicy().value.policy.features.documentExtraction ||
+    runtimeConfig()?.capabilities?.documentExtraction === false
+  );
 }
 function fileAccept() {
   return documentFilesUnavailable()
@@ -48,13 +52,11 @@ function fileError(files: File[], currentCount: number): { message: string; code
   )
     return {
       message:
-        'Document attachments are not configured on this instance. Attach a supported text file or image.',
+        'Document attachments are unavailable for this account. Attach a supported text file or image.',
       code: 'document_extraction_unavailable',
     };
-  if (currentCount + files.length > 5)
-    return { message: 'Choose up to five files.', code: 'too_many_files' };
-  if (files.some((file) => file.size > 1_000_000 || file.size === 0))
-    return { message: 'Each file must be under 1 MB.', code: 'file_size' };
+  const limitError = uploadPolicyError(files, currentCount, accountPolicy().value.policy.uploads);
+  if (limitError) return limitError;
   if (files.some((file) => !acceptsFile(file)))
     return {
       message: 'Only supported text, document, and image files can be attached.',
@@ -246,6 +248,7 @@ export function ChatComposer({
   onAutoHighlights,
 }: ComposerProps) {
   useRuntimeConfig();
+  useAccountPolicy();
   const selectedPersona = effectivePersona(personas, personaId);
   const inferenceNotice = modelNotice(selectedPersona?.model);
   const fileInput = useRef<HTMLInputElement>(null);

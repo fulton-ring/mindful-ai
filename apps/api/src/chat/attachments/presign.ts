@@ -3,10 +3,13 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { HttpError } from '../../http';
 import {
   attachmentKey,
+  DEFAULT_UPLOAD_LIMITS,
   DOCUMENT_TYPES,
-  MAX_ATTACHMENT_BYTES,
   stagingAttachmentKey,
+  type UploadLimits,
+  validateAttachmentCount,
   validateAttachmentFile,
+  validateAttachmentSize,
 } from './attachments';
 
 export type { R2SigningConfig } from '../../storage/r2';
@@ -97,24 +100,27 @@ export async function completeUpload(
   conversationId: string,
   id: string,
   name: string,
+  limits: UploadLimits = DEFAULT_UPLOAD_LIMITS,
 ): Promise<{ id: string; name: string; mimeType: string; size: number }> {
   const stagingKey = stagingAttachmentKey(ownerId, conversationId, id);
   const metadata = await bucket.head(stagingKey);
   if (!metadata) throw new HttpError(404, 'Uploaded file not found.');
-  if (metadata.size < 1 || metadata.size > MAX_ATTACHMENT_BYTES) {
+  try {
+    validateAttachmentCount(1, limits.maxFiles);
+    validateAttachmentSize(metadata.size, limits.maxBytes);
+  } catch (error) {
     await bucket.delete(stagingKey);
-    throw new HttpError(413, 'Files must be between 1 byte and 1 MB.');
+    throw error;
   }
   const object = await bucket.get(stagingKey);
   if (!object) throw new HttpError(404, 'Uploaded file not found.');
   try {
-    if (object.size < 1 || object.size > MAX_ATTACHMENT_BYTES)
-      throw new HttpError(413, 'Files must be between 1 byte and 1 MB.');
+    validateAttachmentSize(object.size, limits.maxBytes);
     const mimeType = attachmentMimeType(name, object.httpMetadata?.contentType ?? '');
     if (object.httpMetadata?.contentType !== mimeType)
       throw new HttpError(415, 'Uploaded file type does not match.');
-    const bytes = await readObjectBytes(object, MAX_ATTACHMENT_BYTES);
-    validateAttachmentFile(new File([bytes], name, { type: mimeType }));
+    const bytes = await readObjectBytes(object, limits.maxBytes ?? object.size);
+    validateAttachmentFile(new File([bytes], name, { type: mimeType }), limits);
     validateAttachmentBytes(bytes, mimeType);
     const safeName = name.slice(0, 180);
     const stored = await bucket.put(attachmentKey(ownerId, conversationId, id), bytes, {
@@ -126,7 +132,7 @@ export async function completeUpload(
     return { id, name: safeName, mimeType, size: bytes.byteLength };
   } catch (error) {
     if (error instanceof ObjectSizeLimitError)
-      throw new HttpError(413, 'Uploaded file exceeds the 1 MB byte limit.');
+      throw new HttpError(413, 'Uploaded file exceeds its byte limit.');
     throw error;
   } finally {
     await object.body?.cancel().catch(() => undefined);

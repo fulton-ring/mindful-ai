@@ -41,7 +41,7 @@ function handleTurnData(args: TurnArgs, data: WaldenDataParts['turn']) {
   live.conversationId = data.conversationId;
   live.branchId = data.branchId;
   live.title = data.title ?? live.title;
-  live.expiresAt = data.expiresAt ?? live.expiresAt;
+  if (data.expiresAt !== undefined) live.expiresAt = data.expiresAt;
   live.failureCode = data.failureCode ?? live.failureCode;
   if (data.userMessageId && live.kind === 'send') adoptUserMessageId(args, data.userMessageId);
 }
@@ -67,7 +67,7 @@ function persistTurn(args: TurnArgs, live: LiveTurn, messages: WaldenUIMessage[]
     ...base,
     branchId: live.branchId ?? base.branchId,
     title: live.title ?? base.title,
-    expiresAt: live.expiresAt ?? base.expiresAt,
+    expiresAt: live.expiresAt === undefined ? base.expiresAt : live.expiresAt,
     messages,
   };
   if (next.branchId !== base.branchId) args.runtime.adoptedBranchId.current = next.branchId;

@@ -15,7 +15,8 @@ import type { AppDatabase, AppStatement } from '../../db/database';
 import { prepareQuery } from '../../db/database';
 import { HttpError, newId, nowIso } from '../../http';
 import type { LoadedAttachment } from '../attachments/attachments';
-import { loadConversation, RETENTION_MS } from '../conversations/repository';
+import { loadConversation } from '../conversations/repository';
+import { retentionExpiry } from '../conversations/retention';
 import { attachmentPart, isInterrupted, storedMessageJson } from '../messages';
 import { chargeMessage, type MessageLimit, refundMessage } from './message-limit';
 import {
@@ -31,6 +32,7 @@ import {
 export type TurnRuntime = {
   db: AppDatabase;
   ownerId: string;
+  retentionIdleDays?: number | null;
   /** Omitted only by tests that exercise admission without a message budget. */
   messageLimit?: MessageLimit;
   /** Resolves the model a persona will run on; defaults to the persona's own model. */
@@ -90,6 +92,7 @@ async function loadTurnRecords(runtime: TurnRuntime, request: ChatRequest): Prom
     loadConversation(db, ownerId, request.conversationId, {
       renewExpired: !request.regenerateMessageId,
       branchId: request.branchId,
+      retentionIdleDays: runtime.retentionIdleDays,
     }),
     first<PreviousTurn>(
       db
@@ -183,7 +186,8 @@ async function reserveTurn(
   const branchId = branchFork ? newId() : input.conversation.branchId;
   const turnId = newId();
   const createdAt = nowIso();
-  const expiresAt = new Date(Date.now() + RETENTION_MS).toISOString();
+  const expiry = retentionExpiry(runtime.retentionIdleDays, createdAt);
+  const expiresAt = expiry.expiresAt;
   if (branchFork) await createBranch(db, input, branchId, ownerId, createdAt);
   try {
     const insert = (db: AppDatabase) =>
@@ -214,7 +218,17 @@ async function reserveTurn(
         .run();
     throw new HttpError(409, 'A turn is already in progress for this conversation');
   }
-  return { branchId, branchFork, turnId, createdAt, expiresAt, editInPlace, persona };
+  return {
+    branchId,
+    branchFork,
+    turnId,
+    createdAt,
+    expiresAt,
+    storedExpiresAt: expiry.storedExpiresAt,
+    retentionDisabled: expiry.retentionDisabled,
+    editInPlace,
+    persona,
+  };
 }
 
 async function createBranch(
@@ -350,12 +364,13 @@ function turnSetupStatements(
     ...(userMessageStatementValue ? [userMessageStatementValue] : []),
     db
       .prepare(
-        "UPDATE conversations SET persona_id=?,last_user_activity_at=?,expires_at=?,learning_checks_enabled=?,title=CASE WHEN title IN ('New conversation','New thread') THEN ? ELSE title END WHERE id=? AND owner_id=?",
+        "UPDATE conversations SET persona_id=?,last_user_activity_at=?,expires_at=?,retention_disabled=?,learning_checks_enabled=?,title=CASE WHEN title IN ('New conversation','New thread') THEN ? ELSE title END WHERE id=? AND owner_id=?",
       )
       .bind(
         persona.id,
         reservation.createdAt,
-        reservation.expiresAt,
+        reservation.storedExpiresAt,
+        reservation.retentionDisabled,
         input.request.action === 'stop_checks'
           ? 0
           : input.conversation.learningChecksEnabled

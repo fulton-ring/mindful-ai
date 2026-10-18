@@ -14,7 +14,7 @@ export function applicationMemoryWriteGuard(): { sql: string; values: unknown[] 
     sql: ` AND EXISTS(SELECT 1 FROM turns t JOIN conversations c ON c.id=t.conversation_id
       JOIN conversation_branches b ON b.id=t.branch_id JOIN users u ON u.id=t.owner_id
       WHERE t.id=? AND t.execution_generation=? AND u.deletion_pending=0
-      AND c.status='active' AND b.status='active' AND c.expires_at>?)`,
+      AND c.status='active' AND b.status='active' AND (c.retention_disabled=1 OR c.expires_at>?))`,
     values: [execution.runId, execution.generation, new Date().toISOString()],
   };
 }

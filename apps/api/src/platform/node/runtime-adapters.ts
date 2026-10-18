@@ -2,6 +2,7 @@ import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { AppDatabase } from '../../db/database';
+import type { EntitlementsProvider } from '../../policy';
 import type { ResearchBrowser, SavedSources } from '../../services/research/ports';
 import type { DocumentExtractor } from '../../storage/document-extractor';
 import { createLocalObjectStore } from '../../storage/local';
@@ -26,6 +27,11 @@ export type NodeSavedSources = SavedSources & {
 
 /** Explicit composition hooks; absent factories select the shipped Node providers. */
 export interface NodeRuntimeAdapters {
+  /** Absent by default; standalone deployments require no billing provider. */
+  createEntitlementsProvider?(
+    config: NodeConfig,
+    context: { db: AppDatabase },
+  ): Provider<EntitlementsProvider>;
   createObjectStore?(config: NodeConfig): Provider<ObjectStore>;
   createDocumentExtractor?(config: NodeConfig): Provider<DocumentExtractor>;
   createResearchBrowser?(config: NodeConfig): Provider<ResearchBrowser>;
@@ -35,7 +41,9 @@ export interface NodeRuntimeAdapters {
   ): Provider<NodeSavedSources>;
 }
 
-export const defaultNodeRuntimeAdapters: Required<NodeRuntimeAdapters> = {
+export const defaultNodeRuntimeAdapters: Required<
+  Omit<NodeRuntimeAdapters, 'createEntitlementsProvider'>
+> = {
   createObjectStore(config) {
     return config.fileStorage === 's3'
       ? createS3ObjectStore({

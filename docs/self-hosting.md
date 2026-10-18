@@ -57,6 +57,8 @@ Chromium's sandbox remains enabled. The host must permit unprivileged user names
 | `OPENROUTER_API_KEY` | Credential when `AI_PROVIDER=openrouter` |
 | `EMBEDDING_MODEL_DIR` | Bundled local model path, `/app/models/minilm` in the image |
 | `EMBEDDING_MODEL_REVISION` | Pinned model identity; must match the installed assets |
+| `APP_POLICY_JSON` | Optional partial JSON policy for message/upload limits, retention and features |
+| `MESSAGE_LIMIT`, `MESSAGE_WINDOW_HOURS` | Legacy defaults: 20 weighted points per 4 hours; `MESSAGE_LIMIT=unlimited` removes the quota |
 
 Supply secret values through a private environment file or your orchestrator's secret mechanism. `AI_PROVIDER=openai-compatible` accepts a local or remote OpenAI-compatible service. From Docker Desktop, a host inference server is normally reachable at `http://host.docker.internal:<port>/v1`; native Linux requires an explicit host-gateway mapping or routable service address. Configure the model name your server actually provides. Startup reports available capabilities through `/api/config`; a missing provider does not create a working chat backend.
 
@@ -77,6 +79,32 @@ AI_MODELS_JSON='[{"id":"local-main","name":"Local main","weight":1,"inputModalit
 ```
 
 Set capability fields to match the actual endpoint; catalog metadata does not add support to a model. Weights are integers from 1 to 3. For OpenRouter, use `AI_PROVIDER=openrouter` and `OPENROUTER_API_KEY`; `AI_MODEL`, `AI_BACKGROUND_MODEL` and an optional authoritative catalog work the same way.
+
+## Limits, retention and features
+
+Self-hosting requires no billing service or plan setup. Leave all policy settings unset to keep the defaults: 20 weighted message points per four-hour window, five attachments per message, 1,000,000 bytes per file, and conversation expiry after seven idle days. Available tools remain enabled when their underlying providers are configured.
+
+To change those defaults, add one optional setting to your private environment file:
+
+```dotenv
+APP_POLICY_JSON='{"messages":{"limit":null},"uploads":{"maxBytes":null,"maxFiles":null},"retention":{"idleDays":null}}'
+```
+
+`null` removes that quota or disables automatic conversation expiry. Omitted fields retain their defaults. For example:
+
+```dotenv
+APP_POLICY_JSON='{"messages":{"limit":100,"windowHours":24},"uploads":{"maxBytes":10000000,"maxFiles":10},"retention":{"idleDays":30},"features":{"mcp":false,"webResearch":false}}'
+```
+
+The full policy has `messages.limit` and `messages.windowHours`; `uploads.maxBytes` and `uploads.maxFiles`; `retention.idleDays`; and boolean `features.mcp`, `features.documentExtraction`, `features.webResearch`, `features.webSearch`. Zero message points or upload limits disable new sends or uploads. Window hours and idle days must be positive; use `null` for indefinite retention. JSON settings override the legacy message settings. Malformed configuration prevents startup/admission rather than granting unrestricted access. Restart all app roles with the same environment after changes.
+
+Limits apply on the server as well as in the browser. Message counts survive plan changes. Upload count is per message; previously accepted files remain readable after a lower size limit is configured. Unlimited uploads still depend on available memory, disk and any upstream request limits. Document extraction and inline image processing retain a separate 32 MB input safety bound; larger accepted files remain downloadable, but cannot be processed inline. Custom document extractors can advertise their own `maxInputBytes` capability. Parser expansion, output, timeout and concurrency protections also remain in force.
+
+Retention changes apply to active conversations using their last user activity, including before scheduled cleanup. A shorter policy can make old conversations immediately eligible for cleanup. Disabling expiry keeps active transcripts accessible; it cannot recover already purged content. Explicit archive/delete still works. The migration adds retention and cleanup-claim fields without rebuilding the conversations table or deleting related data. Cleanup claims prevent renewal while external state is being deleted; a failed cleanup can be retried after its 15-minute lease expires.
+
+`GET /api/account/policy` returns the authenticated account's effective policy. `/api/config` reports runtime capabilities; enabling a feature in policy does not supply missing provider credentials. MCP discovery also respects the existing allowlist and read-only tool restrictions. This change adds no writable MCP tools or user-managed MCP connections.
+
+Hosted installations may optionally define `APP_PLANS_JSON`, `APP_DEFAULT_PLAN` and `APP_ACCOUNT_PLANS_JSON`. See [account plans and future Clerk billing](adapters.md#account-plans-and-future-clerk-billing). Self-hosters can ignore all three.
 
 ## Authentication and administration
 

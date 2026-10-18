@@ -23,7 +23,7 @@ export type LiveTurn = {
   snapshot: WaldenUIMessage[];
   draft?: SentDraft;
   title?: string;
-  expiresAt?: string;
+  expiresAt?: string | null;
   failureCode?: ChatFailureCode;
   startedAt: number;
 };

@@ -5,12 +5,14 @@ import {
   attachmentKey,
   attachmentWorkspacePath,
   DOCUMENT_TYPES,
-  MAX_ATTACHMENT_BYTES,
 } from '../chat/attachments/attachments';
 import { messageAttachments } from '../chat/messages';
 import type { McpTools } from '../services/mcp';
 import type { AgentTurnInput, ServiceEnv } from '../services/types';
-import { createCloudflareDocumentExtractor } from '../storage/document-extractor';
+import {
+  createCloudflareDocumentExtractor,
+  MAX_DOCUMENT_INPUT_BYTES,
+} from '../storage/document-extractor';
 import { readObjectBytes } from '../storage/object-store';
 
 type DocumentFile = Pick<LoadedAttachment, 'id' | 'name' | 'mimeType'>;
@@ -38,8 +40,12 @@ async function extractDocumentMarkdown(
     return { path, text: new TextDecoder().decode(await cached.arrayBuffer()), cached: true };
   const original = await env.FILES.get(attachmentKey(ownerId, conversationId, file.id));
   if (!original) throw new Error(`Attached document "${file.name}" is unavailable.`);
-  const bytes = await readObjectBytes(original, MAX_ATTACHMENT_BYTES);
-  if (bytes.byteLength > MAX_ATTACHMENT_BYTES) throw new Error('Document exceeds the 1 MB limit.');
+  const maximum = extractor.maxInputBytes ?? MAX_DOCUMENT_INPUT_BYTES;
+  if (original.size > maximum) {
+    await original.body?.cancel();
+    throw new Error(`Document exceeds the parser input safety limit (${maximum} bytes).`);
+  }
+  const bytes = await readObjectBytes(original, Math.min(original.size, maximum));
   const conversion = await extractor.extract({
     name: file.name,
     mimeType: file.mimeType,

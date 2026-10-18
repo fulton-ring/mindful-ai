@@ -1,4 +1,6 @@
+import { syncRetentionPolicies } from '../chat/conversations/retention';
 import type { AppDatabase } from '../db/database';
+import type { Bindings } from '../types';
 import type { NativeExecutionHost } from './native-agent';
 
 export type NativeRunDescriptor = {
@@ -102,13 +104,15 @@ async function privacyDeleted(db: AppDatabase, item: NativeRunDescriptor): Promi
     .first<{ deletion_pending: number }>();
   if (!owner || Number(owner.deletion_pending) !== 0) return true;
   const conversation = await db
-    .prepare('SELECT status,expires_at FROM conversations WHERE id=? AND owner_id=?')
+    .prepare(
+      'SELECT status,expires_at,retention_disabled FROM conversations WHERE id=? AND owner_id=?',
+    )
     .bind(item.conversationId, item.ownerId)
-    .first<{ status: string; expires_at: string }>();
+    .first<{ status: string; expires_at: string; retention_disabled: number }>();
   if (
     !conversation ||
     conversation.status !== 'active' ||
-    Date.parse(conversation.expires_at) <= Date.now()
+    (conversation.retention_disabled !== 1 && Date.parse(conversation.expires_at) <= Date.now())
   )
     return true;
   const branch = await db
@@ -185,7 +189,8 @@ async function sweepItem(
 }
 
 /** Bounded, restart-safe cleanup with a persisted cursor so active prefixes cannot starve deletion. */
-export async function sweepNativeRuns(db: AppDatabase, host: NativeExecutionHost) {
+export async function sweepNativeRuns(db: AppDatabase, host: NativeExecutionHost, env?: Bindings) {
+  if (env) await syncRetentionPolicies(env);
   const cursor = await db
     .prepare('SELECT value FROM app_settings WHERE key=?')
     .bind(CURSOR_KEY)

@@ -152,3 +152,29 @@ it('keeps account deletion failures visible and retryable', async () => {
       .disabled,
   ).toBe(false);
 });
+
+it('renders unlimited budgets without an invalid meter or a reset requirement', async () => {
+  vi.spyOn(api, 'usage').mockResolvedValue({
+    budget: { used: 123, limit: null, windowHours: 4, resetsAt: null },
+    messagesSent: 123,
+    favoritePersona: null,
+  });
+  const view = renderSettings();
+  fireEvent.click(view.getByRole('button', { name: /usage/i }));
+  expect(await view.findByText('Unlimited messages')).toBeTruthy();
+  expect(view.queryByRole('meter')).toBeNull();
+});
+it('describes account-specific no-expiry retention without suggesting thread deletion', async () => {
+  const { setAccountPolicy, clearAccountPolicy } = await import('../../../lib/account-policy');
+  const { DEFAULT_APP_POLICY } = await import('@walden/contracts');
+  setAccountPolicy('owner', {
+    planId: 'permanent',
+    policy: { ...DEFAULT_APP_POLICY, retention: { idleDays: null } },
+  });
+  try {
+    const view = renderSettings();
+    expect(view.getByText(/Thread history does not expire automatically/)).toBeTruthy();
+  } finally {
+    clearAccountPolicy();
+  }
+});

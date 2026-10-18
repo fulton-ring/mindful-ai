@@ -31,11 +31,11 @@ async function fixture() {
   cleanup.push(() => db.close());
   await db.exec(`CREATE TABLE app_settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
     CREATE TABLE users(id TEXT PRIMARY KEY,deletion_pending INTEGER NOT NULL);
-    CREATE TABLE conversations(id TEXT PRIMARY KEY,owner_id TEXT REFERENCES users(id) ON DELETE CASCADE,status TEXT,expires_at TEXT);
+    CREATE TABLE conversations(id TEXT PRIMARY KEY,owner_id TEXT REFERENCES users(id) ON DELETE CASCADE,status TEXT,expires_at TEXT,retention_disabled INTEGER DEFAULT 0,last_user_activity_at TEXT);
     CREATE TABLE conversation_branches(id TEXT PRIMARY KEY,conversation_id TEXT REFERENCES conversations(id) ON DELETE CASCADE,owner_id TEXT,status TEXT);
     CREATE TABLE turns(id TEXT PRIMARY KEY,conversation_id TEXT REFERENCES conversations(id) ON DELETE CASCADE,status TEXT);
     INSERT INTO users VALUES('owner',0);
-    INSERT INTO conversations VALUES('conversation','owner','active','2999-01-01');
+    INSERT INTO conversations VALUES('conversation','owner','active','2999-01-01',0,'2026-10-18T00:00:00.000Z');
     INSERT INTO conversation_branches VALUES('branch','conversation','owner','active');
     INSERT INTO turns VALUES('turn','conversation','completed');`);
   let runtime = await createNodeExecutionHost({ database: db, dataDir: directory });
@@ -247,3 +247,24 @@ it.skipIf(process.env.WALDEN_TEST_NATIVE_PURGE_BROKER !== '1')(
   },
   30000,
 );
+
+it('syncs no-expiry policy before sweeping native memory and fails closed when entitlements fail', async () => {
+  const { db, host } = await fixture();
+  const { memory } = await sensitiveData(host);
+  await trackNativeRun(db, descriptor());
+  await db.prepare("UPDATE conversations SET expires_at='2000-01-01'").run();
+  const env = {
+    DB: db,
+    APP_POLICY_JSON: JSON.stringify({ retention: { idleDays: null } }),
+  } as import('../types').Bindings;
+  expect(await sweepNativeRuns(db, host, env)).toMatchObject({ deferred: 1, purged: 0 });
+  expect(await memory.getThreadById({ threadId })).not.toBeNull();
+  await db.prepare("UPDATE conversations SET expires_at='2000-01-01',retention_disabled=0").run();
+  env.ENTITLEMENTS = {
+    async getPlan() {
+      throw new Error('billing projection unavailable');
+    },
+  };
+  await expect(sweepNativeRuns(db, host, env)).rejects.toMatchObject({ status: 503 });
+  expect(await memory.getThreadById({ threadId })).not.toBeNull();
+});

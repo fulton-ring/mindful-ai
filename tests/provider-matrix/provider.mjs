@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 export async function startProvider() {
   let mode = 'answer';
   let calls = 0;
+  let requestedTools = [];
   const active = new Set();
   const server = createServer(async (request, response) => {
     const chunks = [];
@@ -18,6 +19,7 @@ export async function startProvider() {
     }
     const input = JSON.parse(Buffer.concat(chunks).toString());
     calls++;
+    requestedTools = (input.tools ?? []).map((tool) => tool.function?.name).filter(Boolean);
     const content = mode === 'hold' ? 'Partial matrix answer ' : 'Provider matrix answer.';
     if (!input.stream) {
       response.setHeader('content-type', 'application/json');
@@ -37,6 +39,9 @@ export async function startProvider() {
     url: `http://127.0.0.1:${server.address().port}/v1`,
     get calls() {
       return calls;
+    },
+    get requestedTools() {
+      return requestedTools;
     },
     setMode(next) {
       mode = next;

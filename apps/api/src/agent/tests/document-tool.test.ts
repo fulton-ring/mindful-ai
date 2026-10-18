@@ -9,6 +9,54 @@ const input = {
   attachments: [{ id, name: 'paper.pdf', mimeType: 'application/pdf', size: 10 }],
 } as never;
 
+it('honors parser resource bounds before allocating an oversized accepted document', async () => {
+  const cancel = vi.fn();
+  const arrayBuffer = vi.fn();
+  const extract = vi.fn();
+  const bucket = {
+    get: async (key: string) =>
+      key.endsWith('.md')
+        ? null
+        : {
+            size: 9,
+            body: new ReadableStream({
+              start(controller) {
+                controller.enqueue(new Uint8Array(9));
+                controller.close();
+              },
+              cancel,
+            }),
+            arrayBuffer,
+          },
+  };
+  const tool = createDocumentTools(
+    { FILES: bucket as never, DOCUMENT_EXTRACTOR: { maxInputBytes: 8, extract } },
+    input,
+  ).extractDocument as unknown as { execute(args: unknown): Promise<unknown> };
+  await expect(tool.execute({ path })).rejects.toThrow('parser');
+  expect(cancel).toHaveBeenCalledOnce();
+  expect(arrayBuffer).not.toHaveBeenCalled();
+  expect(extract).not.toHaveBeenCalled();
+});
+
+it('extracts a previously accepted larger document without reapplying account byte limits', async () => {
+  const bytes = new Uint8Array(1_000_001);
+  const extract = vi.fn(async (_input: { bytes: Uint8Array }) => ({
+    markdown: 'Large accepted document',
+  }));
+  const bucket = {
+    get: async (key: string) =>
+      key.endsWith('.md') ? null : { size: bytes.length, arrayBuffer: async () => bytes.buffer },
+    put: vi.fn(),
+  };
+  const tool = createDocumentTools(
+    { FILES: bucket as never, DOCUMENT_EXTRACTOR: { extract } },
+    input,
+  ).extractDocument as unknown as { execute(args: unknown): Promise<unknown> };
+  await expect(tool.execute({ path })).resolves.toMatchObject({ path: `${path}.md` });
+  expect(extract.mock.calls[0]?.[0].bytes.byteLength).toBe(bytes.length);
+});
+
 it('converts only a thread attachment and caches Markdown for native workspace reads', async () => {
   const stored = new Map<string, { bytes: Uint8Array; name: string; type: string }>();
   const original = new TextEncoder().encode('%PDF-1.4');
@@ -22,6 +70,7 @@ it('converts only a thread attachment and caches Markdown for native workspace r
       const item = stored.get(key);
       return (
         item && {
+          size: item.bytes.byteLength,
           arrayBuffer: async () => item.bytes.buffer,
           httpMetadata: { contentType: item.type },
         }

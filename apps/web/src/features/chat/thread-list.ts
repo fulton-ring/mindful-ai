@@ -65,6 +65,7 @@ export function groupThreads(
 
 /** Expiry follows user activity, independently of the latest assistant message. */
 export function threadRetention(thread: ConversationSummary, now: Date = new Date()) {
+  if (thread.expiresAt === null) return 'No expiry';
   const remaining = Date.parse(thread.expiresAt) - now.getTime();
   if (!Number.isFinite(remaining)) return 'Expiry unavailable';
   if (remaining <= 0) return thread.noteId ? 'History expired · Note kept' : 'Expired';
@@ -93,7 +94,11 @@ export function threadTimestamp(thread: ConversationSummary) {
 }
 
 export function isRetainedNote(thread: ConversationSummary, now: Date) {
-  return Boolean(thread.noteId) && Date.parse(thread.expiresAt) <= now.getTime();
+  return (
+    Boolean(thread.noteId) &&
+    thread.expiresAt !== null &&
+    Date.parse(thread.expiresAt) <= now.getTime()
+  );
 }
 
 export function sidebarGroups(threads: readonly ConversationSummary[], now: Date): ThreadGroup[] {

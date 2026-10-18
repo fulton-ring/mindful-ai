@@ -38,6 +38,14 @@ function firstResult(
   options: DatabaseOptions,
   conversations: ConversationRecord[],
 ): unknown | null {
+  if (sql.startsWith("UPDATE conversations SET status='purging'")) {
+    const row = conversations.find(
+      (item) => item.id === args[2] && item.ownerId === args[3] && item.status !== 'purging',
+    );
+    if (!row) return null;
+    row.status = 'purging';
+    return { id: row.id };
+  }
   if (sql.includes('SELECT id FROM notes')) {
     return options.notes?.find(({ id, ownerId }) => id === args[0] && ownerId === args[1]) ?? null;
   }
@@ -92,7 +100,7 @@ function applyRun(sql: string, args: unknown[], conversations: ConversationRecor
       title: args[4] as string,
       ownerId: args[1] as string,
       noteId: args[2] as string | null,
-      expiresAt: args[7] as string,
+      expiresAt: args[6] as string,
       status: args[8] as string,
     });
     return;
@@ -103,8 +111,11 @@ function applyRun(sql: string, args: unknown[], conversations: ConversationRecor
   } else if (sql.startsWith('UPDATE conversations SET title=')) {
     const row = conversations.find(({ id, ownerId }) => id === args[1] && ownerId === args[2]);
     if (row) row.title = args[0] as string;
+  } else if (sql.includes("SET status='expired',purge_started_at")) {
+    const row = conversations.find((item) => item.id === args[0] && item.ownerId === args[1]);
+    if (row) row.status = 'expired';
   } else if (sql.includes("SET status='active',last_user_activity_at")) {
-    const row = conversations.find(({ id, ownerId }) => id === args[2] && ownerId === args[3]);
+    const row = conversations.find(({ id, ownerId }) => id === args[3] && ownerId === args[4]);
     if (row) {
       row.status = 'active';
       row.expiresAt = args[1] as string;

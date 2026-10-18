@@ -15,6 +15,13 @@
       "when": 1792275367568,
       "tag": "0001_self_hosting",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792299228907,
+      "tag": "0002_retention_policy",
+      "breakpoints": true
     }
   ]
 }

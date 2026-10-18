@@ -4,6 +4,7 @@ import { deleteAgentMemoryThread } from '../../agent/memory/memory';
 import { all, first } from '../../db/client';
 import { purgeConversationExecution } from '../../execution/privacy';
 import { HttpError, jsonBody, nowIso, parseBody } from '../../http';
+import { getRequestAccountPolicy } from '../../policy/request';
 import type { Bindings, Variables } from '../../types';
 import { deleteAttachmentPrefix } from '../attachments/attachments';
 import { captureConversation, captureSchema } from './capture';
@@ -19,7 +20,11 @@ export const conversationRoutes = new Hono<{ Bindings: Bindings; Variables: Vari
 
 conversationRoutes.post('/conversations', async (c) => {
   const body = await jsonBody<{ personaId?: string }>(c).catch(() => ({}));
-  return c.json(await createConversation(c.env.DB, c.get('userId'), null, body), 201);
+  const { policy } = await getRequestAccountPolicy(c);
+  return c.json(
+    await createConversation(c.env.DB, c.get('userId'), null, body, policy.retention.idleDays),
+    201,
+  );
 });
 
 conversationRoutes.post('/notes/:id/conversations', async (c) => {
@@ -40,7 +45,11 @@ conversationRoutes.post('/notes/:id/conversations', async (c) => {
   );
   if (existing) throw new HttpError(409, 'Note already has a conversation');
   const body = await jsonBody<{ personaId?: string }>(c).catch(() => ({}));
-  return c.json(await createConversation(c.env.DB, ownerId, note.id, body), 201);
+  const { policy } = await getRequestAccountPolicy(c);
+  return c.json(
+    await createConversation(c.env.DB, ownerId, note.id, body, policy.retention.idleDays),
+    201,
+  );
 });
 conversationRoutes.get('/conversations', async (c) => {
   const query = c.req.query('q')?.trim() ?? '';
@@ -82,6 +91,7 @@ conversationRoutes.get('/conversations', async (c) => {
     id: string;
     note_id: string | null;
     expires_at: string;
+    retention_disabled: number;
     title: string;
     last_user_activity_at: string;
     last_message_at: string | null;
@@ -90,12 +100,12 @@ conversationRoutes.get('/conversations', async (c) => {
     c.env.DB.prepare(
       // A conversation attached to a note takes its name from that note: the
       // note is the durable object and the thread is a child of it.
-      `SELECT c.id,c.note_id,c.expires_at,c.last_user_activity_at,n.updated_at AS note_updated_at,
+      `SELECT c.id,c.note_id,c.expires_at,c.retention_disabled,c.last_user_activity_at,n.updated_at AS note_updated_at,
          (SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id) AS last_message_at,
          COALESCE(NULLIF(TRIM(n.title),''),c.title) AS title
          FROM conversations c
          LEFT JOIN notes n ON n.id=c.note_id AND n.owner_id=c.owner_id
-         WHERE c.owner_id=? AND ((c.status='active' AND c.expires_at>?) OR c.note_id IS NOT NULL)
+         WHERE c.owner_id=? AND ((c.status='active' AND (c.retention_disabled=1 OR c.expires_at>?)) OR c.note_id IS NOT NULL)
          ${searchConditions}
          ORDER BY c.last_user_activity_at DESC`,
     ).bind(c.get('userId'), nowIso(), ...terms.flatMap((term) => [term, term, term, term])),
@@ -104,7 +114,7 @@ conversationRoutes.get('/conversations', async (c) => {
     rows.map((row) => ({
       id: row.id,
       noteId: row.note_id,
-      expiresAt: row.expires_at,
+      expiresAt: row.retention_disabled === 1 ? null : row.expires_at,
       title: row.title,
       updatedAt: row.last_user_activity_at,
       lastMessageAt: row.last_message_at ?? null,

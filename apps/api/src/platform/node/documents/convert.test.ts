@@ -26,44 +26,47 @@ it('converts a real DOCX archive to Markdown with headings', async () => {
   });
   expect(result.markdown).toContain('violet otter 731');
 });
-it('converts an actual PDF text stream without a Cloudflare binding', async () => {
-  const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-  ];
-  const stream = 'BT /F1 12 Tf 72 720 Td (coral ibex 284) Tj ET';
-  objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
-  let pdf = '%PDF-1.4\n';
-  const offsets = [0];
-  objects.forEach((object, i) => {
-    offsets.push(pdf.length);
-    pdf += `${i + 1} 0 obj\n${object}\nendobj\n`;
-  });
-  const xref = pdf.length;
-  pdf += `xref\n0 6\n0000000000 65535 f \n${offsets
-    .slice(1)
-    .map((n) => `${String(n).padStart(10, '0')} 00000 n \n`)
-    .join('')}trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
-  expect(
-    (
-      await convertDocument({
-        name: 'paper.pdf',
-        mimeType: 'application/pdf',
-        bytes: new TextEncoder().encode(pdf),
-      })
-    ).markdown,
-  ).toContain('coral ibex 284');
-});
+it.each([0, 1_000_001])(
+  'converts a valid PDF with %i padding bytes independently of account upload defaults',
+  async (padding) => {
+    const objects = [
+      '<< /Type /Catalog /Pages 2 0 R >>',
+      '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    ];
+    const stream = 'BT /F1 12 Tf 72 720 Td (coral ibex 284) Tj ET';
+    objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+    let pdf = `%PDF-1.4\n%${'x'.repeat(padding)}\n`;
+    const offsets = [0];
+    objects.forEach((object, i) => {
+      offsets.push(pdf.length);
+      pdf += `${i + 1} 0 obj\n${object}\nendobj\n`;
+    });
+    const xref = pdf.length;
+    pdf += `xref\n0 6\n0000000000 65535 f \n${offsets
+      .slice(1)
+      .map((n) => `${String(n).padStart(10, '0')} 00000 n \n`)
+      .join('')}trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+    expect(
+      (
+        await convertDocument({
+          name: 'paper.pdf',
+          mimeType: 'application/pdf',
+          bytes: new TextEncoder().encode(pdf),
+        })
+      ).markdown,
+    ).toContain('coral ibex 284');
+  },
+);
 it('rejects oversized and malformed documents and unsupported formats', async () => {
   await expect(
     convertDocument({
       name: 'x.pdf',
       mimeType: 'application/pdf',
-      bytes: new Uint8Array(1_000_001),
+      bytes: new Uint8Array(32_000_001),
     }),
-  ).rejects.toThrow('1 MB');
+  ).rejects.toThrow('32 MB');
   for (const [name, mimeType] of [
     ['x.pdf', 'application/pdf'],
     ['x.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],

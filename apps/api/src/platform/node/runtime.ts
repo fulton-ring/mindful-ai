@@ -8,11 +8,13 @@ import { createBetterAuth } from '../../auth/better-auth';
 import { createDrizzleAuth } from '../../auth/drizzle';
 import { requireAcceptedAuthMode } from '../../auth/state';
 import { purgeExpiredConversations } from '../../chat/conversations/deletion';
+import { syncRetentionPolicies } from '../../chat/conversations/retention';
 import { reconcileTurns } from '../../chat/turns/scheduling';
 import type { AppDatabase } from '../../db/database';
 import { purgeConversationExecution } from '../../execution/privacy';
 import { app } from '../../index';
 import { resolveInferenceConfig } from '../../inference/config';
+import { validatePolicyConfig } from '../../policy';
 import { purgeTelemetry } from '../../privacy/content-telemetry';
 import type { Bindings } from '../../types';
 import type { NodeConfig } from './config';
@@ -86,6 +88,10 @@ async function initializeServices(
     await ready();
     return provider;
   }
+  if (adapters.createEntitlementsProvider)
+    env.ENTITLEMENTS = await manage(
+      await adapters.createEntitlementsProvider(config, { db: env.DB }),
+    );
   const files = await (adapters.createObjectStore ?? defaultNodeRuntimeAdapters.createObjectStore)(
     config,
   );
@@ -119,6 +125,8 @@ async function initializeServices(
   closers.push(execution.close);
   env.EXECUTION = execution.host;
   registerAgentMemoryStore(env.DB, execution.host.storage);
+  // Recovery may purge native data using stored expiry; apply current plans first.
+  await syncRetentionPolicies(env);
   const turns = createNodeTurnRouter(env, execution.host, {
     execute: config.role === 'all' || config.role === 'worker',
   });
@@ -171,9 +179,12 @@ function schedule(
     () =>
       background(
         Promise.all([
-          purgeExpiredConversations(env.DB, env.FILES, (owner, id) =>
-            purgeConversationExecution(env, owner, id),
-          ),
+          (async () => {
+            await syncRetentionPolicies(env);
+            await purgeExpiredConversations(env.DB, env.FILES, (owner, id) =>
+              purgeConversationExecution(env, owner, id),
+            );
+          })(),
           purgeTelemetry(env),
         ]),
       ),
@@ -318,6 +329,7 @@ export async function createNodeRuntime(config: NodeConfig, options: NodeRuntime
       APP_URL: config.appUrl,
     };
     const mode = initializeAuth(env, sqlite, pool);
+    validatePolicyConfig(env);
     let executionReady: (() => Promise<void>) | undefined;
     if (!options.maintenance) {
       await requireAcceptedAuthMode(db, mode);

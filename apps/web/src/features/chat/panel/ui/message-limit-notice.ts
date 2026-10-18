@@ -12,7 +12,9 @@ export function messageLimitNotice(
   sending: boolean,
   now = Date.now(),
 ): string | null {
-  if (sending || !budget?.resetsAt || Date.parse(budget.resetsAt) <= now) return null;
+  if (sending || budget?.limit === null) return null;
+  if (budget?.limit === 0) return 'Messages are disabled for this account.';
+  if (!budget?.resetsAt || Date.parse(budget.resetsAt) <= now) return null;
   const remaining = budget.limit - budget.used;
   const weight = runtimeModelWeight(persona?.model);
   if (remaining >= weight) return null;

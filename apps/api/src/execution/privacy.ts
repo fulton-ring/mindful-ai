@@ -1,4 +1,5 @@
 import { deleteAgentMemoryThread } from '../agent/memory/memory';
+import { syncRetentionPolicies } from '../chat/conversations/retention';
 import { turnObject } from '../chat/turns/turn-session';
 import { loadTurn, recordTurnCancellation, type TurnRow } from '../chat/turns/turn-store';
 import { HttpError } from '../http';
@@ -60,6 +61,7 @@ export async function purgeOwnerExecution(env: Bindings, ownerId: string) {
 /** Cloudflare's retained native state lives in per-turn SQLite objects. */
 export async function sweepCloudflareExecutions(env: Bindings) {
   if (env.EXECUTION) return;
+  await syncRetentionPolicies(env);
   const cursor =
     (
       await env.DB.prepare('SELECT value FROM app_settings WHERE key=?')
@@ -83,7 +85,7 @@ export async function sweepCloudflareExecutions(env: Bindings) {
       replayUntil?: number;
     };
     const live = await env.DB.prepare(
-      "SELECT 1 FROM conversations c JOIN users u ON u.id=c.owner_id WHERE c.id=? AND c.owner_id=? AND c.status='active' AND c.expires_at>? AND u.deletion_pending=0",
+      "SELECT 1 FROM conversations c JOIN users u ON u.id=c.owner_id WHERE c.id=? AND c.owner_id=? AND c.status='active' AND (c.retention_disabled=1 OR c.expires_at>?) AND u.deletion_pending=0",
     )
       .bind(run.conversationId, run.ownerId, new Date().toISOString())
       .first();

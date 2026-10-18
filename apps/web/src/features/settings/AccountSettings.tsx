@@ -1,9 +1,12 @@
 import { useState } from 'react';
+import { useAccountPolicySnapshot } from '../../lib/account-policy';
 import { browserAnalyticsEnabled, setBrowserAnalyticsEnabled } from '../../lib/telemetry';
 import { ConversationPrivacy } from './ConversationPrivacy';
 import { useAccountActions } from './useAccountActions';
 
 export function AccountSettings() {
+  const { value: account } = useAccountPolicySnapshot();
+  const idleDays = account.policy.retention.idleDays;
   const [confirming, setConfirming] = useState(false);
   const [confirmation, setConfirmation] = useState('');
   const actions = useAccountActions();
@@ -14,9 +17,19 @@ export function AccountSettings() {
   return (
     <section>
       <h2>Account</h2>
+      <div className="settings-row">
+        <div>
+          <h3>Account plan</h3>
+          <p>
+            <code>{account.planId}</code>
+          </p>
+        </div>
+      </div>
       <p className="account-retention-note">
-        Thread history expires seven days after your last message. Notes remain until you delete
-        them.
+        {idleDays === null
+          ? 'Thread history does not expire automatically.'
+          : `Thread history expires ${idleDays === 7 ? 'seven' : idleDays} ${idleDays === 1 ? 'day' : 'days'} after your last message.`}{' '}
+        Notes remain until you delete them.
       </p>
       <ConversationPrivacy />
       <AnalyticsPreference onError={actions.setError} />

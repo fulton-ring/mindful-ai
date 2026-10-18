@@ -57,14 +57,15 @@ export function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
           </p>
           <h2>Retention and controls</h2>
           <p>
-            Thread history expires seven days after your last message. Notes are stored separately
-            until deleted. Settings → Account lets you export available data or delete your account.
-            Deletion removes your sign-in identity and application records; provider backups and
-            previously collected diagnostics have separate retention periods. PostHog removes
-            captured conversation content after 30 days; ordinary diagnostic metadata follows its
-            project retention settings and may last longer. Account deletion queues deletion of
-            linked PostHog events. Provider deletion is asynchronous. We do not maintain a separate
-            indefinite archive of shared conversations for evaluations.
+            Thread history follows the retention settings for your account, which may keep history
+            indefinitely. Check Settings → Account for your retention period. Notes are stored
+            separately until deleted. Settings → Account lets you export available data or delete
+            your account. Deletion removes your sign-in identity and application records; provider
+            backups and previously collected diagnostics have separate retention periods. PostHog
+            removes captured conversation content after 30 days; ordinary diagnostic metadata
+            follows its project retention settings and may last longer. Account deletion queues
+            deletion of linked PostHog events. Provider deletion is asynchronous. We do not maintain
+            a separate indefinite archive of shared conversations for evaluations.
           </p>
           <h2>Your choices and privacy requests</h2>
           <p>

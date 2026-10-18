@@ -48,7 +48,7 @@ const ACTIVE = (
     WHERE t.id=?1 AND t.status='streaming'
     AND EXISTS(SELECT 1 FROM users owner WHERE owner.id=t.owner_id AND owner.deletion_pending=0)
     AND NOT EXISTS(SELECT 1 FROM turn_cancellations cancelled WHERE cancelled.owner_id=t.owner_id AND cancelled.request_id=t.request_id)
-    AND c.status='active' AND b.status='active' AND c.expires_at>?2${row ? ` AND t.execution_generation=${generationOf(row)}` : ''}`;
+    AND c.status='active' AND b.status='active' AND (c.retention_disabled=1 OR c.expires_at>?2)${row ? ` AND t.execution_generation=${generationOf(row)}` : ''}`;
 const COMPLETED_MESSAGE = (db: AppDatabase) =>
   db.dialect === 'postgres'
     ? "EXISTS(SELECT 1 FROM messages WHERE id=?1 AND (ui_message::jsonb #>> '{metadata,status}')='complete')"
@@ -87,7 +87,7 @@ export async function claimTurnExecution(
     AND EXISTS(SELECT 1 FROM users owner WHERE owner.id=turns.owner_id AND owner.deletion_pending=0)
     ${options.allowCancelled ? '' : 'AND NOT EXISTS(SELECT 1 FROM turn_cancellations c WHERE c.owner_id=turns.owner_id AND c.request_id=turns.request_id)'}
     AND EXISTS(SELECT 1 FROM conversations c JOIN conversation_branches b ON b.conversation_id=c.id
-      WHERE c.id=turns.conversation_id AND b.id=turns.branch_id AND c.status='active' AND b.status='active' AND c.expires_at>?3)
+      WHERE c.id=turns.conversation_id AND b.id=turns.branch_id AND c.status='active' AND b.status='active' AND (c.retention_disabled=1 OR c.expires_at>?3))
     RETURNING *`)
         .bind(turnId, new Date(Date.now() - TURN_BUDGET_MS).toISOString(), nowIso()),
     );
@@ -144,7 +144,7 @@ export function completionChunks(row: TurnRow): WaldenUIMessageChunk[] {
         branchId: row.branch_id,
         ...(row.user_message_id ? { userMessageId: row.user_message_id } : {}),
         ...(input.conversation?.title ? { title: input.conversation.title } : {}),
-        ...(input.conversation?.expiresAt ? { expiresAt: input.conversation.expiresAt } : {}),
+        ...(input.conversation ? { expiresAt: input.conversation.expiresAt } : {}),
       },
     },
     {
@@ -327,7 +327,7 @@ export async function isConversationLive(
     await first(
       db
         .prepare(
-          "SELECT id FROM conversations WHERE id=? AND owner_id=? AND status='active' AND expires_at>? AND EXISTS(SELECT 1 FROM users owner WHERE owner.id=conversations.owner_id AND owner.deletion_pending=0)",
+          "SELECT id FROM conversations WHERE id=? AND owner_id=? AND status='active' AND (retention_disabled=1 OR expires_at>?) AND EXISTS(SELECT 1 FROM users owner WHERE owner.id=conversations.owner_id AND owner.deletion_pending=0)",
         )
         .bind(conversationId, ownerId, nowIso()),
     ),

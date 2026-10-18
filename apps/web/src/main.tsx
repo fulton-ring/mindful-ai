@@ -8,6 +8,7 @@ import 'katex/dist/katex.min.css';
 import 'streamdown/styles.css';
 import { Authentication } from './features/auth/Authentication';
 import { LegalPage } from './features/legal/LegalPage';
+import { AccountPolicyGate } from './features/policy/AccountPolicyGate';
 import { beginIdentitySession } from './lib/account-identity';
 import { setTokenProvider } from './lib/api';
 import { setRuntimeConfig } from './lib/runtime-config';
@@ -55,7 +56,9 @@ function Workspace({
   return (
     <>
       <QueryClientProvider client={client}>
-        <RouterProvider router={router} context={{ authControls: controls, identity }} />
+        <AccountPolicyGate identity={identity}>
+          <RouterProvider router={router} context={{ authControls: controls, identity }} />
+        </AccountPolicyGate>
       </QueryClientProvider>
     </>
   );

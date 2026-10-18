@@ -26,7 +26,7 @@ describe('expired conversation cleanup', () => {
     ).toBe(true);
   });
 
-  it('purges child state, preserves note-linked rows, and deletes unattached rows', async () => {
+  it('does not delete child state when no expired conversation was claimed', async () => {
     const sql: string[] = [];
     const db = {
       prepare(query: string) {
@@ -51,20 +51,9 @@ describe('expired conversation cleanup', () => {
 
     await purgeExpiredConversations(db);
 
-    expect(sql.some((query) => query.startsWith('DELETE FROM messages'))).toBe(true);
-    expect(sql.some((query) => query.startsWith('DELETE FROM turns'))).toBe(true);
-    expect(sql.some((query) => query.startsWith('DELETE FROM interventions'))).toBe(true);
-    expect(
-      sql.some(
-        (query) =>
-          query.startsWith('UPDATE conversations') && query.includes('note_id IS NOT NULL'),
-      ),
-    ).toBe(true);
-    expect(
-      sql.some(
-        (query) =>
-          query.startsWith('DELETE FROM conversations') && query.includes('note_id IS NULL'),
-      ),
-    ).toBe(true);
+    expect(sql.some((query) => query.startsWith("UPDATE conversations SET status='purging'"))).toBe(
+      true,
+    );
+    expect(sql.some((query) => query.startsWith('DELETE '))).toBe(false);
   });
 });

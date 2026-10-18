@@ -16,6 +16,7 @@ it.skipIf(!key)(
       OPENROUTER_API_KEY: key,
     });
     const stream = await service.streamTurn({
+      ownerId: 'live-smoke-owner',
       turnId: 'openrouter-smoke-turn',
       requestId: 'openrouter-smoke-request',
       conversation: {

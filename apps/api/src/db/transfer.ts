@@ -1,7 +1,7 @@
 import { type AppDatabase, type AppStatement, prepareQuery } from './database';
 
 /** Application-only logical format; Mastra/native execution stores require their own backup. */
-export const APPLICATION_SCHEMA_VERSION = 1;
+export const APPLICATION_SCHEMA_VERSION = 2;
 const tables = [
   'users',
   'app_settings',
@@ -57,6 +57,8 @@ const scalar = (value: unknown): Scalar => {
 };
 
 const requireSettledTurns = (rows: Record<Table, Row[]>): void => {
+  if (rows.conversations.some((row) => row.status === 'purging'))
+    throw new Error('Logical application transfer requires completed retention cleanup');
   if (rows.turns.some((turn) => turn.status === 'streaming'))
     throw new Error(
       'Logical application transfer requires settled turns; finish or cancel active turns before exporting or importing',
@@ -97,7 +99,7 @@ const validate = (value: unknown): ApplicationSnapshot => {
   if (
     snapshot.format !== 'walden-application-snapshot' ||
     snapshot.version !== 1 ||
-    snapshot.schemaVersion !== APPLICATION_SCHEMA_VERSION
+    ![1, APPLICATION_SCHEMA_VERSION].includes(snapshot.schemaVersion)
   )
     throw new Error('Unsupported application snapshot schema version');
   if (!snapshot.tables || Object.keys(snapshot.tables).sort().join() !== [...tables].sort().join())
@@ -110,6 +112,20 @@ const validate = (value: unknown): ApplicationSnapshot => {
       for (const value of Object.values(row)) scalar(value);
     }
   }
+  if (snapshot.schemaVersion === 1)
+    return {
+      ...snapshot,
+      schemaVersion: APPLICATION_SCHEMA_VERSION,
+      tables: {
+        ...snapshot.tables,
+        conversations: snapshot.tables.conversations.map((row) => ({
+          ...row,
+          retention_disabled: 0,
+          purge_started_at: null,
+          purge_token: null,
+        })),
+      },
+    };
   return snapshot;
 };
 

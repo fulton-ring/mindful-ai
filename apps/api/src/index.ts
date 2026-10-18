@@ -5,6 +5,7 @@ import { mountAuthRoutes } from './auth/routes';
 import { capturePlacementRoutes } from './chat/capture/capture-placement';
 import { conversationRoutes } from './chat/conversations/conversations';
 import { purgeExpiredConversations } from './chat/conversations/deletion';
+import { syncOwnerRetention, syncRetentionPolicies } from './chat/conversations/retention';
 import { followupRoutes } from './chat/followups/followups';
 import { highlightRoutes } from './chat/highlights/highlights';
 import { chatRoutes } from './chat/turns/routes';
@@ -15,6 +16,7 @@ import { getPublicInferenceConfig } from './inference/config';
 import { metricsRoutes } from './metrics/routes';
 import { notesRoutes } from './notes/routes';
 import { personaRoutes } from './personas/routes';
+import { getRequestAccountPolicy } from './policy/request';
 import { accountRoutes } from './privacy/account';
 import { purgeTelemetry } from './privacy/content-telemetry';
 import type { Bindings, Variables } from './types';
@@ -68,7 +70,13 @@ app.get('/api/config', async (c) => {
 });
 mountAuthRoutes(app);
 app.use('/api/*', authMiddleware);
+app.use('/api/*', async (c, next) => {
+  const account = await getRequestAccountPolicy(c);
+  await syncOwnerRetention(c.env.DB, c.get('userId'), account.policy.retention.idleDays);
+  await next();
+});
 app.get('/api/account', (c) => c.json(getAccountIdentity(c)));
+app.get('/api/account/policy', async (c) => c.json(await getRequestAccountPolicy(c)));
 app.route('/api/notes', notesRoutes);
 app.route('/api', conversationRoutes);
 app.route('/api', capturePlacementRoutes);
@@ -92,14 +100,19 @@ app.onError((error, c) => {
 export default {
   fetch: app.fetch,
   async scheduled(controller: ScheduledController, env: Bindings, ctx: ExecutionContext) {
-    ctx.waitUntil(reconcileTurns(env));
-    ctx.waitUntil(sweepCloudflareExecutions(env));
-    if (controller.cron !== '17 * * * *') return;
     ctx.waitUntil(
-      purgeExpiredConversations(env.DB, env.FILES, (owner, id) =>
-        purgeConversationExecution(env, owner, id),
-      ),
+      (async () => {
+        // Rebase old deadlines before recovery or cleanup can interpret them as deletion.
+        await syncRetentionPolicies(env);
+        await Promise.all([reconcileTurns(env), sweepCloudflareExecutions(env)]);
+        if (controller.cron !== '17 * * * *') return;
+        await Promise.all([
+          purgeExpiredConversations(env.DB, env.FILES, (owner, id) =>
+            purgeConversationExecution(env, owner, id),
+          ),
+          purgeTelemetry(env),
+        ]);
+      })(),
     );
-    ctx.waitUntil(purgeTelemetry(env));
   },
 };

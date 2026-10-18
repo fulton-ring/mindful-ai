@@ -1,6 +1,7 @@
 import { Paperclip, SlidersHorizontal } from 'lucide-react';
 
 import { Popover, PopoverContent, PopoverTrigger } from '../../../../components/ui/popover';
+import { useAccountPolicy } from '../../../../lib/account-policy';
 import { useRuntimeConfig } from '../../../../lib/runtime-config';
 import { track } from '../../../../lib/telemetry';
 
@@ -25,6 +26,7 @@ export function ChatToolsMenu({
   onAutoHighlights,
 }: Props) {
   const capabilities = useRuntimeConfig()?.capabilities;
+  const policy = useAccountPolicy();
   return (
     <Popover onOpenChange={(open) => open && track('chat_tools_opened')}>
       <PopoverTrigger asChild>
@@ -40,9 +42,9 @@ export function ChatToolsMenu({
         <ToolReadiness />
         <button
           type="button"
-          aria-disabled={disabled}
+          aria-disabled={disabled || policy.uploads.maxFiles === 0 || policy.uploads.maxBytes === 0}
           onClick={() => {
-            if (disabled)
+            if (disabled || policy.uploads.maxFiles === 0 || policy.uploads.maxBytes === 0)
               track('action_blocked', {
                 action: 'add_files',
                 failure_code: 'response_in_progress',
@@ -59,8 +61,8 @@ export function ChatToolsMenu({
         </button>
         <Preference
           label="Web search"
-          value={webSearch}
-          disabled={disabled || capabilities?.webSearch === false}
+          value={webSearch && policy.features.webSearch && capabilities?.webSearch !== false}
+          disabled={disabled || !policy.features.webSearch || capabilities?.webSearch === false}
           onChange={(value) => onPreference('webSearch', value)}
         />
         <Preference
@@ -110,14 +112,26 @@ function Preference({
 
 function ToolReadiness() {
   const capabilities = useRuntimeConfig()?.capabilities;
-  if (!capabilities) return null;
+  const policy = useAccountPolicy();
+  if (!capabilities && Object.values(policy.features).every(Boolean)) return null;
   return (
     <div className="muted px-2 py-2 text-sm">
-      {!capabilities.webSearch && <p>Web search is not configured on this instance.</p>}
-      {!capabilities.documentExtraction && (
+      {!policy.features.webSearch ? (
+        <p>Web search is disabled for this account.</p>
+      ) : (
+        capabilities?.webSearch === false && <p>Web search is not configured on this instance.</p>
+      )}
+      {(policy.uploads.maxBytes === 0 || policy.uploads.maxFiles === 0) && (
+        <p>File uploads are disabled for this account.</p>
+      )}
+      {(!policy.features.documentExtraction || capabilities?.documentExtraction === false) && (
         <p>Document attachments are unavailable. You can attach supported text files and images.</p>
       )}
-      {!capabilities.savedSourceSearch && <p>Saved source search is unavailable.</p>}
+      {!policy.features.webResearch ? (
+        <p>Web research is disabled for this account.</p>
+      ) : (
+        capabilities?.savedSourceSearch === false && <p>Saved source search is unavailable.</p>
+      )}
     </div>
   );
 }

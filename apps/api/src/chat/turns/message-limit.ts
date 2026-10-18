@@ -10,9 +10,9 @@ import type { Bindings } from '../../types';
  * `windowHours`, messages spend their model's weight from `limit`, and the
  * whole budget comes back when the window ends.
  */
-export type MessageLimit = { limit: number; windowHours: number };
+export type MessageLimit = Pick<MessageBudget, 'limit' | 'windowHours'>;
 
-const DEFAULT_LIMIT: MessageLimit = { limit: 20, windowHours: 4 };
+const DEFAULT_LIMIT = { limit: 20, windowHours: 4 } satisfies MessageLimit;
 
 const positive = (value: string | undefined, fallback: number) => {
   const parsed = Number(value);
@@ -22,7 +22,10 @@ const positive = (value: string | undefined, fallback: number) => {
 export const messageLimitFrom = (
   env: Pick<Bindings, 'MESSAGE_LIMIT' | 'MESSAGE_WINDOW_HOURS'>,
 ): MessageLimit => ({
-  limit: Math.floor(positive(env.MESSAGE_LIMIT, DEFAULT_LIMIT.limit)),
+  limit:
+    env.MESSAGE_LIMIT?.trim().toLowerCase() === 'unlimited'
+      ? null
+      : Math.floor(positive(env.MESSAGE_LIMIT, DEFAULT_LIMIT.limit)),
   windowHours: positive(env.MESSAGE_WINDOW_HOURS, DEFAULT_LIMIT.windowHours),
 });
 
@@ -59,18 +62,18 @@ export async function chargeMessage(
   const startedAt = new Date(now).toISOString();
   const expiredBefore = new Date(now - windowMs(limit)).toISOString();
   const result =
-    weight <= limit.limit
+    limit.limit === null || weight <= limit.limit
       ? await prepareQuery(db, {
           sqlite: `INSERT INTO message_windows (owner_id,started_at,used) VALUES (?,?,?)
        ON CONFLICT(owner_id) DO UPDATE SET
          started_at=CASE WHEN started_at<=? THEN excluded.started_at ELSE started_at END,
          used=CASE WHEN started_at<=? THEN excluded.used ELSE used+excluded.used END
-       WHERE started_at<=? OR used+excluded.used<=?`,
+       WHERE started_at<=? OR ?=1 OR used+excluded.used<=? RETURNING started_at`,
           postgres: `INSERT INTO message_windows (owner_id,started_at,used) VALUES (?,?,?)
        ON CONFLICT(owner_id) DO UPDATE SET
          started_at=CASE WHEN message_windows.started_at<=? THEN excluded.started_at ELSE message_windows.started_at END,
          used=CASE WHEN message_windows.started_at<=? THEN excluded.used ELSE message_windows.used+excluded.used END
-       WHERE message_windows.started_at<=? OR message_windows.used+excluded.used<=?`,
+       WHERE message_windows.started_at<=? OR ?=1 OR message_windows.used+excluded.used<=? RETURNING started_at`,
         })
           .bind(
             ownerId,
@@ -79,12 +82,13 @@ export async function chargeMessage(
             expiredBefore,
             expiredBefore,
             expiredBefore,
-            limit.limit,
+            limit.limit === null ? 1 : 0,
+            limit.limit ?? 0,
           )
-          .run()
+          .first<Pick<WindowRow, 'started_at'>>()
       : null;
+  if (result) return result.started_at;
   const window = await loadWindow(db, ownerId);
-  if ((result?.meta.changes ?? 0) > 0 && window) return window.started_at;
   const previousReset = window ? Date.parse(window.started_at) + windowMs(limit) : 0;
   const resetsAt = previousReset > now ? previousReset : now + windowMs(limit);
   throw new HttpError(

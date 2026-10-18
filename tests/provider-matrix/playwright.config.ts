@@ -6,7 +6,7 @@ const stacks = (
 ).split(',');
 export default defineConfig({
   testDir: '.',
-  testMatch: 'matrix.spec.ts',
+  testMatch: /(?:matrix|policy)\.spec\.ts/,
   outputDir: '../../test-results/provider-matrix',
   workers: 1,
   fullyParallel: false,

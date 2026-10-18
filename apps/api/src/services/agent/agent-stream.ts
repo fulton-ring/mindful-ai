@@ -11,6 +11,7 @@ import { messageAttachments } from '../../chat/messages';
 import { isConversationLive } from '../../chat/turns/turn-store';
 import type { NativeExecutionContext } from '../../execution/native-agent';
 import { type ApiTelemetry, createApiTelemetry } from '../../observability';
+import { getAccountPolicy } from '../../policy';
 import { captureConversation, contentPreference } from '../../privacy/content-telemetry';
 import { createMcpService, type McpTools } from '../mcp';
 import { createResearchTools, publicUrl } from '../research/research';
@@ -156,13 +157,19 @@ async function createPrimaryStream(
   telemetry: ApiTelemetry | null,
 ): Promise<AsyncIterable<WaldenUIMessageChunk>> {
   const { env, input, model, modelName, signal, memoryModel } = options;
-  const mcpTools = await createMcpService(env).tools();
+  if (!input.ownerId?.trim()) throw new Error('An account owner is required for agent tools.');
+  const {
+    policy: { features },
+  } = await getAccountPolicy(env, input.ownerId);
+  const mcpTools = features.mcp ? await createMcpService(env).tools() : {};
   const allowedUrls = collectAllowedUrls(input);
   const tools: McpTools = {
     ...mcpTools,
-    ...createDocumentTools(env, input),
-    ...createResearchTools(env, input.ownerId, signal, allowedUrls),
-    ...createWebSearchTools(env, signal, allowedUrls),
+    ...(features.documentExtraction ? createDocumentTools(env, input) : {}),
+    ...(features.webResearch ? createResearchTools(env, input.ownerId, signal, allowedUrls) : {}),
+    ...(features.webSearch && input.conversation.webSearchEnabled !== false
+      ? createWebSearchTools(env, signal, allowedUrls)
+      : {}),
     ...(memory && env.DB && input.ownerId
       ? createCompactTools({
           db: env.DB,
