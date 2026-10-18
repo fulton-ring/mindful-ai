@@ -1,6 +1,7 @@
 import { cp, mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { chromium } from 'playwright';
 import { afterEach, expect, it, vi } from 'vitest';
 import { attachmentKey } from '../../chat/attachments/attachments';
 import * as conversations from '../../chat/conversations/deletion';
@@ -10,7 +11,11 @@ import { LocalObjectStore } from '../../storage/local';
 import type { ObjectStore } from '../../storage/object-store';
 import { readNodeConfig } from './config';
 import { createNodeRuntime } from './runtime';
-import type { NodeRuntimeAdapters, NodeRuntimeService } from './runtime-adapters';
+import {
+  defaultNodeRuntimeAdapters,
+  type NodeRuntimeAdapters,
+  type NodeRuntimeService,
+} from './runtime-adapters';
 import * as turns from './turns';
 
 const directories: string[] = [];
@@ -22,6 +27,22 @@ afterEach(async () => {
   );
   vi.restoreAllMocks();
 });
+
+it.each([undefined, '/usr/bin/chromium'])(
+  'launches the default research browser with the configured executable %s and its sandbox',
+  async (executablePath) => {
+    const config = readNodeConfig({ CHROMIUM_EXECUTABLE_PATH: executablePath });
+    const unavailable = new Error('Browser unavailable');
+    const launch = vi.spyOn(chromium, 'launch').mockRejectedValue(unavailable);
+    const browser = await defaultNodeRuntimeAdapters.createResearchBrowser(config);
+    await expect(
+      browser.readMarkdown('https://fixture.example/', new AbortController().signal),
+    ).rejects.toBe(unavailable);
+    expect(launch).toHaveBeenCalledWith(
+      expect.objectContaining({ executablePath, chromiumSandbox: true }),
+    );
+  },
+);
 
 function alternateProviders(closed: string[]) {
   return {

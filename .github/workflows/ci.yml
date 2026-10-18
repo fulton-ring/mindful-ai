@@ -4,6 +4,11 @@ on:
   pull_request:
   # Deploys both Workers from main by hand, e.g. after rotating the token.
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      skip-deploy:
+        type: boolean
+        default: true
 
 jobs:
   verify:
@@ -83,7 +88,7 @@ jobs:
 
   # Manual deployment selects the changed deployables. Main pushes only run checks.
   changes:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.skip-deploy != true
     runs-on: ubuntu-latest
     outputs:
       app: ${{ steps.filter.outputs.app }}
@@ -107,7 +112,7 @@ jobs:
   # serving requests or scheduled work. No separate migration job is needed.
   deploy-app:
     needs: [verify, self-hosted-integration, changes]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.skip-deploy != true
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-app
@@ -143,7 +148,7 @@ jobs:
 
   deploy-landing:
     needs: [verify, self-hosted-integration, changes]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.skip-deploy != true
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-landing

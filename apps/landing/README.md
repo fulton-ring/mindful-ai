@@ -1,5 +1,7 @@
 # Landing page
 
+The Walden landing page presents Walden as a [Fulton Ring](https://fultonring.com) product.
+
 Astro builds this marketing site as static HTML. React (`@astrojs/react`) is available for interactive islands. The portable Wrangler example serves the build as an assets-only Worker named `walden-landing`; the app lives in `apps/api`.
 
 ```sh

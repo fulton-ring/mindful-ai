@@ -5,6 +5,7 @@
     "LICENSE",
     "NOTICE",
     "scripts/third-party-notices.mjs",
+    "licenses/npm/**",
     "pnpm-lock.yaml",
     "apps/landing/.env"
   ],

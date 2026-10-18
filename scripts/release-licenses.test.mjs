@@ -1,18 +1,52 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { inspectImageRoot } from './public-image-check.mjs';
-import { generateNotices } from './third-party-notices.mjs';
+import * as noticeCommand from './third-party-notices.mjs';
+
+const { addDeployedPackages, generateNotices, parseNoticeArguments } = noticeCommand;
 
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), 'walden-licenses-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   return root;
 }
+
+test('notice command scopes the production inventory with explicit workspace filters', () => {
+  assert.equal(typeof parseNoticeArguments, 'function');
+  assert.deepEqual(
+    parseNoticeArguments([
+      '--filter=@walden/api',
+      '--filter=@walden/web',
+      'out.txt',
+      'public/out.txt',
+    ]),
+    {
+      filters: ['@walden/api', '@walden/web'],
+      outputs: ['out.txt', 'public/out.txt'],
+      deployed: undefined,
+    },
+  );
+  assert.deepEqual(parseNoticeArguments(['--deployed=/out/node_modules', 'out.txt']), {
+    filters: [],
+    outputs: ['out.txt'],
+    deployed: '/out/node_modules',
+  });
+  for (const args of [
+    [],
+    ['--filter=', 'out.txt'],
+    ['--unknown', 'out.txt'],
+    ['--deployed=', 'out.txt'],
+    ['--deployed=a', '--deployed=b', 'out.txt'],
+  ]) {
+    assert.throws(() => parseNoticeArguments(args), /Usage:/);
+  }
+});
 
 test('notices preserve nested attribution, deduplicate peers, and omit installed paths', async (t) => {
   const root = await fixture(t);
@@ -23,11 +57,15 @@ test('notices preserve nested attribution, deduplicate peers, and omit installed
   );
   await writeFile(join(root, 'LICENSE'), 'MIT license\nCopyright Example');
   await writeFile(join(root, 'licenses', 'NOTICE.txt'), 'Nested attribution');
+  await writeFile(join(root, 'ThirdPartyNotices.txt'), 'Bundled dependency notices');
+  await writeFile(join(root, 'LICENSES.txt'), 'Additional upstream license texts');
   await writeFile(join(root, 'license.d.ts'), 'not a license text');
   const entry = { name: 'example', paths: [root, root] };
   const result = await generateNotices({ MIT: [entry] });
   assert.match(result, /MIT license\nCopyright Example/);
   assert.match(result, /Nested attribution/);
+  assert.match(result, /Bundled dependency notices/);
+  assert.match(result, /Additional upstream license texts/);
   assert.doesNotMatch(result, /not a license text/);
   assert.ok(!result.includes(root));
   assert.equal(result.match(/Package: example@1.0.0/g).length, 1);
@@ -43,9 +81,237 @@ test('packages without a license retain upstream README and explicitly flag miss
   assert.match(result, /Upstream licensing information/);
 });
 
+test('deployed package stores add unlisted packages and workspace packages keep the project license', async (t) => {
+  const root = await fixture(t);
+  const store = join(root, 'node_modules', '.pnpm');
+  const write = async (entry, name, metadata, files = {}) => {
+    const path = join(store, entry, 'node_modules', name);
+    await mkdir(path, { recursive: true });
+    await writeFile(join(path, 'package.json'), JSON.stringify({ name, ...metadata }));
+    for (const [file, text] of Object.entries(files)) await writeFile(join(path, file), text);
+    return path;
+  };
+  const listedPath = await write(
+    'listed@1.0.0',
+    'listed',
+    { version: '1.0.0', license: 'MIT' },
+    {
+      LICENSE: 'Listed license',
+    },
+  );
+  await write(
+    '@scope+deployed@2.0.0',
+    '@scope/deployed',
+    { version: '2.0.0', license: 'ISC' },
+    {
+      LICENSE: 'Deployed scoped license',
+    },
+  );
+  await write(
+    'legacy@3.0.0',
+    'legacy',
+    { version: '3.0.0', licenses: [{ type: 'BSD-2-Clause' }] },
+    {
+      'LICENSE.md': 'Legacy license',
+    },
+  );
+  await write('unknown@4.0.0', 'unknown', { version: '4.0.0' });
+  await write('@walden+contracts@0.0.0', '@walden/contracts', {
+    version: '0.0.0',
+    license: 'Apache-2.0',
+  });
+  const inventory = await addDeployedPackages(
+    { MIT: [{ name: 'listed', versions: ['1.0.0'], paths: [listedPath] }] },
+    join(root, 'node_modules'),
+  );
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(inventory).map(([license, packages]) => [
+        license,
+        packages.map((pkg) => `${pkg.name}@${pkg.versions.join()}`).sort(),
+      ]),
+    ),
+    {
+      MIT: ['listed@1.0.0'],
+      ISC: ['@scope/deployed@2.0.0'],
+      'BSD-2-Clause': ['legacy@3.0.0'],
+      Unknown: ['unknown@4.0.0'],
+      'Apache-2.0': ['@walden/contracts@0.0.0'],
+    },
+  );
+  const result = await generateNotices(inventory, {
+    workspacePackages: new Set(['@walden/contracts@0.0.0']),
+  });
+  assert.equal(result.match(/Package: listed@1.0.0/g).length, 1);
+  assert.match(result, /Package: @scope\/deployed@2.0.0\nDeclared license: ISC/);
+  assert.match(result, /Deployed scoped license/);
+  assert.match(result, /Package: @walden\/contracts@0.0.0[^=]+Walden repository LICENSE/);
+  assert.doesNotMatch(result, /MISSING_LICENSE_TEXT: @walden\/contracts/);
+  assert.match(result, /MISSING_LICENSE_TEXT: unknown@4.0.0/);
+});
+
+async function supplementFixture(t) {
+  const root = await fixture(t);
+  const pkg = join(root, 'package');
+  const supplements = join(root, 'supplements');
+  await mkdir(pkg);
+  await mkdir(supplements);
+  await writeFile(
+    join(pkg, 'package.json'),
+    JSON.stringify({ name: 'supplemented', version: '1.0.0' }),
+  );
+  const text = 'MIT license\nCopyright Original Author\n';
+  await writeFile(join(supplements, 'LICENSE'), text);
+  const manifest = {
+    'supplemented@1.0.0': {
+      provenance: {
+        registry: 'https://registry.npmjs.org/supplemented/1.0.0',
+        gitHead: 'a'.repeat(40),
+      },
+      files: [
+        {
+          path: 'LICENSE',
+          source: `https://raw.githubusercontent.com/example/package/${'a'.repeat(40)}/LICENSE`,
+          sha256: createHash('sha256').update(text).digest('hex'),
+        },
+      ],
+    },
+  };
+  await writeFile(join(supplements, 'manifest.json'), JSON.stringify(manifest));
+  return { pkg, supplements, manifest, inventory: { MIT: [{ paths: [pkg] }] } };
+}
+
+test('exact-version supplements retain verified upstream text and provenance offline', async (t) => {
+  const { inventory, supplements } = await supplementFixture(t);
+  const result = await generateNotices(inventory, { supplementDirectory: supplements });
+  assert.match(result, /Copyright Original Author/);
+  assert.match(result, /https:\/\/raw\.githubusercontent\.com\/example\/package\//);
+  assert.doesNotMatch(result, /MISSING_LICENSE_TEXT: supplemented/);
+});
+
+test('supplements support release commits resolved from parent metadata or an upstream tag', async (t) => {
+  const { inventory, supplements, manifest } = await supplementFixture(t);
+  manifest['supplemented@1.0.0'].provenance.resolvedCommit = 'a'.repeat(40);
+  manifest['supplemented@1.0.0'].provenance.gitHead = null;
+  await writeFile(join(supplements, 'manifest.json'), JSON.stringify(manifest));
+  assert.doesNotMatch(
+    await generateNotices(inventory, { supplementDirectory: supplements }),
+    /MISSING_LICENSE_TEXT: supplemented/,
+  );
+});
+
+test('supplements identify upstream base64 transport for reproducible source verification', async (t) => {
+  const { inventory, supplements, manifest } = await supplementFixture(t);
+  manifest['supplemented@1.0.0'].files[0].sourceEncoding = 'base64';
+  await writeFile(join(supplements, 'manifest.json'), JSON.stringify(manifest));
+  assert.match(
+    await generateNotices(inventory, { supplementDirectory: supplements }),
+    /Source encoding: base64/,
+  );
+});
+
+test('canonical terms retain the exact published declaration and label their provenance', async (t) => {
+  const { inventory, supplements, manifest } = await supplementFixture(t);
+  const entry = manifest['supplemented@1.0.0'];
+  delete entry.provenance.gitHead;
+  entry.provenance.npmIntegrity = `sha512-${Buffer.alloc(64).toString('base64')}`;
+  entry.notice = 'Canonical terms correspond to the exact published MIT declaration.';
+  entry.files[0].canonicalTerms = true;
+  const declaration = JSON.stringify({
+    name: 'supplemented',
+    version: '1.0.0',
+    license: 'MIT',
+    author: 'Original Author',
+  });
+  await writeFile(join(supplements, 'declaration.json'), declaration);
+  entry.files.push({
+    path: 'declaration.json',
+    source: 'https://registry.npmjs.org/supplemented/-/supplemented-1.0.0.tgz',
+    sourceArchiveMember: 'package/package.json',
+    sha256: createHash('sha256').update(declaration).digest('hex'),
+  });
+  await writeFile(join(supplements, 'manifest.json'), JSON.stringify(manifest));
+  const result = await generateNotices(inventory, { supplementDirectory: supplements });
+  assert.match(result, /Supplement context: Canonical terms correspond/);
+  assert.match(result, /Canonical license terms \(reference text/);
+  assert.match(result, /Source archive member: package\/package.json/);
+  assert.ok(result.includes(declaration));
+  assert.doesNotMatch(result, /MISSING_LICENSE_TEXT: supplemented/);
+});
+
+test('supplements never cover a different package version', async (t) => {
+  const { pkg, inventory, supplements } = await supplementFixture(t);
+  await writeFile(
+    join(pkg, 'package.json'),
+    JSON.stringify({ name: 'supplemented', version: '1.0.1' }),
+  );
+  assert.match(
+    await generateNotices(inventory, { supplementDirectory: supplements }),
+    /MISSING_LICENSE_TEXT: supplemented@1.0.1/,
+  );
+});
+
+test('supplements reject missing license files and checksum mismatches', async (t) => {
+  const { inventory, supplements } = await supplementFixture(t);
+  await writeFile(join(supplements, 'LICENSE'), 'modified');
+  await assert.rejects(
+    generateNotices(inventory, { supplementDirectory: supplements }),
+    /checksum.*supplemented@1.0.0/i,
+  );
+  await rm(join(supplements, 'LICENSE'));
+  await assert.rejects(generateNotices(inventory, { supplementDirectory: supplements }), /ENOENT/);
+});
+
+test('supplements reject paths outside their directory and missing provenance', async (t) => {
+  const { inventory, supplements, manifest } = await supplementFixture(t);
+  manifest['supplemented@1.0.0'].files[0].path = '../LICENSE';
+  await writeFile(join(supplements, 'manifest.json'), JSON.stringify(manifest));
+  await assert.rejects(
+    generateNotices(inventory, { supplementDirectory: supplements }),
+    /Invalid.*supplement/i,
+  );
+  manifest['supplemented@1.0.0'].files[0].path = 'LICENSE';
+  delete manifest['supplemented@1.0.0'].provenance;
+  await writeFile(join(supplements, 'manifest.json'), JSON.stringify(manifest));
+  await assert.rejects(
+    generateNotices(inventory, { supplementDirectory: supplements }),
+    /Invalid.*supplement/i,
+  );
+});
+
+test('all checked-in supplements generate offline with valid provenance and checksums', async (t) => {
+  const root = await fixture(t);
+  const manifest = JSON.parse(
+    await readFile(new URL('../licenses/npm/manifest.json', import.meta.url), 'utf8'),
+  );
+  assert.ok(Object.keys(manifest).length > 0, 'The release must retain its verified supplements');
+  const packages = [];
+  for (const [index, identity] of Object.keys(manifest).entries()) {
+    const separator = identity.lastIndexOf('@');
+    const path = join(root, String(index));
+    await mkdir(path);
+    await writeFile(
+      join(path, 'package.json'),
+      JSON.stringify({
+        name: identity.slice(0, separator),
+        version: identity.slice(separator + 1),
+      }),
+    );
+    packages.push({ paths: [path] });
+  }
+  const result = await generateNotices({ 'Supplemented upstream license': packages });
+  assert.doesNotMatch(result, /MISSING_LICENSE_TEXT: /);
+});
+
 async function imageFixture(t) {
   const root = await fixture(t);
-  for (const path of ['public', 'models/minilm', 'node_modules/@mastra/core/dist']) {
+  for (const path of [
+    'public',
+    'models/minilm',
+    'node_modules/@mastra/core/dist',
+    'node_modules/.pnpm',
+    'notices',
+  ]) {
     await mkdir(join(root, path), { recursive: true });
   }
   for (const path of [
@@ -56,6 +322,9 @@ async function imageFixture(t) {
     'models/minilm/LICENSE',
     'models/minilm/README.md',
     'models/minilm/model-manifest.json',
+    'notices/manifest.json',
+    'notices/debian-packages.tsv',
+    'notices/debian-sources.json',
   ]) {
     await writeFile(join(root, path), 'retained attribution');
   }
@@ -86,6 +355,29 @@ test('image guard does not mistake the MIT ee-first package for enterprise code'
   await mkdir(join(root, 'node_modules/ee-first'));
   await writeFile(join(root, 'node_modules/ee-first/index.js'), 'MIT licensed helper');
   assert.deepEqual(await inspectImageRoot(root), { issues: [], warnings: [] });
+});
+
+test('image guard rejects a release missing its native inventory', async (t) => {
+  const root = await imageFixture(t);
+  await rm(join(root, 'notices/debian-packages.tsv'));
+  assert.deepEqual((await inspectImageRoot(root)).issues, [
+    'Missing attribution artifact: notices/debian-packages.tsv',
+  ]);
+});
+
+test('image guard checks the actual deployed package versions against retained notices', async (t) => {
+  const root = await imageFixture(t);
+  const pkg = join(root, 'node_modules/.pnpm/example@2.0.0/node_modules/example');
+  await mkdir(pkg, { recursive: true });
+  await writeFile(join(pkg, 'package.json'), JSON.stringify({ name: 'example', version: '2.0.0' }));
+  await writeFile(join(root, 'THIRD_PARTY_LICENSES.txt'), 'Package: example@1.0.0\n');
+  assert.ok(
+    (await inspectImageRoot(root)).issues.includes(
+      'Runtime package absent from notices: example@2.0.0',
+    ),
+  );
+  await writeFile(join(root, 'THIRD_PARTY_LICENSES.txt'), 'Package: example@2.0.0\n');
+  assert.deepEqual((await inspectImageRoot(root)).issues, []);
 });
 
 test('bundled Mastra enterprise files alone do not fail the image-check command', async (t) => {

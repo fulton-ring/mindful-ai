@@ -193,6 +193,10 @@ it.skipIf(process.env.WALDEN_TEST_NATIVE_PURGE_BROKER !== '1')(
       '-p',
       '127.0.0.1::6379',
       'valkey/valkey:8-alpine',
+      'sh',
+      '-c',
+      // Exercise readiness even when the image is already cached.
+      'sleep 2; exec docker-entrypoint.sh valkey-server',
     ]);
     cleanup.push(() => {
       try {
@@ -214,12 +218,15 @@ it.skipIf(process.env.WALDEN_TEST_NATIVE_PURGE_BROKER !== '1')(
     const url = `redis://127.0.0.1:${port}`;
     const { RedisStreamsPubSub } = await import('@mastra/redis-streams');
     const { default: Redis } = await import('ioredis');
+    const readyDeadline = Date.now() + 10000;
     const redis = new Redis(url, {
-      maxRetriesPerRequest: 2,
+      maxRetriesPerRequest: null,
       connectTimeout: 5000,
-      retryStrategy: (attempt) => (attempt < 10 ? 50 : null),
+      retryStrategy: () => (Date.now() < readyDeadline ? 50 : null),
     });
     redis.on('error', () => {});
+    cleanup.push(() => redis.disconnect());
+    await redis.ping();
     const pubsub = new RedisStreamsPubSub({
       url,
       keyPrefix: 'purge-test',
@@ -228,9 +235,7 @@ it.skipIf(process.env.WALDEN_TEST_NATIVE_PURGE_BROKER !== '1')(
     });
     cleanup.push(async () => {
       await pubsub.close();
-      redis.disconnect();
     });
-    await redis.ping();
     host.pubsub = pubsub;
     const topic = `agent.thread-stream.${encodeURIComponent(`${resourceId}\0${threadId}`)}`;
     for (const runId of ['turn', 'another'])

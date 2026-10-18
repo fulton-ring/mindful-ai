@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build && node ../../scripts/third-party-notices.mjs dist/THIRD_PARTY_LICENSES.txt",
+    "build": "tsc --noEmit && vite build && node ../../scripts/third-party-notices.mjs --filter=@walden/api --filter=@walden/web dist/THIRD_PARTY_LICENSES.txt",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

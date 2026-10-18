@@ -13,7 +13,9 @@ export function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
     <main className="legal-page">
       <a href="/">← Back to Walden</a>
       <h1>{kind === 'privacy' ? 'Privacy Policy' : 'Terms of Service'}</h1>
-      <p className="notice">Effective September 20, 2026 · Operated by Fulton Ring.</p>
+      <p className="notice">
+        Effective September 20, 2026 · Operated by <a href="https://fultonring.com">Fulton Ring</a>.
+      </p>
       {kind === 'privacy' ? (
         <>
           <h2>Information used by Walden</h2>

@@ -1,45 +1,170 @@
 name: Self-hosted image
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: Release version (v1.2.3 or v1.2.3-rc.1)
+        required: true
+        default: v0.1.0
+        type: string
+      publish:
+        description: Publish source archives and GHCR images (main only)
+        type: boolean
+        default: false
   release:
     types: [published]
 permissions:
   contents: read
+concurrency:
+  group: self-hosted-image-${{ github.repository }}
+  cancel-in-progress: false
 jobs:
+  metadata:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      image: ${{ steps.release.outputs.image }}
+      revision: ${{ steps.release.outputs.revision }}
+      publish: ${{ steps.release.outputs.publish }}
+      latest: ${{ steps.release.outputs.latest }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - run: node --test scripts/container-release.test.mjs
+      - id: release
+        run: node scripts/container-release.mjs
+
+  checks:
+    uses: ./.github/workflows/ci.yml
+    with:
+      skip-deploy: true
+
+  prepare-release:
+    needs: [metadata, checks]
+    if: needs.metadata.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ needs.metadata.outputs.version }}
+      REVISION: ${{ needs.metadata.outputs.revision }}
+      LATEST: ${{ needs.metadata.outputs.latest }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.metadata.outputs.revision }}
+      - name: Validate immutable release commit and prepare public source destination
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            git fetch --no-tags origin main
+            test "$(git rev-parse origin/main)" = "$REVISION"
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$VERSION"; then
+            git fetch origin "refs/tags/$VERSION:refs/tags/$VERSION"
+            test "$(git rev-parse "$VERSION^{commit}")" = "$REVISION"
+          fi
+          if gh release view "$VERSION" --json isDraft --jq .isDraft > /tmp/walden-release-draft; then
+            gh release view "$VERSION" --json assets --jq '.assets[].name' > /tmp/walden-release-assets
+            if grep -Fxq "walden-image-$VERSION.published.json" /tmp/walden-release-assets; then
+              echo 'This version already has a published image; choose a new version.' >&2
+              exit 1
+            fi
+            # Sources must be publicly accessible before pushing any matching image.
+            if [ "$(cat /tmp/walden-release-draft)" = true ]; then
+              gh release edit "$VERSION" --draft=false
+            fi
+          else
+            flags=(--latest=false)
+            if [ "$LATEST" = false ]; then flags+=(--prerelease); fi
+            gh release create "$VERSION" --target "$REVISION" --title "Walden $VERSION" \
+              --notes "Matching native and Debian source archives accompany the container images. Image tags are published after both architectures pass the release checks. See docs/self-hosting.md and licenses/native/README.md at commit $REVISION." \
+              "${flags[@]}"
+          fi
+          gh release upload "$VERSION" deploy/docker/chromium-seccomp.json --clobber
+
   build-and-smoke:
+    needs: [metadata, checks, prepare-release]
+    if: >-
+      always() && needs.metadata.result == 'success' && needs.checks.result == 'success' &&
+      (needs.prepare-release.result == 'success' || needs.prepare-release.result == 'skipped')
+    permissions:
+      contents: write
+      packages: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { runner: ubuntu-24.04, platform: linux/amd64 }
-          - { runner: ubuntu-24.04-arm, platform: linux/arm64 }
+          - { runner: ubuntu-24.04, platform: linux/amd64, arch: amd64 }
+          - { runner: ubuntu-24.04-arm, platform: linux/arm64, arch: arm64 }
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
+    timeout-minutes: 90
+    env:
+      IMAGE: ${{ needs.metadata.outputs.image }}
+      REVISION: ${{ needs.metadata.outputs.revision }}
+      VERSION: ${{ needs.metadata.outputs.version }}
+      ARCH: ${{ matrix.arch }}
+      APT_REFRESH: ${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.metadata.outputs.revision }}
+      - name: Reserve space for Chromium's matching source archives
+        run: sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet
       - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
+      - name: Build runtime image
+        uses: docker/build-push-action@v6
         with:
           context: .
+          target: runtime
           platforms: ${{ matrix.platform }}
           load: true
           push: false
           tags: walden:ci
+          build-args: |
+            WALDEN_IMAGE_VERSION=${{ needs.metadata.outputs.version }}
+            WALDEN_IMAGE_REVISION=${{ needs.metadata.outputs.revision }}
+            WALDEN_APT_REFRESH=${{ env.APT_REFRESH }}
           cache-from: type=gha,scope=${{ matrix.runner }}
           cache-to: type=gha,mode=max,scope=${{ matrix.runner }}
-      - name: Verify Chromium's non-root sandbox
+      - name: Verify package and native attribution artifacts
+        run: |
+          node scripts/public-image-check.mjs walden:ci
+          docker run --rm --network none --entrypoint node walden:ci \
+            scripts/container-notices.mjs verify /app/notices
+          test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' walden:ci)" = "$REVISION"
+      - name: Identify this source publication without replacing previous archives
+        id: sources
+        run: |
+          image_id=$(docker image inspect --format '{{.Id}}' walden:ci)
+          echo "id=${image_id#sha256:}-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+          docker run --rm --network none --entrypoint sha256sum walden:ci \
+            /app/notices/debian-packages.tsv /app/licenses/native/sources.json > /tmp/walden-inventory.sha256
+          echo "debian=$(awk 'NR == 1 { print $1 }' /tmp/walden-inventory.sha256)" >> "$GITHUB_OUTPUT"
+          echo "native=$(awk 'NR == 2 { print $1 }' /tmp/walden-inventory.sha256)" >> "$GITHUB_OUTPUT"
+      - name: Build actual research-browser adapter check
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: browser-check
+          platforms: ${{ matrix.platform }}
+          load: true
+          push: false
+          tags: walden:browser-check
+          build-args: |
+            WALDEN_IMAGE_VERSION=${{ needs.metadata.outputs.version }}
+            WALDEN_IMAGE_REVISION=${{ needs.metadata.outputs.revision }}
+            WALDEN_APT_REFRESH=${{ env.APT_REFRESH }}
+            WALDEN_DEBIAN_INVENTORY_SHA256=${{ steps.sources.outputs.debian }}
+            WALDEN_NATIVE_PINS_SHA256=${{ steps.sources.outputs.native }}
+      - name: Verify Debian Chromium rendering and non-root sandbox
         run: >-
-          docker run --rm --security-opt no-new-privileges:true
+          docker run --rm --network none --security-opt no-new-privileges:true
           --security-opt seccomp=deploy/docker/chromium-seccomp.json
-          --cap-drop ALL --shm-size 512m --entrypoint node walden:ci
-          --input-type=module -e
-          "import {chromium} from 'playwright';
-          if(process.getuid()===0) throw new Error('Image runs as root');
-          const browser=await chromium.launch({headless:true,chromiumSandbox:true});
-          const page=await browser.newPage();
-          await page.setContent('<title>sandbox smoke</title>');
-          if(await page.title()!=='sandbox smoke') throw new Error('Browser failed');
-          await browser.close();"
+          --cap-drop ALL --shm-size 512m walden:browser-check
       - name: Start standalone image
         run: >-
           docker run --detach --name walden-ci --security-opt no-new-privileges:true
@@ -59,10 +184,99 @@ jobs:
           test -s /tmp/walden-index.html
           grep -q '<html' /tmp/walden-index.html
           curl --fail http://localhost:3000/api/config
-          docker inspect --format '{{.Config.User}}' walden-ci
+          test "$(docker inspect --format '{{.Config.User}}' walden-ci)" = node
+          node tests/container/http-smoke.mjs http://127.0.0.1:3000
+      - name: Collect matching native and operating-system source archives
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: release-sources
+          platforms: ${{ matrix.platform }}
+          outputs: type=local,dest=release-sources
+          build-args: |
+            WALDEN_IMAGE_VERSION=${{ needs.metadata.outputs.version }}
+            WALDEN_IMAGE_REVISION=${{ needs.metadata.outputs.revision }}
+            WALDEN_APT_REFRESH=${{ env.APT_REFRESH }}
+            WALDEN_SOURCE_ID=${{ steps.sources.outputs.id }}
+            WALDEN_DEBIAN_INVENTORY_SHA256=${{ steps.sources.outputs.debian }}
+            WALDEN_NATIVE_PINS_SHA256=${{ steps.sources.outputs.native }}
+      - name: Verify complete source parts and record exact image identity
+        env:
+          SOURCE_ID: ${{ steps.sources.outputs.id }}
+        run: |
+          node scripts/container-notices.mjs verify release-sources
+          mv release-sources/manifest.json "release-sources/walden-sources-$ARCH-$SOURCE_ID.manifest.json"
+          docker image inspect --format '{{json .}}' walden:ci > "release-sources/walden-sources-$ARCH-$SOURCE_ID.image.json"
+      - name: Preserve source archives for dry-run review
+        if: needs.metadata.outputs.publish != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: walden-sources-${{ matrix.arch }}
+          path: release-sources/*
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
+      - name: Publish matching sources before making the image available
+        if: needs.metadata.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release upload "$VERSION" release-sources/*
+      - name: Authenticate to GHCR
+        if: needs.metadata.outputs.publish == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push the exact tested image
+        if: needs.metadata.outputs.publish == 'true'
+        run: |
+          docker tag walden:ci "$IMAGE:sha-$REVISION-$ARCH"
+          docker push "$IMAGE:sha-$REVISION-$ARCH"
       - name: Logs and cleanup
         if: always()
         run: |
           docker logs walden-ci || true
           docker rm --force walden-ci || true
           docker volume rm walden-ci-data || true
+
+  publish-manifest:
+    needs: [metadata, build-and-smoke]
+    if: needs.metadata.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      packages: write
+    env:
+      IMAGE: ${{ needs.metadata.outputs.image }}
+      REVISION: ${{ needs.metadata.outputs.revision }}
+      VERSION: ${{ needs.metadata.outputs.version }}
+      LATEST: ${{ needs.metadata.outputs.latest }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish checked multiarch version and commit tags
+        run: |
+          # Both architecture pushes succeeded, so auth and package access are established.
+          if docker buildx imagetools inspect "$IMAGE:$VERSION" > /tmp/walden-existing-image 2>&1; then
+            echo 'Version tags are immutable; choose a new release version.' >&2
+            exit 1
+          elif ! grep -Eiq 'not found|no such manifest|manifest unknown|MANIFEST_UNKNOWN' /tmp/walden-existing-image; then
+            cat /tmp/walden-existing-image >&2
+            exit 1
+          fi
+          tags=(--tag "$IMAGE:$VERSION" --tag "$IMAGE:sha-$REVISION")
+          if [ "$LATEST" = true ]; then tags+=(--tag "$IMAGE:latest"); fi
+          docker buildx imagetools create "${tags[@]}" \
+            "$IMAGE:sha-$REVISION-amd64" "$IMAGE:sha-$REVISION-arm64"
+          docker buildx imagetools inspect "$IMAGE:$VERSION"
+          docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{json .Manifest}}' > "walden-image-$VERSION.published.json"
+          gh release upload "$VERSION" "walden-image-$VERSION.published.json"
+          if [ "$LATEST" = true ]; then gh release edit "$VERSION" --latest; fi
