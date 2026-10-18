@@ -7,7 +7,7 @@ import { createNodeExecutionHost } from './execution-host';
 import { createPostgresDatabase } from './postgres';
 import { migratePostgres } from './postgres-migrations';
 import { createNodeTurnRouter } from './turns';
-import { type Cleanup, createTurnFixture } from './turns-fixtures';
+import { type Cleanup, createTurnFixture, waitForPartial } from './turns-fixtures';
 
 const enabled = process.env.WALDEN_TEST_POSTGRES === '1';
 const test = enabled ? it : it.skip;
@@ -72,17 +72,6 @@ async function fixture(name: 'completed' | 'stopped' | 'recovered', cacheDatabas
     ...options,
   });
   return { ...context, options };
-}
-async function waitForPartial(db: Awaited<ReturnType<typeof fixture>>['db']) {
-  await expect
-    .poll(
-      async () =>
-        (await db
-          .prepare("SELECT COUNT(*) AS n FROM turn_events WHERE turn_id='turn'")
-          .first<{ n: number }>())!.n,
-      { timeout: 20000 },
-    )
-    .toBeGreaterThan(3);
 }
 test('commits a real provider turn through the shared PostgreSQL and Valkey runner', async () => {
   const { db, router, calls } = await fixture('completed', 1);
