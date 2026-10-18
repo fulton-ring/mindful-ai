@@ -18,24 +18,37 @@ async function remove(path) {
   return bytes;
 }
 
+async function realDirectory(path) {
+  if (!(await lstat(path).catch(() => undefined))?.isDirectory())
+    throw new Error(`Unexpected deployment layout (not a real directory): ${path}`);
+  return path;
+}
+
+async function packageRemovals(store, name, platform, arch) {
+  let bin = store;
+  for (const part of [name, 'node_modules', 'onnxruntime-node', 'bin', 'napi-v6'])
+    bin = await realDirectory(join(bin, part));
+  try {
+    await access(join(bin, platform, arch, 'onnxruntime_binding.node'));
+  } catch {
+    throw new Error(`Missing ONNX Runtime binding for ${platform}/${arch}: ${name}`);
+  }
+  const removals = [];
+  for (const os of await readdir(bin)) {
+    if (os !== platform) removals.push(join(bin, os));
+    else
+      for (const cpu of await readdir(await realDirectory(join(bin, os))))
+        if (cpu !== arch) removals.push(join(bin, os, cpu));
+  }
+  return removals;
+}
+
 async function onnxRemovals(store, platform, arch) {
   const packages = (await readdir(store)).filter((name) => name.startsWith('onnxruntime-node@'));
   if (!packages.length) throw new Error('Missing ONNX Runtime deployment');
   const removals = [];
-  for (const name of packages) {
-    const bin = join(store, name, 'node_modules/onnxruntime-node/bin/napi-v6');
-    try {
-      await access(join(bin, platform, arch, 'onnxruntime_binding.node'));
-    } catch {
-      throw new Error(`Missing ONNX Runtime binding for ${platform}/${arch}: ${name}`);
-    }
-    for (const os of await readdir(bin)) {
-      if (os !== platform) removals.push(join(bin, os));
-      else
-        for (const cpu of await readdir(join(bin, os)))
-          if (cpu !== arch) removals.push(join(bin, os, cpu));
-    }
-  }
+  for (const name of packages)
+    removals.push(...(await packageRemovals(store, name, platform, arch)));
   return removals;
 }
 
@@ -54,7 +67,7 @@ export async function pruneDeployment(
   nodeModules,
   { platform = process.platform, arch = process.arch } = {},
 ) {
-  const store = join(nodeModules, '.pnpm');
+  const store = await realDirectory(join(nodeModules, '.pnpm'));
   let bytes = 0;
   for (const path of await onnxRemovals(store, platform, arch)) bytes += await remove(path);
   for (const path of await developmentFiles(store)) bytes += await remove(path);

@@ -1,5 +1,15 @@
 import assert from 'node:assert/strict';
-import { access, mkdir, mkdtemp, readlink, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readlink,
+  rename,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -103,4 +113,37 @@ test('deployment pruning fails closed when ONNX Runtime is not deployed', async 
     pruneDeployment(join(root, 'node_modules'), { platform: 'linux', arch: 'x64' }),
     /Missing ONNX Runtime deployment/,
   );
+});
+
+for (const linked of [
+  'onnxruntime-node@1.30.0',
+  'onnxruntime-node@1.30.0/node_modules/onnxruntime-node',
+  onnx,
+]) {
+  test(`native pruning rejects a symlinked ONNX path without modifying its target: ${linked}`, async (t) => {
+    const { root, store } = await deployment(t);
+    const outside = join(root, 'outside-native');
+    await rename(join(store, linked), outside);
+    await symlink(outside, join(store, linked));
+    await assert.rejects(
+      pruneDeployment(join(root, 'node_modules'), { platform: 'linux', arch: 'arm64' }),
+      /Unexpected deployment layout/,
+    );
+    const files = await readdir(outside, { recursive: true });
+    assert.ok(files.some((file) => file.includes('darwin')));
+    assert.ok(files.some((file) => file.includes('win32')));
+    assert.ok(await exists(join(store, 'pkg@1.0.0/node_modules/pkg/index.d.ts')));
+  });
+}
+
+test('native pruning rejects a symlinked platform directory without modifying its target', async (t) => {
+  const { root, store } = await deployment(t);
+  const outside = join(root, 'outside-linux');
+  await rename(join(store, onnx, 'linux'), outside);
+  await symlink(outside, join(store, onnx, 'linux'));
+  await assert.rejects(
+    pruneDeployment(join(root, 'node_modules'), { platform: 'linux', arch: 'arm64' }),
+    /Unexpected deployment layout/,
+  );
+  assert.ok(await exists(join(outside, 'x64/onnxruntime_binding.node')));
 });
