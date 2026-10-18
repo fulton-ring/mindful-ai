@@ -1,5 +1,7 @@
 # Walden
 
+A project from [Fulton Ring](https://fultonring.com).
+
 A chat-first workspace for thinking with an assistant. Create notes during a conversation when you have something you want to keep. Notes stay; conversations expire after seven days of inactivity. Suggested edits are reviewed inline before they become part of your document.
 
 ## License
