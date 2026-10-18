@@ -4,7 +4,9 @@ Walden's [Apache-2.0 license](LICENSE) covers its original code and documentatio
 
 ## Dependencies
 
-The exact JavaScript dependency versions are recorded in `pnpm-lock.yaml`. Their packages include upstream license files and, where applicable, notices. Preserve those files when redistributing dependencies. After `pnpm install --frozen-lockfile`, `pnpm licenses list --prod` displays the installed production dependency license inventory; inspect the upstream license files as well as package metadata.
+The exact JavaScript dependency versions are recorded in `pnpm-lock.yaml`. Preserve upstream license files and notices when redistributing dependencies. Web and landing builds generate `dist/THIRD_PARTY_LICENSES.txt` from `pnpm licenses list --prod --json` and installed license, notice, copyright, and attribution files. The artifact also retains Walden's own `LICENSE` and `NOTICE`. It includes a superset of workspace production dependencies, including platform-specific dependencies installed on the build host. It is served at `/THIRD_PARTY_LICENSES.txt`; the Docker runtime also retains a copy at `/app/THIRD_PARTY_LICENSES.txt`.
+
+Some upstream packages omit license text from their published archives. The generator retains their README when available and marks these entries `MISSING_LICENSE_TEXT`. Those entries require review and the appropriate upstream texts before public redistribution; a declared license identifier alone is insufficient. The artifact does not cover downloaded browser binaries, OS packages, model assets, or all libraries inside native binaries.
 
 Notable components include:
 
@@ -18,13 +20,17 @@ Notable components include:
 | Lucide icons | ISC; preserve the installed `lucide-react` license, including the Feather-derived icon attribution. |
 | Playwright | Apache-2.0; the copied seccomp profile's license is retained in [deploy/docker/PLAYWRIGHT-LICENSE](deploy/docker/PLAYWRIGHT-LICENSE). Chromium has additional third-party notices. |
 
-This summary is not an exhaustive set of redistribution notices. For compiled web assets or other releases that omit `node_modules`, include the license texts and copyright notices for the dependencies actually bundled in the release.
+This summary and the generated inventory are not a complete redistribution clearance. Retain the generated artifact with compiled assets, review missing texts, and meet the separate native, browser, model, and OS requirements below.
 
 ## Mastra enterprise files
 
-The installed `@mastra/core` package's `LICENSE.md` excludes directories named `ee/` from Apache-2.0 and refers to Mastra's [enterprise license](https://github.com/mastra-ai/mastra/blob/main/ee/LICENSE). Walden does not directly import these enterprise modules. Package-level Apache-2.0 metadata must not be treated as permission to redistribute enterprise files.
+The pinned `@mastra/core@1.78.0` package's `LICENSE.md` excludes directories named `ee/` from Apache-2.0. Designated enterprise features have separate terms under the [Mastra Enterprise License v2](https://github.com/mastra-ai/mastra/blob/6a465f9d1da730e179c44bfb4ef3e6ec398ba81f/ee/LICENSE). Package-level Apache-2.0 metadata does not relicense those features.
 
-The current Dockerfile copies the production dependency tree, which can include these files. Before publishing container images, resolve the redistribution terms applicable to the pinned package version or exclude the unused enterprise files and verify the resulting image. Adding Walden's license does not resolve this packaging requirement.
+This release's ordinary agent implementation imports enterprise auth chunks and `auth/ee/fga-check.js`; removing the chunks breaks the import graph. [Upstream issue #22113](https://github.com/mastra-ai/mastra/issues/22113) describes publishing a Docker image with the complete package and no enterprise features enabled. A [Mastra maintainer responded that this use would be fine](https://github.com/mastra-ai/mastra/issues/22113#issuecomment-5405270073) and acknowledged unclear wording; [PR #22474](https://github.com/mastra-ai/mastra/pull/22474) subsequently clarified licensing documentation and package notices.
+
+Walden retains the working dependency tree without enabling Mastra enterprise features or bypassing authorization/license checks. Based on that upstream clarification, bundled Mastra enterprise file presence is informational rather than an automatic publication blocker. This does not relicense enterprise code or grant permission to enable enterprise features; review their applicable terms before doing so. The image check cannot determine which features an application enables.
+
+Before publishing an image, run `pnpm check:public-image YOUR_IMAGE`. This read-only check runs without network access. It reports bundled Mastra enterprise files as informational warnings, and rejects other enterprise payloads requiring review, unresolved license-text entries, and missing project/model/generated notice artifacts. It is an explicit release check rather than a prerequisite for existing private Docker builds. Passing it does not replace review of native, browser, and OS licensing. The repository has no automated public-image publication step.
 
 ## Embedding model
 

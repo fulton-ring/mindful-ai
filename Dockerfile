@@ -46,6 +46,7 @@ COPY LICENSE /app/models/minilm/LICENSE
 COPY LICENSE NOTICE THIRD_PARTY_NOTICES.md /app/
 COPY --from=build /workspace/apps/api/dist/node/ /app/dist/node/
 COPY --from=build /workspace/apps/api/public/ /app/public/
+COPY --from=build /workspace/apps/api/public/THIRD_PARTY_LICENSES.txt /app/THIRD_PARTY_LICENSES.txt
 COPY --from=build /workspace/apps/api/migrations/ /app/migrations/
 COPY --from=build /workspace/apps/api/postgres-migrations/ /app/postgres-migrations/
 COPY apps/api/package.json /app/package.json

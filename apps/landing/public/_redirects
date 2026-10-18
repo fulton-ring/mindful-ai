@@ -1,7 +1,0 @@
-# The app moved from withwalden.app to chat.withwalden.app. Keep old links working.
-# Static file: if PUBLIC_APP_URL changes, update these too.
-/conversations/* https://chat.withwalden.app/conversations/:splat 301
-/notes/* https://chat.withwalden.app/notes/:splat 301
-/terms https://chat.withwalden.app/terms 301
-/privacy https://chat.withwalden.app/privacy 301
-/sign-in https://chat.withwalden.app/ 302

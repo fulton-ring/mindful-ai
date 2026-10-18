@@ -31,12 +31,12 @@ For the Cloudflare adapter, use the explicit legacy workflow:
 
 ```sh
 cp apps/api/.dev.vars.example apps/api/.dev.vars
-# Configure Clerk and inference credentials in apps/api/.dev.vars.
+# Configure optional auth and inference credentials in apps/api/.dev.vars.
 pnpm db:migrate
 pnpm dev:cloudflare
 ```
 
-Open **http://localhost:5173** for frontend hot reload; Wrangler serves the API on 8787 and uses its own local D1 state. This mode retains the Clerk and Cloudflare binding requirements. Cloudflare browser reading and AI Search use remote bindings and need authenticated Wrangler access (`pnpm --filter @walden/api exec wrangler login`). Use this mode when validating Cloudflare behavior.
+Open **http://localhost:5173** for frontend hot reload; Wrangler serves the API on 8787 and uses its own local D1 state. This mode uses Cloudflare bindings and the auth mode you configure. Cloudflare browser reading and AI Search use remote bindings and need authenticated Wrangler access (`pnpm --filter @walden/api exec wrangler login`). Use this mode when validating Cloudflare behavior.
 
 ## Database schema
 
@@ -63,13 +63,11 @@ Builds do not deploy. Live providers and hosted services require their own crede
 
 See [credential setup](docs/runbooks/credentials.md). Completed plans and work logs are kept in [docs/archive](docs/archive/README.md).
 
-## Hosted environment
+## Cloudflare hosting
 
-https://walden.jeremy-herzog.workers.dev
+The tracked Wrangler files are portable examples, with no production account or custom domains selected. Create your own D1 database, R2 bucket and remote bindings, replace the placeholder database ID, and configure inference and optional authentication. See [credential and deployment setup](docs/runbooks/credentials.md) for private deployment profiles and CI settings. The Walden product is available at [withwalden.app](https://withwalden.app).
 
-The Worker, frontend assets, D1 schema, AI binding, and cleanup schedule are deployed. Clerk sign-in is required and supports email verification codes and Google using the linked development instance. See the credential runbook for the remaining setup and keep application credentials separate from provisioning credentials.
-
-Chat requires **Workers Paid**. Workers Free can terminate Mastra chat and annotation requests for exceeding CPU time, leaving an interrupted response. On 2026-09-20 this was reproduced in production; a request was killed at about 2 seconds of CPU. Local Wrangler does not reproduce that production limit. Upgrade the account's Workers plan before treating signed-in chat as ready for use.
+The Cloudflare adapter's configured 30-second CPU limit requires Workers Paid. Local Wrangler does not reproduce production CPU limits; validate chat on your deployment before opening access.
 
 Each chat turn runs in its own Durable Object, not in the request that started it. A dropped connection only detaches the client; it reattaches through the turn's event stream, and Stop cancels the turn. A turn has a 15-minute budget. A deploy or restart mid-turn ends the reply as interrupted, keeping what streamed, with Try again.
 

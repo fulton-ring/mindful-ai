@@ -1,18 +1,19 @@
 # Landing page
 
-The marketing site at withwalden.app. Astro builds static HTML; React (`@astrojs/react`) is available for interactive islands. It deploys as an assets-only Worker, `walden-landing`. The app is the `walden` Worker in `apps/api`, served at chat.withwalden.app.
+Astro builds this marketing site as static HTML. React (`@astrojs/react`) is available for interactive islands. The portable Wrangler example serves the build as an assets-only Worker named `walden-landing`; the app lives in `apps/api`.
 
 ```sh
 pnpm --filter @walden/landing dev      # http://localhost:4321
 pnpm --filter @walden/landing build    # astro check + static build into dist/
-pnpm --filter @walden/landing preview  # serve dist/ with wrangler, including _redirects
-pnpm --filter @walden/landing deploy   # explicit request only
+pnpm --filter @walden/landing preview  # serve dist/ with Wrangler, including _redirects
 ```
 
-Set `PUBLIC_APP_URL` (see `.env.example`) to point "Open Walden", "Start thinking" and the Terms/Privacy links at another deployment of the app; it defaults to http://localhost:5173 (the local web app) under `dev` and to https://chat.withwalden.app in builds. The Terms of Service and Privacy Policy live in the app, at `/terms` and `/privacy`.
+Set `PUBLIC_APP_URL` to your app URL and `PUBLIC_SITE_URL` to the canonical landing-page URL, either in the shell or in `apps/landing/.env` (see `.env.example`). Shell values take precedence. App links default to `http://localhost:3000`, matching `pnpm dev`; the canonical site defaults to `http://localhost:4321`.
 
-`public/_redirects` sends the app's old paths (`/conversations/*`, `/notes/*`) to chat.withwalden.app.
+The build generates `dist/_redirects` from the same `PUBLIC_APP_URL` used by the page links. Old app paths (`/conversations/*`, `/notes/*`, `/terms`, `/privacy`, `/sign-in`) redirect to your configured app. Terms and Privacy pages live in the app.
 
-## Domains and deploys
+## Deployment
 
-withwalden.app and www.withwalden.app are custom domains on this Worker; the app is the `walden` Worker at chat.withwalden.app. Pushes to `main` deploy each Worker after checks pass, and only when its files changed (`.github/workflows/ci.yml`). That needs a `CLOUDFLARE_API_TOKEN` repository secret; without it the deploy jobs skip.
+Builds do not deploy. Configure your own account, resources and optional custom-domain routes in a private Wrangler profile. See [credential and deployment setup](../../docs/runbooks/credentials.md) for explicit deployment commands.
+
+GitHub deploys are manual `workflow_dispatch` runs on `main`, gated by verification and standalone integration checks. The `production` environment requires the deployment token, the selected Worker's raw private Wrangler config secret, and public URL variables. Missing settings fail the job. Main pushes run checks without deploying; see [the workflow](../../.github/workflows/ci.yml).

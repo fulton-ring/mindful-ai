@@ -21,6 +21,8 @@ test-results/
 *.tsbuildinfo
 .auth/
 .astro/
+*.private.json
+*.private.jsonc
 
 # Self-host build output and local state
 apps/api/public/

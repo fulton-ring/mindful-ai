@@ -114,29 +114,32 @@ jobs:
       cancel-in-progress: false
     environment:
       name: production
-      url: https://chat.withwalden.app
+      url: ${{ vars.WALDEN_PUBLIC_APP_URL }}
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      WALDEN_APP_WRANGLER_CONFIG: ${{ secrets.WALDEN_APP_WRANGLER_CONFIG }}
+      PUBLIC_APP_URL: ${{ vars.WALDEN_PUBLIC_APP_URL }}
     steps:
-      - name: Require a deploy token
-        if: env.CLOUDFLARE_API_TOKEN == ''
-        run: |
-          echo "::error::CLOUDFLARE_API_TOKEN is not set; deployment cannot proceed."
-          exit 1
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24.15.0
           cache: pnpm
-      - if: env.CLOUDFLARE_API_TOKEN != ''
-        run: pnpm install --frozen-lockfile
-      - if: env.CLOUDFLARE_API_TOKEN != ''
-        run: pnpm exec turbo run build --filter=@walden/api
+      - name: Prepare private production configuration
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          for (const name of ['CLOUDFLARE_API_TOKEN', 'WALDEN_APP_WRANGLER_CONFIG', 'PUBLIC_APP_URL']) {
+            if (!process.env[name]?.trim()) throw new Error(`${name} is required for production deployment.`);
+          }
+          writeFileSync('apps/api/wrangler.production.private.jsonc', process.env.WALDEN_APP_WRANGLER_CONFIG, { mode: 0o600 });
+          NODE
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec turbo run build --filter=@walden/api
       - name: Deploy the walden Worker
-        if: env.CLOUDFLARE_API_TOKEN != ''
         working-directory: apps/api
-        run: pnpm exec wrangler deploy
+        run: pnpm exec wrangler deploy --config wrangler.production.private.jsonc
 
   deploy-landing:
     needs: [verify, self-hosted-integration, changes]
@@ -147,26 +150,30 @@ jobs:
       cancel-in-progress: false
     environment:
       name: production
-      url: https://withwalden.app
+      url: ${{ vars.WALDEN_PUBLIC_SITE_URL }}
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      WALDEN_LANDING_WRANGLER_CONFIG: ${{ secrets.WALDEN_LANDING_WRANGLER_CONFIG }}
+      PUBLIC_APP_URL: ${{ vars.WALDEN_PUBLIC_APP_URL }}
+      PUBLIC_SITE_URL: ${{ vars.WALDEN_PUBLIC_SITE_URL }}
     steps:
-      - name: Require a deploy token
-        if: env.CLOUDFLARE_API_TOKEN == ''
-        run: |
-          echo "::error::CLOUDFLARE_API_TOKEN is not set; deployment cannot proceed."
-          exit 1
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24.15.0
           cache: pnpm
-      - if: env.CLOUDFLARE_API_TOKEN != ''
-        run: pnpm install --frozen-lockfile
-      - if: env.CLOUDFLARE_API_TOKEN != ''
-        run: pnpm exec turbo run build --filter=@walden/landing
+      - name: Prepare private production configuration
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          for (const name of ['CLOUDFLARE_API_TOKEN', 'WALDEN_LANDING_WRANGLER_CONFIG', 'PUBLIC_APP_URL', 'PUBLIC_SITE_URL']) {
+            if (!process.env[name]?.trim()) throw new Error(`${name} is required for production deployment.`);
+          }
+          writeFileSync('apps/landing/wrangler.production.private.jsonc', process.env.WALDEN_LANDING_WRANGLER_CONFIG, { mode: 0o600 });
+          NODE
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec turbo run build --filter=@walden/landing
       - name: Deploy the walden-landing Worker
-        if: env.CLOUDFLARE_API_TOKEN != ''
         working-directory: apps/landing
-        run: pnpm exec wrangler deploy
+        run: pnpm exec wrangler deploy --config wrangler.production.private.jsonc

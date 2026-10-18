@@ -29,7 +29,7 @@ cleanup collects all matching pages before deleting to avoid skipping entries.
 Verified on 2026-10-18 against the actual service, including indexed retrieval, owner
 isolation and eventual deletion. A failed cleanup revealed the old 100-item page size;
 the adapter now uses 50, with a regression covering 51 files across two pages. Existing
-`mindful-ai-sources` content and standalone `.data` were not used by this check.
+production source-index content and standalone `.data` were not used by this check.
 
 ## Tool behavior
 

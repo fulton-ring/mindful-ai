@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev --port 4321",
-    "build": "astro check && astro build",
+    "build": "astro check && astro build && node ../../scripts/third-party-notices.mjs dist/THIRD_PARTY_LICENSES.txt",
     "typecheck": "astro check",
     "preview": "wrangler dev",
     "deploy": "wrangler deploy"

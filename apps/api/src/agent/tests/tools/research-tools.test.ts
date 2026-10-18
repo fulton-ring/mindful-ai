@@ -299,7 +299,8 @@ describe('browsing instructions follow the registered tools', () => {
 });
 
 const liveToken = process.env.CLOUDFLARE_API_TOKEN;
-const runLive = process.env.RUN_LIVE_RESEARCH === '1' && Boolean(liveToken);
+const liveAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+const runLive = process.env.RUN_LIVE_RESEARCH === '1' && Boolean(liveToken && liveAccountId);
 
 describe.skipIf(!runLive)('live Gemma research tool calling', () => {
   it('uses the synthetic reader and search index before citing their source', async () => {
@@ -307,7 +308,7 @@ describe.skipIf(!runLive)('live Gemma research tool calling', () => {
     const fixture = researchTools(controller.signal);
     const model = createCloudflareModel(
       {
-        CLOUDFLARE_ACCOUNT_ID: 'e9be35217a75f5d2148e572d8853b3bf',
+        CLOUDFLARE_ACCOUNT_ID: liveAccountId,
         CLOUDFLARE_API_TOKEN: liveToken,
       },
       DEFAULT_AI_MODEL,

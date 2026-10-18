@@ -6,12 +6,10 @@
   "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "compatibility_date": "2026-09-18",
   "compatibility_flags": ["nodejs_compat"],
-  // Cloudflare creates the DNS records and certificates for custom domains.
-  // workers.dev stays available alongside them; with routes set it is off unless
-  // enabled explicitly.
+  // Portable Cloudflare example: authenticate Wrangler with your own account and
+  // create the resources below before deploying. See docs/runbooks/credentials.md.
+  // Add your own custom-domain routes if needed; workers.dev remains available.
   "workers_dev": true,
-  // withwalden.app and www are the landing page (apps/landing, `walden-landing`).
-  "routes": [{ "pattern": "chat.withwalden.app", "custom_domain": true }],
   // @mastra/cloudflare-d1 imports the `cloudflare` REST SDK only for its
   // apiToken mode; the D1 binding path never constructs it.
   "alias": { "cloudflare": "./stubs/cloudflare.ts" },
@@ -22,7 +20,7 @@
     {
       "binding": "DB",
       "database_name": "walden",
-      "database_id": "18072abe-34d0-4972-9ef6-d955ca0d6896",
+      "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }
   ],
@@ -56,17 +54,11 @@
   "triggers": {
     "crons": ["* * * * *", "17 * * * *"]
   },
+  // Remote AI, browser and search bindings require your own Cloudflare access.
+  // Configure inference, optional auth, source-index and R2 upload settings for
+  // your deployment; keep secret values in .dev.vars or Wrangler secrets.
   "vars": {
-    "AUTH_MODE": "clerk",
-    "AI_PROVIDER": "cloudflare",
-    "AI_MODEL": "@cf/zai-org/glm-5.3-flash",
-    "R2_ACCOUNT_ID": "e9be35217a75f5d2148e572d8853b3bf",
-    "R2_BUCKET": "walden-attachments",
-    "CLOUDFLARE_ACCOUNT_ID": "e9be35217a75f5d2148e572d8853b3bf",
-    "POSTHOG_PROJECT_ID": "619294",
-    "CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsud2l0aHdhbGRlbi5hcHAk",
-    "CLERK_AUTHORIZED_PARTIES": "http://localhost:5173,http://localhost:8788,http://localhost:8787,http://127.0.0.1:5173,http://127.0.0.1:8788,http://127.0.0.1:8787,https://walden.jeremy-herzog.workers.dev,https://chat.withwalden.app",
-    "AI_SEARCH_INSTANCE": "mindful-ai-sources",
+    "AUTH_MODE": "none",
     "MESSAGE_LIMIT": "20",
     "MESSAGE_WINDOW_HOURS": "4"
   },
@@ -76,6 +68,5 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*"]
   },
-  "account_id": "e9be35217a75f5d2148e572d8853b3bf",
   "minify": true
 }
