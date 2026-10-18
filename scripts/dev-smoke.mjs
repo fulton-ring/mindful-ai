@@ -120,6 +120,9 @@ async function main() {
     console.info(
       'Standalone dev smoke passed: UI/API proxy, no-provider notes, source rebuild and persistence.',
     );
+  } catch (error) {
+    console.error(await readFile(log, 'utf8'));
+    throw error;
   } finally {
     try {
       process.kill(-child.pid, 'SIGTERM');
