@@ -1,5 +1,7 @@
 # Walden Helm chart
 
+Deploy Walden, an open-source [Fulton Ring](https://fultonring.com) product, on Kubernetes.
+
 This chart runs two HTTP replicas, two worker replicas and one scheduler. Each process applies pending application migrations before serving traffic or starting execution. PostgreSQL migration locks serialize concurrent startup; no separate migration Job is required. PostgreSQL, Valkey and a private S3 bucket are external dependencies. The chart creates no cloud resources or credentials.
 
 Build and publish the image through your own registry process, then set `image.repository` and `image.tag`. Provision an existing Kubernetes Secret whose keys are runtime environment variables: `DATABASE_URL`, `VALKEY_URL`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `BETTER_AUTH_SECRET`, and the credentials for your inference provider. Keep endpoints and bucket names in `config` values. The browser must be able to reach `S3_PUBLIC_ENDPOINT` when that differs from the internal S3 endpoint.

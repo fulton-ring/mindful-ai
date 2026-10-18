@@ -203,6 +203,9 @@ function SidebarFooter({ authControls }: { authControls?: ReactNode }) {
         {theme === 'light' ? <Moon /> : <Sun />} {theme === 'light' ? 'Dark' : 'Light'}
       </button>
       {authControls && <div className="sidebar-auth-controls">{authControls}</div>}
+      <a className="sidebar-maker" href="https://fultonring.com" target="_blank" rel="noreferrer">
+        A Fulton Ring product
+      </a>
     </footer>
   );
 }

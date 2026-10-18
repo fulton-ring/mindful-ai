@@ -1,5 +1,7 @@
 # Credentials and deployment
 
+Walden is a [Fulton Ring](https://fultonring.com) product. This guide covers configuring your own deployment.
+
 Use your own service accounts and resources. Keep secrets in the root `.env` for standalone development, `apps/api/.dev.vars` for Wrangler development, or the deployment platform's secret store. Never commit credentials or print private deployment profiles in CI logs.
 
 ## Standalone development and self-hosting

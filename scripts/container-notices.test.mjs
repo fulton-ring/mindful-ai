@@ -1,9 +1,15 @@
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { collectNoticeFiles, parseDpkgInventory, verifyFiles } from './container-notices.mjs';
+import {
+  collectNoticeFiles,
+  httpsBody,
+  parseDpkgInventory,
+  verifyFiles,
+} from './container-notices.mjs';
 
 test('collects native copyright files through Debian documentation symlinks and ignores binaries', async () => {
   const root = await mkdtemp(join(tmpdir(), 'native-notices-'));
@@ -145,5 +151,19 @@ test('rejects notice file symlinks outside the documentation root', async () => 
   await assert.rejects(
     collectNoticeFiles(join(root, 'doc'), join(root, 'out')),
     /Unsafe documentation symlink/,
+  );
+});
+
+test('source downloads fail when a host stops responding', async (t) => {
+  const sockets = [];
+  const server = createServer((socket) => sockets.push(socket));
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => {
+    for (const socket of sockets) socket.destroy();
+    server.close();
+  });
+  await assert.rejects(
+    httpsBody(`https://127.0.0.1:${server.address().port}/source.tar.gz`, 200),
+    /Download stalled for 200 ms/,
   );
 });

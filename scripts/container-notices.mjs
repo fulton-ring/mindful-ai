@@ -199,19 +199,23 @@ async function collectRuntime(output) {
   await verifyFiles(output, files);
 }
 
-const httpsBody = (url, redirects = 5) =>
+export const httpsBody = (url, timeout = 60_000, redirects = 5) =>
   new Promise((resolve, reject) => {
-    get(url, (response) => {
+    const request = get(url, { timeout }, (response) => {
       const { statusCode, headers } = response;
       if (statusCode >= 300 && statusCode < 400 && headers.location && redirects > 0) {
         response.resume();
-        resolve(httpsBody(new URL(headers.location, url).href, redirects - 1));
+        resolve(httpsBody(new URL(headers.location, url).href, timeout, redirects - 1));
       } else if (statusCode === 200) resolve(response);
       else {
         response.resume();
         reject(new Error(`Download failed (${statusCode}): ${url}`));
       }
-    }).on('error', reject);
+    });
+    request.on('timeout', () =>
+      request.destroy(new Error(`Download stalled for ${timeout} ms: ${url}`)),
+    );
+    request.on('error', reject);
   });
 
 async function fetchSources(output) {

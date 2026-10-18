@@ -13,9 +13,9 @@
 - [x] Confirm both latest PR #3 verification jobs succeeded at `df8a1f8`; merge the reviewed commit.
 - [x] Create `feat/public-container-release` from merged `origin/main`; keep implementation off `main`.
 - [x] Dispatch `ci.yml` on `main`; retain the existing private configuration secrets and URL variables.
-- [ ] Confirm deployment jobs succeed, then verify runtime config, protected API auth, signed-in chat/reload, uploads, landing app/legal links and redirects.
+- [x] Confirm deployment jobs succeed, then verify runtime config, protected API auth, signed-in chat/reload, uploads, landing app/legal links and redirects.
 
-Deployment run `39150561028` passed all jobs at `51da930c93a741e95acbcacd994851503754f28a`. Public config, protected API rejection, landing links/redirects and signed-in chat/reload passed. Synthetic thread: `477dd122-d9a9-46a8-8a27-2ddcb367b2f5`. Hosted browser upload verification is pending the browser extension's file URL permission; no user files were uploaded.
+Deployment run `39150561028` passed all jobs at `51da930c93a741e95acbcacd994851503754f28a`. Public config, protected API rejection, landing links/redirects and signed-in chat/reload passed. Synthetic thread: `477dd122-d9a9-46a8-8a27-2ddcb367b2f5`. After the production `walden-attachments` CORS rule added `https://chat.withwalden.app` (existing rule preserved, with explicit user approval), an authenticated hosted upload of a pasted 1×1 PNG completed and its preview rendered (`complete: true`, 1×1); the draft was cleared. The extension's file-picker permission is not an app requirement, since the supported paste path exercised actual upload and download. No user files were uploaded.
 
 Commands: `gh run view RUN --json status,conclusion,jobs`; use the logged-in browser session for authenticated app verification. Do not manually reapply migrations or change production data beyond disposable smoke-test records.
 

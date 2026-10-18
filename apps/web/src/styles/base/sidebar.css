@@ -199,6 +199,18 @@
     gap: 0.55rem;
     text-align: left;
   }
+  .sidebar-maker {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0.35rem 0.7rem;
+    color: var(--muted);
+    font-size: 0.75rem;
+    text-underline-offset: 3px;
+  }
+  .sidebar-maker:hover {
+    color: var(--ink);
+  }
   .note-sidebar footer button.primary {
     background: var(--ink);
     color: var(--card);

@@ -2,7 +2,7 @@
 import LegalFooter from '../components/LegalFooter.astro';
 import Mark from '../components/Mark.astro';
 import Base from '../layouts/Base.astro';
-import { APP_URL } from '../site';
+import { APP_URL, COMPANY } from '../site';
 
 // Each beat is one stop on the walk around the pond and one feature of Walden; the
 // scene frames that feature's shape on the side opposite the text.
@@ -21,16 +21,20 @@ const beats = [
   <canvas id="pond" aria-hidden="true"></canvas>
 
   <header class="bar">
-    <a class="logo" href="#welcome" data-beat-link aria-label="Walden, back to the start">
-      <Mark size={34} />
-      Walden
-    </a>
+    <div class="brand-lockup">
+      <a class="logo" href="#welcome" data-beat-link aria-label="Walden, back to the start">
+        <Mark size={34} />
+        Walden
+      </a>
+      <a class="maker" href={COMPANY.site}>by {COMPANY.name}</a>
+    </div>
     <a class="pill" href={APP_URL}>Open Walden</a>
   </header>
 
   <main>
     <section class="beat" id="welcome" data-side="left" aria-label="Welcome">
       <div class="card">
+        <p class="product-maker">A <a href={COMPANY.site}>{COMPANY.name}</a> product</p>
         <h1>Walden</h1>
         <svg
           class="underline"
@@ -164,6 +168,20 @@ const beats = [
     pointer-events: auto;
   }
 
+  .brand-lockup {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .maker {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    font-size: 14px;
+    text-underline-offset: 3px;
+  }
+
   .logo {
     display: flex;
     align-items: center;
@@ -281,6 +299,15 @@ const beats = [
 
   .card p + p {
     margin-top: 12px;
+  }
+
+  .card .product-maker {
+    margin-bottom: 20px;
+    font-size: 16px;
+  }
+
+  .product-maker a {
+    text-underline-offset: 3px;
   }
 
   .underline {
