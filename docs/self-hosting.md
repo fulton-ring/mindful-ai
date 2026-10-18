@@ -1,5 +1,7 @@
 # Self-hosting Walden
 
+Walden is an open-source product by [Fulton Ring](https://fultonring.com).
+
 The same OCI image serves the UI and API, runs durable chat execution, extracts PDF/DOCX/XLSX attachments, reads public web pages with Chromium and searches saved sources using a bundled local embedding model. A standalone instance stores its database and private objects in one persistent volume. PostgreSQL, Valkey and S3 support separate HTTP, worker and scheduler processes. Neither setup requires a Cloudflare account.
 
 Use Node.js 24.15 or newer and pnpm 10.30.0 when building outside Docker. The image pins the Node 24.15 Debian baseline and uses Debian's Chromium distribution, tested with the installed Playwright adapter on both supported architectures. The build downloads the pinned embedding model; runtime startup does not download model weights. Model assets and the UI are included in the image. Provider credentials are runtime configuration, never build arguments.

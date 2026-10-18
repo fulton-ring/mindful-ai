@@ -1,5 +1,7 @@
 # Replacing providers
 
+Walden is a [Fulton Ring](https://fultonring.com) product. This guide covers replacing its runtime providers.
+
 Application routes and chat tools consume service contracts. Host startup creates the adapters and owns their readiness and shutdown. Choose providers independently: using Cloudflare inference does not require D1 or R2, and using R2 does not require Cloudflare inference.
 
 | Dependency | Contract / selection point | Implementations |

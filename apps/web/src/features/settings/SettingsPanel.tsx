@@ -41,7 +41,15 @@ export function SettingsPanel({
           }}
         >
           <header className="settings-header">
-            <Dialog.Title>Settings</Dialog.Title>
+            <div>
+              <Dialog.Title>Settings</Dialog.Title>
+              <p className="settings-maker">
+                Walden by{' '}
+                <a href="https://fultonring.com" target="_blank" rel="noreferrer">
+                  Fulton Ring
+                </a>
+              </p>
+            </div>
             <Dialog.Close asChild>
               <button className="icon-button" aria-label="Close settings">
                 <X />

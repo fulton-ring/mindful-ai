@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import { COMPANY } from '../site';
 
 interface Props {
   title?: string;
@@ -25,6 +26,7 @@ const shareImageAlt = 'Walden — A quiet place to think. The Walden ripple mark
     <meta name="theme-color" content="#f3ece1" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#241c17" media="(prefers-color-scheme: dark)" />
     <meta name="description" content={description} />
+    <meta name="author" content={COMPANY.name} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="canonical" href={canonicalUrl} />
     <meta property="og:type" content="website" />
