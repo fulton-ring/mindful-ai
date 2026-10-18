@@ -380,6 +380,24 @@ function createSearchTool(
   });
 }
 
+/** Resolve the same adapter for indexing, retrieval and account deletion. */
+export function resolveSavedSources(
+  env: ResearchEnv,
+  signal: AbortSignal,
+): SavedSources | undefined {
+  if (env.SAVED_SOURCES) return env.SAVED_SOURCES;
+  const restConfigured = Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN);
+  if (!env.AI_SEARCH_INSTANCE?.trim() || (!env.AI_SEARCH && !restConfigured)) return undefined;
+  const instance = restConfigured
+    ? createRestInstance(
+        `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(env.CLOUDFLARE_ACCOUNT_ID!)}/ai-search/namespaces/default/instances/${encodeURIComponent(env.AI_SEARCH_INSTANCE)}`,
+        { Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN!}` },
+        signal,
+      )
+    : env.AI_SEARCH!.get(env.AI_SEARCH_INSTANCE);
+  return createCloudflareSavedSources(instance);
+}
+
 export function createResearchTools(
   env: ResearchEnv,
   ownerId: string | undefined,
@@ -389,7 +407,7 @@ export function createResearchTools(
   if (!ownerId?.trim()) return {};
   const restConfigured = Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN);
   let browser = env.RESEARCH_BROWSER;
-  let sources = env.SAVED_SOURCES;
+  const sources = resolveSavedSources(env, signal);
   // Each capability is independently configured. A browser does not require an index.
   if (!browser && (env.BROWSER || restConfigured)) {
     const transport = restConfigured
@@ -400,16 +418,6 @@ export function createResearchTools(
         )
       : env.BROWSER!;
     browser = createCloudflareResearchBrowser(transport);
-  }
-  if (!sources && env.AI_SEARCH_INSTANCE?.trim() && (env.AI_SEARCH || restConfigured)) {
-    const instance = restConfigured
-      ? createRestInstance(
-          `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(env.CLOUDFLARE_ACCOUNT_ID!)}/ai-search/namespaces/default/instances/${encodeURIComponent(env.AI_SEARCH_INSTANCE)}`,
-          { Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN!}` },
-          signal,
-        )
-      : env.AI_SEARCH!.get(env.AI_SEARCH_INSTANCE);
-    sources = createCloudflareSavedSources(instance);
   }
   const scope = researchOwnerScope(ownerId);
   const tools: McpTools = {};

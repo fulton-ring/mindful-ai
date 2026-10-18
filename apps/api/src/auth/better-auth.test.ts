@@ -149,6 +149,34 @@ it('deletes the local authentication identity and all sessions with the app acco
   expect(await DB.prepare('SELECT id FROM auth_session').first()).toBeFalsy();
 });
 
+it('deletes Cloudflare saved sources through the same account cleanup path', async () => {
+  const { request, app, env, DB, owner } = await fixture();
+  const scope = await researchOwnerScope(owner.id);
+  const remove = vi.fn().mockResolvedValue(undefined);
+  const list = vi.fn().mockResolvedValue({
+    result: [
+      { id: 'saved-page', key: `owners/${scope}/page.md`, metadata: { owner_scope: scope } },
+    ],
+  });
+  env.AI_SEARCH_INSTANCE = 'test-sources';
+  env.AI_SEARCH = {
+    get: vi.fn().mockReturnValue({ items: { list, delete: remove } }),
+  } as unknown as AiSearchNamespace;
+  const login = await request('/api/auth/sign-in/email', {
+    email: 'owner@test.example',
+    password: 'a-very-long-password-123',
+  });
+  const cookie = login.headers.get('set-cookie')!.split(';')[0]!;
+  const response = await app.request(
+    'http://localhost:8787/account',
+    { method: 'DELETE', headers: { cookie } },
+    env,
+  );
+  expect(response.status).toBe(204);
+  expect(remove).toHaveBeenCalledExactlyOnceWith('saved-page');
+  expect(await DB.prepare('SELECT id FROM auth_user').first()).toBeFalsy();
+});
+
 it('leaving Better Auth revokes real sessions before its mode can be re-enabled', async () => {
   const { request, app, env, DB } = await fixture();
   const login = await request('/api/auth/sign-in/email', {

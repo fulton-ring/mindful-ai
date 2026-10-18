@@ -8,6 +8,7 @@ it.skipIf(!CLOUDFLARE_API_TOKEN || !CLOUDFLARE_ACCOUNT_ID || !OPENROUTER_API_KEY
   'searches an unfamiliar incident through the production Cloudflare provider',
   async () => {
     const service = createAgentService({
+      AI_PROVIDER: 'cloudflare',
       AI_MODEL: DEFAULT_AI_MODEL,
       CLOUDFLARE_API_TOKEN,
       CLOUDFLARE_ACCOUNT_ID,

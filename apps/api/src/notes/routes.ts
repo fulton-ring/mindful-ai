@@ -142,6 +142,7 @@ notesRoutes.delete('/:id', async (c) => {
   const result = await c.env.DB.prepare('DELETE FROM notes WHERE id=? AND owner_id=?')
     .bind(c.req.param('id'), c.get('userId'))
     .run();
-  if (result.meta.changes !== 1) throw new HttpError(404, 'Note not found');
+  // D1 includes cascaded note history and link changes in this count.
+  if (!result.meta.changes) throw new HttpError(404, 'Note not found');
   return c.body(null, 204);
 });

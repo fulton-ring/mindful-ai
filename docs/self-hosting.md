@@ -154,6 +154,21 @@ For PostgreSQL, stop admission and workers for a consistent database/object chec
 
 Before an upgrade, make and validate a backup, build/pull the intended image, and run its migration role against the intended database. Standalone `all` applies migrations on startup; distributed roles require a successful migration job and refuse an outdated schema. Migrations are additive and transactional where supported. Retain the prior image and database backup; a binary rollback alone does not undo schema changes.
 
+## Local development
+
+```sh
+pnpm install
+pnpm dev
+```
+
+The default development launcher reads the root `.env`, prepares the checksum-verified MiniLM model and matching Playwright Chromium, and starts Vite at http://localhost:3000 with the standalone API on loopback port 3001. It applies SQLite migrations automatically and keeps local state in `.data/`, matching the root production launcher. The first run downloads the assets; later runs reuse them. Frontend edits use Vite hot reload, while API edits rebuild and restart the Node process.
+
+No Cloudflare account is needed. With no auth configuration, this is the shared default account; set `AUTH_MODE=none` explicitly if the root `.env` already contains Clerk keys and you intend to use that shared account. Configure inference in `.env` to enable chat. Credentials remain server-side. Set `DATA_DIR` for separate development state, `PORT` for the public listener, and optionally `WALDEN_API_PORT` for the internal listener; its default is `PORT + 1`. Keep `APP_URL` equal to the public browser origin. Linux hosts may need Chromium system dependencies installed once with `pnpm --filter @walden/api exec playwright install --with-deps chromium`.
+
+`pnpm dev:cloudflare` explicitly selects the previous Vite 5173 / Wrangler 8787 workflow, with its local D1 database and Cloudflare binding/auth requirements. See [development setup](../README.md#development) for that adapter.
+
+[The adapter guide](adapters.md) explains how the shared application is composed for Node and Cloudflare. `pnpm test:dev` checks the development configuration. `pnpm test:dev:smoke` uses temporary state and spare ports to check native startup, the frontend/API proxy, note persistence across an API hot reload, and process shutdown; it temporarily appends and restores a retained comment in `server.ts` to trigger the rebuild.
+
 ## Verification
 
 ```sh
@@ -165,5 +180,7 @@ pnpm start:self-hosted
 ```
 
 Run these commands beside the root `package.json`. The root launcher loads `.env`, serves the built UI/API, and keeps SQLite databases and private files in `.data/`. This directory and `.cache/` are ignored by Git and excluded from image builds. Set `DATA_DIR` to override the location; relative paths resolve from the repository root with this launcher. Credentials in `.env` remain server-side. A local OpenRouter setup needs `AI_PROVIDER=openrouter` and `OPENROUTER_API_KEY`; set `AUTH_MODE=none` explicitly when using the shared default account alongside preconfigured Clerk keys. Preserve the whole `.data/` directory when moving or backing up local state.
+
+`pnpm test:providers` runs the same browser and API scenarios against actual Node/SQLite/local-file and workerd/D1/R2/Durable Object hosts, with controlled inference responses. Set `WALDEN_TEST_S3_ENDPOINT` to include the mixed SQLite/S3 case. [The provider matrix guide](../tests/provider-matrix/README.md) covers disposable SeaweedFS configuration and the separate opt-in browser checks against live Cloudflare and OpenRouter inference. CI runs all three deterministic provider combinations and the standalone development smoke; live credentials are not needed for those gates.
 
 The manual/release `Self-hosted image` CI workflow builds and smokes native amd64 and arm64 images, checks non-root sandboxed Chromium, and exercises first-start readiness, UI assets and runtime configuration. It does not push images or deploy infrastructure. A complete operator smoke test additionally signs in when enabled, starts a note/chat, reconnects to its event stream, restarts a worker during an active turn, exercises Stop and retry, uploads/extracts a document, reads a public page, searches saved sources, and validates backup/restore against a disposable instance.

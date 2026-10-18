@@ -6,7 +6,7 @@ import { all, first } from '../db/client';
 import { purgeOwnerExecution } from '../execution/privacy';
 import { newId, nowIso, parseBody } from '../http';
 import { NOTE_PROJECTION } from '../notes/repository';
-import { researchOwnerScope } from '../services/research/research';
+import { researchOwnerScope, resolveSavedSources } from '../services/research/research';
 import type { Bindings, Variables } from '../types';
 import { PRIVACY_VERSION } from './content-telemetry';
 
@@ -122,7 +122,9 @@ accountRoutes.delete('/account', async (c) => {
       'INSERT INTO telemetry_deletions (distinct_id,requested_at) VALUES (?,?) ON CONFLICT(distinct_id) DO NOTHING',
     ).bind(c.get('authSubject'), nowIso()),
   ]);
-  await c.env.SAVED_SOURCES?.deleteOwner(await researchOwnerScope(ownerId));
+  await resolveSavedSources(c.env, c.req.raw.signal)?.deleteOwner(
+    await researchOwnerScope(ownerId),
+  );
   await purgeOwnerExecution(c.env, ownerId);
   await deleteAccountIdentity(c.env, ownerId, c.get('authSubject'));
   await c.env.DB.prepare('DELETE FROM users WHERE id=?').bind(ownerId).run();

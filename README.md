@@ -12,27 +12,27 @@ Requires Node.js 24.15+ and pnpm 10.30.0.
 
 ```sh
 pnpm install
-cp apps/api/.dev.vars.example apps/api/.dev.vars
-pnpm db:migrate
 pnpm dev
 ```
 
-The frontend runs on Vite and proxies `/api` to the local Cloudflare Worker. Local use requires Clerk authentication and either Cloudflare Workers AI credentials or an AI binding. Authentication fails closed when it is not configured.
+Open **http://localhost:3000**. The default development server runs the standalone Node API with SQLite and local files in `.data/`. Vite proxies `/api` and `/health` to its internal API on port 3001. Startup applies local migrations, prepares the pinned MiniLM embedding model and matching Chromium, and builds shared packages before starting source watchers. The first run needs network access; subsequent runs reuse the downloaded assets.
 
-`pnpm dev` respects `AI_PROVIDER` and `AI_MODEL` from the environment files; it does not override the configured provider. Use Cloudflare inference when validating production behavior.
+The launcher loads the repository-root `.env` and preserves your auth, inference and storage settings. Without authentication configuration, the local instance uses one shared default account. Notes work without an inference provider; configure `AI_PROVIDER` and its model/credentials to enable chat. See [the configuration examples](docs/self-hosting.md#configuration). Only `VITE_` variables are exposed to browser code.
 
-`pnpm dev` builds the shared contracts and domain packages before starting the app, then keeps their `dist/` output updated with native TypeScript watch tasks. Vite and Wrangler consume those emitted files during development.
+See [the adapter guide](docs/adapters.md) for the shared application and runtime boundaries. `pnpm test:dev` checks launcher/proxy configuration; `pnpm test:dev:smoke` starts a disposable instance on spare ports and verifies API hot reload and shutdown.
 
-Use **http://localhost:5173** while developing the web app. Wrangler serves the
-worker and a *prebuilt* copy of `apps/web/dist` on :8787, so front-end edits do
-not appear there until the next `pnpm build`; :5173 is the Vite server with hot
-reload and proxies `/api` to the worker.
+Keep `.data/` to preserve local notes and conversations. `DATA_DIR` selects another directory. `PORT` changes the public Vite port, `WALDEN_API_PORT` changes the internal API port (default: `PORT + 1`), and `APP_URL` must match the public browser origin. For example: `PORT=4200 APP_URL=http://localhost:4200 pnpm dev`.
 
-Web reading and source search (`readWebPage`, `searchSources`) use the Cloudflare
-browser and AI Search bindings. Neither has local emulation, so both are declared
-`remote` and need an authenticated Wrangler: run `npx wrangler login` once. Until
-you do, the two tools are simply not registered, and the assistant is told it has
-no web access so it says so rather than offering to look things up.
+For the Cloudflare adapter, use the explicit legacy workflow:
+
+```sh
+cp apps/api/.dev.vars.example apps/api/.dev.vars
+# Configure Clerk and inference credentials in apps/api/.dev.vars.
+pnpm db:migrate
+pnpm dev:cloudflare
+```
+
+Open **http://localhost:5173** for frontend hot reload; Wrangler serves the API on 8787 and uses its own local D1 state. This mode retains the Clerk and Cloudflare binding requirements. Cloudflare browser reading and AI Search use remote bindings and need authenticated Wrangler access (`pnpm --filter @walden/api exec wrangler login`). Use this mode when validating Cloudflare behavior.
 
 ## Database schema
 
@@ -41,7 +41,7 @@ Edit `apps/api/src/db/schema.ts`, run `pnpm db:generate`, review the SQL, then a
 ## Workspace
 
 - `apps/web`: React/Vite interface, CodeMirror editor, TanStack Query state.
-- `apps/api`: Hono Worker, D1 persistence, Clerk verification, Mastra orchestration, service adapters.
+- `apps/api`: Hono API with Node and Cloudflare adapters, persistence, authentication, Mastra orchestration and services.
 - `packages/contracts`: shared request validation and wire types.
 - `packages/domain`: text edits, authorship, and retention rules.
 

@@ -1,8 +1,12 @@
 import { cp, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 
-await build({
+const apiRoot = fileURLToPath(new URL('../', import.meta.url));
+
+export const nodeBuildOptions = {
+  absWorkingDir: apiRoot,
   entryPoints: {
     server: 'src/platform/node/server.ts',
     cli: 'src/platform/node/cli.ts',
@@ -15,10 +19,17 @@ await build({
   bundle: true,
   packages: 'external',
   alias: {
-    '@walden/contracts': resolve('../../packages/contracts/src/index.ts'),
-    '@walden/domain': resolve('../../packages/domain/src/index.ts'),
+    '@walden/contracts': resolve(apiRoot, '../../packages/contracts/src/index.ts'),
+    '@walden/domain': resolve(apiRoot, '../../packages/domain/src/index.ts'),
   },
   sourcemap: true,
-});
-await mkdir('public', { recursive: true });
-await cp('../web/dist', 'public', { recursive: true });
+};
+
+export async function buildNode() {
+  await build(nodeBuildOptions);
+  await mkdir(resolve(apiRoot, 'public'), { recursive: true });
+  await cp(resolve(apiRoot, '../web/dist'), resolve(apiRoot, 'public'), { recursive: true });
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href)
+  await buildNode();

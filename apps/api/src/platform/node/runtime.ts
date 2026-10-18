@@ -1,6 +1,5 @@
 import { mkdir, readFile, stat } from 'node:fs/promises';
 import { extname, join, resolve, sep } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { registerAgentMemoryStore } from '../../agent/memory/memory';
@@ -15,23 +14,28 @@ import { purgeConversationExecution } from '../../execution/privacy';
 import { app } from '../../index';
 import { resolveInferenceConfig } from '../../inference/config';
 import { purgeTelemetry } from '../../privacy/content-telemetry';
-import { createLocalObjectStore } from '../../storage/local';
-import { createS3ObjectStore } from '../../storage/s3';
 import type { Bindings } from '../../types';
 import type { NodeConfig } from './config';
-import { createNodeDocumentExtractor } from './documents/extractor';
 import { createNodeExecutionHost } from './execution-host';
 import { createPostgresDatabase } from './postgres';
 import { migratePostgres } from './postgres-migrations';
-import { createPlaywrightResearchBrowser } from './research/browser';
-import { createLocalEmbedder } from './research/embeddings';
-import { createLocalSavedSources } from './research/saved-sources';
+import {
+  defaultNodeRuntimeAdapters,
+  type NodeRuntimeAdapters,
+  type NodeRuntimeLifecycle,
+  type NodeSavedSources,
+} from './runtime-adapters';
 import { requireCompatibleSchema } from './schema-version';
 import { openSqliteDatabase, type SqliteDatabase } from './sqlite';
 import { applySqliteMigrations } from './sqlite-migrations';
 import { createNodeTurnRouter } from './turns';
 
-type RuntimeOptions = { migrate?: boolean; maintenance?: boolean; environment?: NodeJS.ProcessEnv };
+export type NodeRuntimeOptions = {
+  migrate?: boolean;
+  maintenance?: boolean;
+  environment?: NodeJS.ProcessEnv;
+  adapters?: NodeRuntimeAdapters;
+};
 type Closer = () => void | Promise<void>;
 
 async function database(config: NodeConfig, migrate: boolean, closers: Closer[]) {
@@ -66,36 +70,45 @@ function initializeAuth(env: Bindings, sqlite?: SqliteDatabase, pool?: Pool) {
   return mode;
 }
 
-async function initializeServices(config: NodeConfig, env: Bindings, closers: Closer[]) {
-  env.FILES =
-    config.fileStorage === 's3'
-      ? createS3ObjectStore({
-          ...config.s3,
-          bucket: config.s3.bucket!,
-          credentials: config.s3.accessKeyId
-            ? { accessKeyId: config.s3.accessKeyId, secretAccessKey: config.s3.secretAccessKey! }
-            : undefined,
-        })
-      : createLocalObjectStore(config.filesDir);
-  await env.FILES.list({ prefix: 'health/', limit: 1 });
-  await stat(join(config.appRoot, 'dist/node/document-worker.js'));
-  env.DOCUMENT_EXTRACTOR = createNodeDocumentExtractor({
-    workerUrl: pathToFileURL(join(config.appRoot, 'dist/node/document-worker.js')),
+async function initializeServices(
+  config: NodeConfig,
+  env: Bindings,
+  closers: Closer[],
+  adapters: NodeRuntimeAdapters,
+) {
+  const healthChecks: Array<() => void | Promise<void>> = [];
+  async function manage<T extends NodeRuntimeLifecycle>(
+    provider: T,
+    ready: () => void | Promise<void> = () => provider.ready?.(),
+  ) {
+    if (provider.close) closers.push(() => provider.close!());
+    healthChecks.push(ready);
+    await ready();
+    return provider;
+  }
+  const files = await (adapters.createObjectStore ?? defaultNodeRuntimeAdapters.createObjectStore)(
+    config,
+  );
+  env.FILES = await manage(files, async () => {
+    if (files.ready) await files.ready();
+    else await files.list({ prefix: 'health/', limit: 1 });
   });
-  env.RESEARCH_BROWSER = createPlaywrightResearchBrowser();
-  await Promise.all(
-    ['config.json', 'tokenizer.json', 'onnx/model_quantized.onnx'].map((name) =>
-      stat(join(config.embeddingModelDir, name)),
+  env.DOCUMENT_EXTRACTOR = await manage(
+    await (adapters.createDocumentExtractor ?? defaultNodeRuntimeAdapters.createDocumentExtractor)(
+      config,
     ),
   );
-  const savedSources = createLocalSavedSources({
-    db: env.DB,
-    blobs: env.FILES,
-    embedder: createLocalEmbedder({
-      modelDirectory: config.embeddingModelDir,
-      revision: config.embeddingRevision,
+  env.RESEARCH_BROWSER = await manage(
+    await (adapters.createResearchBrowser ?? defaultNodeRuntimeAdapters.createResearchBrowser)(
+      config,
+    ),
+  );
+  const savedSources = await manage(
+    await (adapters.createSavedSources ?? defaultNodeRuntimeAdapters.createSavedSources)(config, {
+      db: env.DB,
+      blobs: env.FILES,
     }),
-  });
+  );
   env.SAVED_SOURCES = savedSources;
   const execution = await createNodeExecutionHost({
     database: env.DB,
@@ -112,29 +125,38 @@ async function initializeServices(config: NodeConfig, env: Bindings, closers: Cl
   env.TURNS = turns.router;
   closers.push(() => turns.close());
   await turns.start();
-  const controller = new AbortController();
-  const indexing = new Set<Promise<void>>();
-  const resume = () => {
-    const task = savedSources.resume(controller.signal);
-    indexing.add(task);
-    void task
-      .catch(() => console.warn('Source indexing deferred'))
-      .finally(() => indexing.delete(task));
+  startSourceIndexing(savedSources, config.role, closers);
+  return async () => {
+    await execution.ready();
+    for (const check of healthChecks) await check();
   };
-  closers.push(async () => {
-    controller.abort();
-    await Promise.allSettled([...indexing]);
-  });
-  if (config.role === 'all' || config.role === 'worker') {
+}
+
+function startSourceIndexing(
+  savedSources: NodeSavedSources,
+  role: NodeConfig['role'],
+  closers: Closer[],
+) {
+  if (savedSources.resume && (role === 'all' || role === 'worker')) {
+    const resumeIndexing = savedSources.resume.bind(savedSources);
+    const controller = new AbortController();
+    const indexing = new Set<Promise<void>>();
+    const resume = () => {
+      const task = Promise.resolve().then(() => resumeIndexing(controller.signal));
+      indexing.add(task);
+      void task
+        .catch(() => console.warn('Source indexing deferred'))
+        .finally(() => indexing.delete(task));
+    };
+    closers.push(async () => {
+      controller.abort();
+      await Promise.allSettled([...indexing]);
+    });
     resume();
     const timer = setInterval(resume, 60_000);
     timer.unref();
     closers.push(() => clearInterval(timer));
   }
-  return async () => {
-    await execution.ready();
-    if (config.fileStorage === 's3') await env.FILES!.list({ prefix: 'health/', limit: 1 });
-  };
 }
 
 function schedule(
@@ -277,7 +299,7 @@ function requestHandler(
 }
 
 /** One composition root; HTTP routes and turn execution are shared with the Worker. */
-export async function createNodeRuntime(config: NodeConfig, options: RuntimeOptions = {}) {
+export async function createNodeRuntime(config: NodeConfig, options: NodeRuntimeOptions = {}) {
   const closers: Closer[] = [];
   const pending = new Set<Promise<unknown>>();
   const requests = new Set<Promise<Response>>();
@@ -299,7 +321,7 @@ export async function createNodeRuntime(config: NodeConfig, options: RuntimeOpti
     let executionReady: (() => Promise<void>) | undefined;
     if (!options.maintenance) {
       await requireAcceptedAuthMode(db, mode);
-      executionReady = await initializeServices(config, env, closers);
+      executionReady = await initializeServices(config, env, closers, options.adapters ?? {});
       schedule(env, config, closers, background);
     }
     const ready = async () => {

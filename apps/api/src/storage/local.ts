@@ -45,7 +45,8 @@ export class LocalObjectStore implements ObjectStore {
       throw new Error('Invalid object key');
     return createHash('sha256').update(key).digest('hex');
   }
-  private async ready() {
+  /** Cheap readiness after initialization; does not enumerate stored objects again. */
+  async ready() {
     // Refuse symlinks in every ancestor, including a substituted volume root.
     const components = this.directory.split('/').filter(Boolean);
     let current = '/';

@@ -17,6 +17,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:ci
+      - run: pnpm test:dev
       - run: pnpm verify
 
   self-hosted-integration:
@@ -40,9 +41,33 @@ jobs:
       - run: pnpm --filter @walden/contracts build && pnpm --filter @walden/domain build
       - run: node apps/api/scripts/download-embedding-model.mjs /tmp/walden-minilm
       - run: pnpm --filter @walden/api exec playwright install --with-deps chromium
+      - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm build:self-hosted
       - run: pnpm --filter @walden/api build
       - run: pnpm --filter @walden/api exec vitest run src/platform/node src/execution/production-worker.workerd.test.ts src/execution/purge.test.ts --maxWorkers=2
+      - name: Start disposable object storage for provider tests
+        env:
+          SEAWEEDFS_PORT: '18334'
+          APP_URL: '*'
+        run: docker compose --env-file /dev/null -p walden-ci-provider-matrix --profile postgres up -d --wait seaweedfs
+      - name: Browser and API provider matrix
+        env:
+          WALDEN_TEST_S3_ENDPOINT: http://127.0.0.1:18334
+        run: pnpm test:providers --skip-build
+      - name: Standalone development hot reload and shutdown
+        run: pnpm test:dev:smoke
+      - name: Provider test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: provider-matrix
+          path: |
+            playwright-report/provider-matrix
+            test-results/provider-matrix
+          if-no-files-found: ignore
+      - name: Remove disposable provider storage
+        if: always()
+        run: docker compose --env-file /dev/null -p walden-ci-provider-matrix --profile postgres down --volumes
 
   # Manual deployment selects the changed deployables. Main pushes only run checks.
   changes:
