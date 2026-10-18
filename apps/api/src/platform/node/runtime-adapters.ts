@@ -60,7 +60,8 @@ export const defaultNodeRuntimeAdapters: Required<
     await stat(worker);
     return createNodeDocumentExtractor({ workerUrl: pathToFileURL(worker) });
   },
-  createResearchBrowser: () => createPlaywrightResearchBrowser(),
+  createResearchBrowser: (config) =>
+    createPlaywrightResearchBrowser({ executablePath: config.chromiumExecutablePath }),
   async createSavedSources(config, context) {
     await Promise.all(
       ['config.json', 'tokenizer.json', 'onnx/model_quantized.onnx'].map((name) =>

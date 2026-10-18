@@ -8,6 +8,7 @@ export type NodeConfig = {
   publicDir: string;
   embeddingModelDir: string;
   embeddingRevision: string;
+  chromiumExecutablePath?: string;
   host: string;
   port: number;
   appUrl: string;
@@ -124,6 +125,7 @@ export function readNodeConfig(env: NodeJS.ProcessEnv = process.env): NodeConfig
     publicDir: resolve(env.PUBLIC_DIR ?? `${appRoot}/public`),
     embeddingModelDir: resolve(env.EMBEDDING_MODEL_DIR ?? `${appRoot}/models/minilm`),
     embeddingRevision: env.EMBEDDING_MODEL_REVISION ?? '751bff37182d3f1213fa05d7196b954e230abad9',
+    chromiumExecutablePath: env.CHROMIUM_EXECUTABLE_PATH,
     host: env.HOST ?? '0.0.0.0',
     port,
     appUrl: appUrl.origin,

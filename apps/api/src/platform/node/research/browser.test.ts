@@ -41,6 +41,7 @@ browserTest(
   async () => {
     const requests: string[] = [];
     const browser = createPlaywrightResearchBrowser({
+      executablePath: process.env.CHROMIUM_EXECUTABLE_PATH,
       transport: async (url): Promise<PublicResponse> => {
         requests.push(url.toString());
         return {
@@ -102,6 +103,7 @@ browserTest(
   async () => {
     const requests: string[] = [];
     const browser = createPlaywrightResearchBrowser({
+      executablePath: process.env.CHROMIUM_EXECUTABLE_PATH,
       transport: async (url): Promise<PublicResponse> => {
         requests.push(url.toString());
         if (url.pathname === '/allowed')
@@ -138,6 +140,7 @@ browserTest(
   async () => {
     const controller = new AbortController();
     const browser = createPlaywrightResearchBrowser({
+      executablePath: process.env.CHROMIUM_EXECUTABLE_PATH,
       transport: async (_url, signal) =>
         new Promise((_resolve, reject) => {
           signal.addEventListener(

@@ -1,0 +1,117 @@
+{
+  "@img/sharp-libvips-darwin-arm64@1.3.3": {
+    "provenance": {
+      "registry": "https://registry.npmjs.org/@img%2fsharp-libvips-darwin-arm64/1.3.3",
+      "gitHead": "6e5971d333377743163edc3ad9e5d0b897abcbc9"
+    },
+    "files": [
+      {
+        "path": "native/sharp-libvips-1.3.3-THIRD-PARTY-NOTICES.md",
+        "source": "https://raw.githubusercontent.com/lovell/sharp-libvips/6e5971d333377743163edc3ad9e5d0b897abcbc9/THIRD-PARTY-NOTICES.md",
+        "sha256": "25ffcfa69e28b1913ced27ec778b90f24911a1bb3021253577e8b0af55db0d49"
+      },
+      {
+        "path": "native/sharp-libvips-1.3.3-LGPL-3.0.txt",
+        "source": "https://www.gnu.org/licenses/lgpl-3.0.txt",
+        "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118"
+      },
+      {
+        "path": "native/sharp-libvips-1.3.3-GPL-3.0.txt",
+        "source": "https://www.gnu.org/licenses/gpl-3.0.txt",
+        "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+      }
+    ]
+  },
+  "@img/sharp-libvips-linux-arm64@1.3.3": {
+    "provenance": {
+      "registry": "https://registry.npmjs.org/@img%2fsharp-libvips-linux-arm64/1.3.3",
+      "gitHead": "6e5971d333377743163edc3ad9e5d0b897abcbc9"
+    },
+    "files": [
+      {
+        "path": "native/sharp-libvips-1.3.3-THIRD-PARTY-NOTICES.md",
+        "source": "https://raw.githubusercontent.com/lovell/sharp-libvips/6e5971d333377743163edc3ad9e5d0b897abcbc9/THIRD-PARTY-NOTICES.md",
+        "sha256": "25ffcfa69e28b1913ced27ec778b90f24911a1bb3021253577e8b0af55db0d49"
+      },
+      {
+        "path": "native/sharp-libvips-1.3.3-LGPL-3.0.txt",
+        "source": "https://www.gnu.org/licenses/lgpl-3.0.txt",
+        "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118"
+      },
+      {
+        "path": "native/sharp-libvips-1.3.3-GPL-3.0.txt",
+        "source": "https://www.gnu.org/licenses/gpl-3.0.txt",
+        "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+      }
+    ]
+  },
+  "@img/sharp-libvips-linux-x64@1.3.3": {
+    "provenance": {
+      "registry": "https://registry.npmjs.org/@img%2fsharp-libvips-linux-x64/1.3.3",
+      "gitHead": "6e5971d333377743163edc3ad9e5d0b897abcbc9"
+    },
+    "files": [
+      {
+        "path": "native/sharp-libvips-1.3.3-THIRD-PARTY-NOTICES.md",
+        "source": "https://raw.githubusercontent.com/lovell/sharp-libvips/6e5971d333377743163edc3ad9e5d0b897abcbc9/THIRD-PARTY-NOTICES.md",
+        "sha256": "25ffcfa69e28b1913ced27ec778b90f24911a1bb3021253577e8b0af55db0d49"
+      },
+      {
+        "path": "native/sharp-libvips-1.3.3-LGPL-3.0.txt",
+        "source": "https://www.gnu.org/licenses/lgpl-3.0.txt",
+        "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118"
+      },
+      {
+        "path": "native/sharp-libvips-1.3.3-GPL-3.0.txt",
+        "source": "https://www.gnu.org/licenses/gpl-3.0.txt",
+        "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+      }
+    ]
+  },
+  "@img/sharp-libvips-linuxmusl-arm64@1.3.3": {
+    "provenance": {
+      "registry": "https://registry.npmjs.org/@img%2fsharp-libvips-linuxmusl-arm64/1.3.3",
+      "gitHead": "6e5971d333377743163edc3ad9e5d0b897abcbc9"
+    },
+    "files": [
+      {
+        "path": "native/sharp-libvips-1.3.3-THIRD-PARTY-NOTICES.md",
+        "source": "https://raw.githubusercontent.com/lovell/sharp-libvips/6e5971d333377743163edc3ad9e5d0b897abcbc9/THIRD-PARTY-NOTICES.md",
+        "sha256": "25ffcfa69e28b1913ced27ec778b90f24911a1bb3021253577e8b0af55db0d49"
+      },
+      {
+        "path": "native/sharp-libvips-1.3.3-LGPL-3.0.txt",
+        "source": "https://www.gnu.org/licenses/lgpl-3.0.txt",
+        "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118"
+      },
+      {
+        "path": "native/sharp-libvips-1.3.3-GPL-3.0.txt",
+        "source": "https://www.gnu.org/licenses/gpl-3.0.txt",
+        "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+      }
+    ]
+  },
+  "@img/sharp-libvips-linuxmusl-x64@1.3.3": {
+    "provenance": {
+      "registry": "https://registry.npmjs.org/@img%2fsharp-libvips-linuxmusl-x64/1.3.3",
+      "gitHead": "6e5971d333377743163edc3ad9e5d0b897abcbc9"
+    },
+    "files": [
+      {
+        "path": "native/sharp-libvips-1.3.3-THIRD-PARTY-NOTICES.md",
+        "source": "https://raw.githubusercontent.com/lovell/sharp-libvips/6e5971d333377743163edc3ad9e5d0b897abcbc9/THIRD-PARTY-NOTICES.md",
+        "sha256": "25ffcfa69e28b1913ced27ec778b90f24911a1bb3021253577e8b0af55db0d49"
+      },
+      {
+        "path": "native/sharp-libvips-1.3.3-LGPL-3.0.txt",
+        "source": "https://www.gnu.org/licenses/lgpl-3.0.txt",
+        "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118"
+      },
+      {
+        "path": "native/sharp-libvips-1.3.3-GPL-3.0.txt",
+        "source": "https://www.gnu.org/licenses/gpl-3.0.txt",
+        "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+      }
+    ]
+  }
+}

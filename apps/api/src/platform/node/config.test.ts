@@ -7,6 +7,13 @@ it('keeps default native runtime state in a hidden data directory', () => {
   expect(config.dataDir).toBe(resolve('.data'));
   expect(config.sqlitePath).toBe(resolve('.data/walden.sqlite'));
   expect(config.filesDir).toBe(resolve('.data/files'));
+  expect(config).toMatchObject({ chromiumExecutablePath: undefined });
+});
+
+it('accepts a system Chromium executable for the native research browser', () => {
+  expect(readNodeConfig({ CHROMIUM_EXECUTABLE_PATH: '/usr/bin/chromium' })).toMatchObject({
+    chromiumExecutablePath: '/usr/bin/chromium',
+  });
 });
 
 it('defaults to a single process with persistent local SQLite and files', () => {
