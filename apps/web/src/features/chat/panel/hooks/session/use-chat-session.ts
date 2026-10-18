@@ -82,9 +82,22 @@ async function prepareTurn(args: TurnArgs, editing: boolean, signal?: AbortSigna
   };
 }
 
+function resumedTranscript(messages: WaldenUIMessage[], turn: ActiveTurn) {
+  const fork = turn.regenerateMessageId ?? turn.editMessageId;
+  const index = messages.findIndex(({ id }) => id === fork || id === turn.id);
+  const prefix = index < 0 ? messages : messages.slice(0, index);
+  const user = turn.userMessage;
+  if (user?.role !== 'user' || user.id !== turn.userMessageId) return prefix;
+  const existing = prefix.findIndex(({ id }) => id === user.id);
+  return existing < 0
+    ? [...prefix, user]
+    : prefix.map((message, position) => (position === existing ? user : message));
+}
+
 /** A running turn found on mount or after switching threads becomes the live turn. */
-export function adoptResumedTurn(args: TurnArgs, turn: ActiveTurn) {
+export function adoptResumedTurn(args: TurnArgs, turn: ActiveTurn, messages = args.chat.messages) {
   const { runtime, chat } = args;
+  const transcript = resumedTranscript(messages, turn);
   runtime.live.current = {
     kind: 'resume',
     turnId: turn.id,
@@ -92,16 +105,11 @@ export function adoptResumedTurn(args: TurnArgs, turn: ActiveTurn) {
     conversationId: turn.conversationId,
     branchId: turn.branchId,
     noteRevision: null,
-    snapshot: chat.messages,
+    snapshot: transcript,
     startedAt: performance.now(),
   };
   args.display.setStatus('Reconnecting…');
-  const fork = turn.regenerateMessageId ?? turn.editMessageId;
-  if (fork)
-    chat.setMessages((messages) => {
-      const index = messages.findIndex((message) => message.id === fork);
-      return index < 0 ? messages : messages.slice(0, index);
-    });
+  chat.setMessages(transcript);
 }
 
 function createTransport(argsRef: RefObject<TurnArgs | null>) {

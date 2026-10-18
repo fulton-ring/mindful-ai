@@ -2,12 +2,13 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { TurnStart } from '@walden/contracts';
+import type { Conversation, TurnStart, WaldenUIMessage } from '@walden/contracts';
 import { Hono } from 'hono';
 import { expect, it, vi } from 'vitest';
 import { sqliteD1Binding } from '../../../agent/memory/tests/d1-test-binding';
 import { HttpError } from '../../../http';
 import type { Bindings, Variables } from '../../../types';
+import { conversationRoutes } from '../../conversations/conversations';
 import { chatRoutes } from '../routes';
 import { turnObjects } from './turn-fixture';
 
@@ -55,6 +56,7 @@ async function fixture() {
     await next();
   });
   app.route('/api/chat', chatRoutes);
+  app.route('/api', conversationRoutes);
   app.onError((error, c) =>
     error instanceof HttpError
       ? c.json({ error: error.message }, error.status)
@@ -80,6 +82,63 @@ async function fixture() {
     );
   return { DB, env, app, start };
 }
+
+it('returns the admitted canonical user message while committed conversation history still excludes it', async () => {
+  const { DB, env, app, start } = await fixture();
+  const admitted = await start('recover', 'Question still being answered');
+  expect(admitted.status).toBe(200);
+  const { turnId, userMessageId } = (await admitted.json()) as TurnStart;
+  const stored = await DB.prepare('SELECT ui_message FROM messages WHERE id=?')
+    .bind(userMessageId)
+    .first<{ ui_message: string }>();
+  const conversation = await app.request('/api/conversations/chat?branch=branch', {}, env);
+  expect(conversation.status).toBe(200);
+  expect(((await conversation.json()) as Conversation).messages).toEqual([]);
+  const active = await app.request('/api/chat/turns?conversationId=chat&branchId=branch', {}, env);
+  expect(active.status).toBe(200);
+  expect(await active.json()).toMatchObject({
+    turn: { id: turnId, userMessageId, userMessage: JSON.parse(stored!.ui_message) },
+  });
+  expect(
+    await DB.prepare('SELECT head_message_id FROM conversation_branches WHERE id=?')
+      .bind('branch')
+      .first(),
+  ).toEqual({ head_message_id: null });
+});
+
+it('scopes recovered user messages to the admitted owner and conversation while allowing regeneration reuse', async () => {
+  const { DB, env, app, start } = await fixture();
+  const { turnId, userMessageId } = (await (await start('original')).json()) as TurnStart;
+  await DB.prepare("UPDATE turns SET status='completed' WHERE id=?").bind(turnId).run();
+  await DB.prepare(
+    "INSERT INTO turns(id,request_id,conversation_id,owner_id,status,created_at,branch_id,source_branch_id,user_message_id) VALUES('regenerated','regenerate','chat','owner','streaming','later','branch','branch',?)",
+  )
+    .bind(userMessageId)
+    .run();
+  const active = () => app.request('/api/chat/turns?conversationId=chat&branchId=branch', {}, env);
+  const payload = (await (await active()).json()) as { turn: { userMessage?: WaldenUIMessage } };
+  expect(payload.turn.userMessage?.id).toBe(userMessageId);
+  // A corrupted cross-owner reference must never disclose the other owner's message.
+  await DB.prepare('UPDATE messages SET owner_id=? WHERE id=?').bind('other', userMessageId).run();
+  const foreignOwner = (await (await active()).json()) as { turn: object };
+  expect(foreignOwner).toMatchObject({ turn: { id: 'regenerated' } });
+  expect(foreignOwner.turn).not.toHaveProperty('userMessage');
+  await DB.prepare(
+    "INSERT INTO conversations(id,owner_id,title,last_user_activity_at,expires_at,status,created_at) VALUES('another','owner','Other','now','2999-01-01','active','now')",
+  ).run();
+  await DB.prepare('UPDATE messages SET owner_id=?,conversation_id=? WHERE id=?')
+    .bind('owner', 'another', userMessageId)
+    .run();
+  expect(((await (await active()).json()) as { turn: object }).turn).not.toHaveProperty(
+    'userMessage',
+  );
+  await DB.prepare("UPDATE turns SET user_message_id=NULL WHERE id='regenerated'").run();
+  const reserved = (await (await active()).json()) as { turn: object };
+  expect(reserved).toMatchObject({
+    turn: { userMessageId: null },
+  });
+  expect(reserved.turn).not.toHaveProperty('userMessage');
+});
 
 it('admits one immutable turn, protects replay, and persists Stop', async () => {
   const { DB, env, app, start } = await fixture();

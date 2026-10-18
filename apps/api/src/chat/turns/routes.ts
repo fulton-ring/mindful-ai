@@ -26,6 +26,7 @@ import {
   validateAttachmentBytes,
 } from '../attachments/presign';
 import { requireConversation } from '../conversations/repository';
+import { parseStoredMessage } from '../messages';
 import { limitWindowStats, loadMessageBudget, messageLimitFrom } from './message-limit';
 import { type PreparedTurn, prepareTurn } from './turn-lifecycle';
 import { turnObject } from './turn-session';
@@ -346,6 +347,17 @@ chatRoutes.get('/turns', async (c) => {
     row.request_json,
     {},
   );
+  const userMessage = row.user_message_id
+    ? await first<{ ui_message: string }>(
+        c.env.DB.prepare(`SELECT m.ui_message FROM turns t JOIN messages m
+          ON m.id=t.user_message_id AND m.owner_id=t.owner_id AND m.conversation_id=t.conversation_id
+          WHERE t.id=? AND t.owner_id=? AND t.conversation_id=? AND m.role='user'`).bind(
+          row.id,
+          c.get('userId'),
+          conversationId,
+        ),
+      )
+    : null;
   return c.json({
     turn: {
       id: row.id,
@@ -353,6 +365,7 @@ chatRoutes.get('/turns', async (c) => {
       conversationId: row.conversation_id,
       branchId: row.branch_id,
       userMessageId: row.user_message_id,
+      ...(userMessage ? { userMessage: parseStoredMessage(userMessage.ui_message) } : {}),
       ...(request.regenerateMessageId ? { regenerateMessageId: request.regenerateMessageId } : {}),
       ...(request.editMessageId ? { editMessageId: request.editMessageId } : {}),
     },

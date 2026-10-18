@@ -15,6 +15,7 @@ import type {
   ProvenanceSpan,
   TurnStart,
   Usage,
+  WaldenUIMessage,
 } from '@walden/contracts';
 
 import { checkIdentityFailure, identityRequestScope } from './account-identity';
@@ -455,6 +456,7 @@ export const api = {
         conversationId: string;
         branchId: string;
         userMessageId: string | null;
+        userMessage?: WaldenUIMessage;
         regenerateMessageId?: string;
         editMessageId?: string;
       } | null;
