@@ -72,3 +72,18 @@ Cases without their provider credentials are explicitly skipped. The live gate h
 tests and output directory; fixture call-count and held-response
 assertions apply only to the reproducible matrix. Live model inference does not establish
 coverage for remote browser/search services.
+
+To verify the dedicated Cloudflare saved-source index, configure
+`AI_SEARCH_INSTANCE=walden-e2e` in the private `apps/api/.env.live` alongside the Cloudflare
+account and application token, then run:
+
+```sh
+pnpm --filter @walden/api test:search:live
+```
+
+The instance uses built-in storage and declares text metadata fields `owner_scope` and
+`source_url`. The token requires AI Search Edit and Run permissions. This opt-in test uses
+the actual saved-source adapter to upload synthetic content, wait for indexed retrieval,
+check owner isolation and delete its unique owner scope. It refuses other instance names,
+leaves the instance available for later tests and does not change the standalone app's local
+index. Without the explicit live flag, the ordinary test suite skips remote indexing.

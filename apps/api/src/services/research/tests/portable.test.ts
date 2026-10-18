@@ -59,3 +59,27 @@ it('deletes only matching owner metadata and owner-prefixed Cloudflare items', a
   );
   expect(remove).toHaveBeenCalledExactlyOnceWith('yes');
 });
+
+it('collects every owner page within the Cloudflare API limit before deleting items', async () => {
+  const remove = vi.fn();
+  const item = (id: number): AiSearchItemInfo => ({
+    id: String(id),
+    status: 'completed',
+    key: `owners/alice/${id}.md`,
+    metadata: { owner_scope: 'alice' },
+  });
+  const list = vi.fn(async ({ page = 1, per_page = 50 }: AiSearchListItemsParams) => {
+    if (per_page > 50) throw new Error('Cloudflare permits at most 50 items per page');
+    expect(remove).not.toHaveBeenCalled();
+    return { result: page === 1 ? Array.from({ length: 50 }, (_, id) => item(id)) : [item(50)] };
+  });
+  const sources = createCloudflareSavedSources({
+    items: { list, delete: remove, upload: vi.fn() },
+    search: vi.fn(),
+  });
+  await sources.deleteOwner('alice');
+  expect(list).toHaveBeenCalledTimes(2);
+  expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, per_page: 50 }));
+  expect(remove).toHaveBeenCalledTimes(51);
+  expect(remove).toHaveBeenLastCalledWith('50');
+});

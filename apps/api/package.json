@@ -15,6 +15,7 @@
     "db:check": "drizzle-kit check",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote --env-file /dev/null",
     "test:live": "node --env-file=.env.live node_modules/vitest/vitest.mjs run src/agent/memory src/services",
+    "test:search:live": "RUN_LIVE_AI_SEARCH=1 node --env-file=.env.live node_modules/vitest/vitest.mjs run src/services/research/tests/live-saved-sources.test.ts",
     "build:node": "node scripts/build-node.mjs",
     "start:node": "node dist/node/server.js",
     "cli": "node dist/node/cli.js"

@@ -22,6 +22,7 @@ const MAX_INDEX_CHARS = 64_000;
 const MAX_QUERY_CHARS = 500;
 const MAX_RESULTS = 5;
 const MAX_CHUNK_CHARS = 4_000;
+const MAX_ITEMS_PER_PAGE = 50;
 
 export type ResearchEnv = {
   RESEARCH_BROWSER?: ResearchBrowser;
@@ -279,7 +280,7 @@ export function createCloudflareSavedSources(instance: ResearchInstance): SavedS
       for (let page = 1; ; page++) {
         const response = await instance.items.list({
           page,
-          per_page: 100,
+          per_page: MAX_ITEMS_PER_PAGE,
           metadata_filter: JSON.stringify({ owner_scope: ownerScope }),
         });
         for (const item of response.result)
@@ -288,7 +289,7 @@ export function createCloudflareSavedSources(instance: ResearchInstance): SavedS
             item.key.startsWith(`owners/${ownerScope}/`)
           )
             ids.add(item.id);
-        if (response.result.length < 100) break;
+        if (response.result.length < MAX_ITEMS_PER_PAGE) break;
       }
       for (const id of ids) await instance.items.delete(id);
     },
