@@ -42,6 +42,18 @@ jobs:
       - run: node apps/api/scripts/download-embedding-model.mjs /tmp/walden-minilm
       - run: pnpm --filter @walden/api exec playwright install --with-deps chromium
       - run: pnpm exec playwright install --with-deps chromium
+      - name: Allow sandboxed Playwright Chromium on Ubuntu
+        run: |
+          # Ubuntu restricts user namespaces for downloaded Chromium binaries.
+          # Allow only the CI browser cache; retain Chromium's own sandbox.
+          sudo tee /etc/apparmor.d/walden-ci-playwright > /dev/null <<'PROFILE'
+          abi <abi/4.0>,
+          include <tunables/global>
+          profile walden-ci-playwright /home/runner/.cache/ms-playwright/**/chrome{,-headless-shell} flags=(unconfined) {
+            userns,
+          }
+          PROFILE
+          sudo apparmor_parser -r /etc/apparmor.d/walden-ci-playwright
       - run: pnpm build:self-hosted
       - run: pnpm --filter @walden/api build
       - run: pnpm --filter @walden/api exec vitest run src/platform/node src/execution/production-worker.workerd.test.ts src/execution/purge.test.ts --maxWorkers=2
