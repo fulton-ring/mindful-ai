@@ -56,7 +56,7 @@ Files: `Dockerfile`, the existing `.github/workflows/self-hosted-image.yml`, `sc
 - [x] Extend the existing image workflow with explicit release/version input, least-privilege registry permissions and no secrets on pull-request builds. Reuse the full CI workflow with production deployment explicitly disabled.
 - [ ] Build the exact image, run attribution checks and disposable health/API smoke tests before publication, and retain full app/provider matrix gates.
 - [ ] Publish version and commit tags to `ghcr.io/fulton-ring/mindful-ai`, accompanied by source/notice artifacts; update `latest` only for a successful stable release.
-- [ ] Document anonymous single-container startup, persistent `/data`, optional OpenRouter configuration, immutable image references and source artifact locations.
+- [x] Document anonymous single-container startup, persistent `/data`, optional OpenRouter configuration, immutable image references and source artifact locations.
 - [ ] Run spec review, then code-quality review, targeted tests, lint, clean Docker build and the initialized no-mistakes gate. Commit/push on the feature branch, validate CI and merge through the PR.
 - [ ] Execute the release workflow and pull/run the published image anonymously to verify the actual public artifact.
 
