@@ -4,7 +4,7 @@ Walden's [Apache-2.0 license](LICENSE) covers its original code and documentatio
 
 ## Dependencies
 
-The exact JavaScript dependency versions are recorded in `pnpm-lock.yaml`. Preserve upstream license files and notices when redistributing dependencies. Web and landing builds generate `dist/THIRD_PARTY_LICENSES.txt` from `pnpm licenses list --prod --json` and installed license, notice, copyright, and attribution files. This artifact includes a superset of workspace production dependencies, including platform-specific dependencies installed on the build host. It is served at `/THIRD_PARTY_LICENSES.txt`; the Docker runtime also retains a copy at `/app/THIRD_PARTY_LICENSES.txt`.
+The exact JavaScript dependency versions are recorded in `pnpm-lock.yaml`. Preserve upstream license files and notices when redistributing dependencies. Web and landing builds generate `dist/THIRD_PARTY_LICENSES.txt` from `pnpm licenses list --prod --json` and installed license, notice, copyright, and attribution files. The artifact also retains Walden's own `LICENSE` and `NOTICE`. It includes a superset of workspace production dependencies, including platform-specific dependencies installed on the build host. It is served at `/THIRD_PARTY_LICENSES.txt`; the Docker runtime also retains a copy at `/app/THIRD_PARTY_LICENSES.txt`.
 
 Some upstream packages omit license text from their published archives. The generator retains their README when available and marks these entries `MISSING_LICENSE_TEXT`. Those entries require review and the appropriate upstream texts before public redistribution; a declared license identifier alone is insufficient. The artifact does not cover downloaded browser binaries, OS packages, model assets, or all libraries inside native binaries.
 

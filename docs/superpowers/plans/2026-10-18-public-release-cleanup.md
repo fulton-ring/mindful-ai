@@ -35,7 +35,7 @@
 - [x] Run `pnpm check:ci`, script tests, `pnpm verify`, and Wrangler dry runs with the preserved private profiles.
 - [x] Build the Docker image and run the affected browser/API provider matrix, including Node, Cloudflare and SeaweedFS.
 - [x] Re-run the secret scan, verify private profiles are ignored, and review the diff for changes to hosted auth/resource identities.
-- [ ] Commit and push on `feat/public-release-cleanup`; record CI results in the pull request. Preserve the repository's private visibility.
+- [x] Commit and push on `feat/public-release-cleanup`; record CI results in the pull request. Preserve the repository's private visibility.
 
 ## Verification evidence
 
@@ -44,6 +44,7 @@
 - Provider browser/API matrix: 24 passed, three intentional mixed-policy skips, across Node, Cloudflare, and disposable SeaweedFS. Chromium required execution outside the filesystem sandbox.
 - Docker build and readiness, API config, note create/edit/export/delete, and served notices passed. The explicit public-image check correctly rejected retained Mastra enterprise files and missing upstream license texts.
 - Both private hosted profiles remain byte-identical to the original configurations and mode `0600`; their Wrangler dry runs passed. Production environment configuration secrets and public URL variables are installed.
-- Gitleaks scanned 112 reachable commits: six previously reviewed false positives, zero confirmed credentials. Private profiles remain ignored.
+- Gitleaks scanned all reachable commits: six previously reviewed false positives, zero confirmed credentials. Private profiles remain ignored.
 - User selected preserving Mastra and gating public image publication. Repository visibility and image publication are unchanged.
 - Final landing review: default, `.env`, and shell-precedence builds verified canonical URLs, links and all five redirects; the `.env` file is a tested Turbo cache input. No dependency changes were needed.
+- Served license artifact also retains the exact project `LICENSE` and `NOTICE`; both files are Turbo cache inputs.

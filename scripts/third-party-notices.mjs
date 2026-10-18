@@ -66,7 +66,12 @@ async function main() {
       maxBuffer: 32 * 1024 * 1024,
     }),
   );
-  const content = await generateNotices(inventory);
+  const content = [
+    'WALDEN LICENSE AND ATTRIBUTION',
+    await readFile(join(repository, 'LICENSE'), 'utf8'),
+    await readFile(join(repository, 'NOTICE'), 'utf8'),
+    await generateNotices(inventory),
+  ].join('\n');
   for (const output of outputs) {
     const path = resolve(output);
     await mkdir(dirname(path), { recursive: true });

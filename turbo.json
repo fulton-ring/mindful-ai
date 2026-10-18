@@ -2,6 +2,8 @@
   "$schema": "https://turborepo.com/schema.json",
   "globalDependencies": [
     "tsconfig.base.json",
+    "LICENSE",
+    "NOTICE",
     "scripts/third-party-notices.mjs",
     "pnpm-lock.yaml",
     "apps/landing/.env"
