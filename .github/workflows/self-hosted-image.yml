@@ -107,6 +107,7 @@ jobs:
       REVISION: ${{ needs.metadata.outputs.revision }}
       VERSION: ${{ needs.metadata.outputs.version }}
       ARCH: ${{ matrix.arch }}
+      APT_REFRESH: ${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -126,6 +127,7 @@ jobs:
           build-args: |
             WALDEN_IMAGE_VERSION=${{ needs.metadata.outputs.version }}
             WALDEN_IMAGE_REVISION=${{ needs.metadata.outputs.revision }}
+            WALDEN_APT_REFRESH=${{ env.APT_REFRESH }}
           cache-from: type=gha,scope=${{ matrix.runner }}
           cache-to: type=gha,mode=max,scope=${{ matrix.runner }}
       - name: Verify package and native attribution artifacts
@@ -139,6 +141,10 @@ jobs:
         run: |
           image_id=$(docker image inspect --format '{{.Id}}' walden:ci)
           echo "id=${image_id#sha256:}-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+          docker run --rm --network none --entrypoint sha256sum walden:ci \
+            /app/notices/debian-packages.tsv /app/licenses/native/sources.json > /tmp/walden-inventory.sha256
+          echo "debian=$(awk 'NR == 1 { print $1 }' /tmp/walden-inventory.sha256)" >> "$GITHUB_OUTPUT"
+          echo "native=$(awk 'NR == 2 { print $1 }' /tmp/walden-inventory.sha256)" >> "$GITHUB_OUTPUT"
       - name: Build actual research-browser adapter check
         uses: docker/build-push-action@v6
         with:
@@ -151,6 +157,7 @@ jobs:
           build-args: |
             WALDEN_IMAGE_VERSION=${{ needs.metadata.outputs.version }}
             WALDEN_IMAGE_REVISION=${{ needs.metadata.outputs.revision }}
+            WALDEN_APT_REFRESH=${{ env.APT_REFRESH }}
       - name: Verify Debian Chromium rendering and non-root sandbox
         run: >-
           docker run --rm --network none --security-opt no-new-privileges:true
@@ -187,7 +194,10 @@ jobs:
           build-args: |
             WALDEN_IMAGE_VERSION=${{ needs.metadata.outputs.version }}
             WALDEN_IMAGE_REVISION=${{ needs.metadata.outputs.revision }}
+            WALDEN_APT_REFRESH=${{ env.APT_REFRESH }}
             WALDEN_SOURCE_ID=${{ steps.sources.outputs.id }}
+            WALDEN_DEBIAN_INVENTORY_SHA256=${{ steps.sources.outputs.debian }}
+            WALDEN_NATIVE_PINS_SHA256=${{ steps.sources.outputs.native }}
       - name: Verify complete source parts and record exact image identity
         env:
           SOURCE_ID: ${{ steps.sources.outputs.id }}

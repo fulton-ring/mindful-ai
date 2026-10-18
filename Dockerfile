@@ -20,6 +20,12 @@ COPY . .
 RUN pnpm build:self-hosted
 RUN node scripts/build-container-browser-check.mjs /workspace/container-browser-smoke.mjs
 
+# Runtime attribution covers the exact deployed package store plus the bundled web dependencies.
+FROM build AS runtime-notices
+COPY --from=prod-dependencies /out/node_modules/ /deployed/node_modules/
+RUN node scripts/third-party-notices.mjs --filter=@walden/api --filter=@walden/web \
+    --deployed=/deployed/node_modules /workspace/THIRD_PARTY_LICENSES.txt
+
 # Immutable, checksummed model assets are independent of application changes.
 FROM node:24.15-bookworm-slim AS models
 COPY apps/api/scripts/download-embedding-model.mjs /download-embedding-model.mjs
@@ -28,7 +34,9 @@ RUN node /download-embedding-model.mjs /models/minilm
 # Debian Chromium excludes proprietary Chrome/Widevine components. Its matching
 # source package is included in the release's corresponding-source companion.
 FROM node:24.15-bookworm-slim AS browser
-RUN apt-get update \
+ARG WALDEN_APT_REFRESH=development
+RUN echo "Debian package refresh: $WALDEN_APT_REFRESH" \
+ && apt-get update \
  && apt-get upgrade --yes \
  && apt-get install --yes --no-install-recommends tini ca-certificates chromium fonts-liberation fonts-noto-color-emoji fonts-freefont-ttf \
  && rm -rf /var/lib/apt/lists/* /root/.cache /root/.npm /usr/local/bin/docker-entrypoint.sh \
@@ -54,7 +62,7 @@ COPY LICENSE /app/models/minilm/LICENSE
 COPY LICENSE NOTICE THIRD_PARTY_NOTICES.md /app/
 COPY --from=build /workspace/apps/api/dist/node/ /app/dist/node/
 COPY --from=build /workspace/apps/api/public/ /app/public/
-COPY --from=build /workspace/apps/api/public/THIRD_PARTY_LICENSES.txt /app/THIRD_PARTY_LICENSES.txt
+COPY --from=runtime-notices /workspace/THIRD_PARTY_LICENSES.txt /app/THIRD_PARTY_LICENSES.txt
 COPY --from=build /workspace/apps/api/migrations/ /app/migrations/
 COPY --from=build /workspace/apps/api/postgres-migrations/ /app/postgres-migrations/
 COPY apps/api/package.json /app/package.json
@@ -66,7 +74,13 @@ RUN node scripts/container-notices.mjs runtime /app/notices
 FROM packaged AS source-archives
 ARG TARGETARCH
 ARG WALDEN_SOURCE_ID=development
+ARG WALDEN_DEBIAN_INVENTORY_SHA256
+ARG WALDEN_NATIVE_PINS_SHA256
 RUN set -e; \
+    printf '%s  %s\n' \
+      "$WALDEN_DEBIAN_INVENTORY_SHA256" /app/notices/debian-packages.tsv \
+      "$WALDEN_NATIVE_PINS_SHA256" /app/licenses/native/sources.json \
+      | sha256sum --check --strict -; \
     sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/debian.sources; \
     apt-get update; \
     mkdir -p /sources/native /sources/debian /out; \
