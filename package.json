@@ -24,7 +24,7 @@
     "db:check": "pnpm --filter @walden/api db:check",
     "build:self-hosted": "pnpm --filter @walden/contracts build && pnpm --filter @walden/domain build && pnpm --filter @walden/web build && pnpm --filter @walden/api build:node",
     "start:self-hosted": "node --env-file-if-exists=.env scripts/start-self-hosted.mjs",
-    "test:licenses": "node --test scripts/release-licenses.test.mjs scripts/container-notices.test.mjs scripts/container-release.test.mjs",
+    "test:licenses": "node --test scripts/release-licenses.test.mjs scripts/container-notices.test.mjs scripts/container-release.test.mjs scripts/prune-deployment.test.mjs",
     "check:public-image": "node scripts/public-image-check.mjs"
   },
   "devDependencies": {

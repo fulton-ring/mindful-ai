@@ -4,6 +4,7 @@ import {
   createPlaywrightResearchBrowser,
   type PublicResponse,
 } from '../../apps/api/src/platform/node/research/browser';
+import { createLocalEmbedder } from '../../apps/api/src/platform/node/research/embeddings';
 
 assert.notEqual(process.getuid?.(), 0, 'Browser checks must run as the image user');
 const config = readNodeConfig();
@@ -46,6 +47,13 @@ assert.equal(image.bytes[0], 255);
 assert.ok(image.bytes.length > 100 && image.bytes.length <= 512_000);
 await assert.rejects(browser.readMarkdown('https://fixture.example/private', signal));
 assert.ok(requests.every((url) => url.startsWith('https://fixture.example/')));
+const embedder = createLocalEmbedder({
+  modelDirectory: config.embeddingModelDir,
+  revision: config.embeddingRevision,
+});
+const vectors = await embedder.embed(['Walden pond', 'Debian Chromium'], signal);
+assert.equal(vectors.length, 2);
+assert.notDeepEqual(vectors[0], vectors[1]);
 console.log(
-  'Non-root sandboxed Chromium: rendered Markdown, links, screenshot and private redirect checks passed.',
+  'Non-root sandboxed Chromium: rendered Markdown, links, screenshot and private redirect checks passed; offline native CPU embeddings passed.',
 );

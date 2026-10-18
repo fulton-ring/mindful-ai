@@ -62,4 +62,6 @@ Files: `Dockerfile`, the existing `.github/workflows/self-hosted-image.yml`, `sc
 
 Pre-commit verification: `pnpm verify` passed (41 domain, 370 web and 700 API tests; 54 opt-in API tests skipped), `pnpm check:ci` passed, and the focused release/license/native suite passed 29 tests. Separate spec and code-quality reviews reported no blocking findings. Real Docker runtime/browser/source builds remain in progress before publication.
 
+User-added scope: reduce deployed `node_modules`. `scripts/prune-deployment.mjs` runs after `pnpm deploy` in the `prod-dependencies` stage, removing dependency source maps, TypeScript declarations and non-target ONNX Runtime binaries without following symlinks, and fails if the target binding or ONNX Runtime is missing. Measured on the final arm64 runtime image: 522,600,782 bytes pruned, `/app/node_modules` 1051 MiB to 550 MiB, compressed image 662,818,072 to 526,528,760 bytes. The pruned image passed the attribution guard, sandboxed browser checks with network-disabled native CPU embeddings, and the standalone API notes/attachment smoke. amd64 is covered by the release matrix.
+
 Do not publish an image whose required notices/source artifacts are incomplete. Production deployment and public source release remain independently verifiable milestones while packaging work proceeds.

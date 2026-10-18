@@ -12,8 +12,11 @@ COPY packages/domain/package.json packages/domain/package.json
 RUN pnpm install --frozen-lockfile
 
 # Stable production dependency layer. Workspace packages are bundled by build:node.
+# Dependency source maps, type declarations and other platforms' ONNX binaries are not deployed.
 FROM dependencies AS prod-dependencies
-RUN pnpm --filter @walden/api deploy --prod --legacy /out
+COPY scripts/prune-deployment.mjs /prune-deployment.mjs
+RUN pnpm --filter @walden/api deploy --prod --legacy /out \
+ && node /prune-deployment.mjs /out/node_modules
 
 FROM dependencies AS build
 COPY . .
