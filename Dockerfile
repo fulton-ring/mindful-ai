@@ -91,6 +91,7 @@ COPY --from=source-archives /out/ /
 FROM packaged AS browser-check
 COPY --from=build /workspace/container-browser-smoke.mjs /app/container-browser-smoke.mjs
 USER node
+ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["node", "/app/container-browser-smoke.mjs"]
 
 FROM packaged AS runtime
