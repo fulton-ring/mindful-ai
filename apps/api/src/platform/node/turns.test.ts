@@ -2,7 +2,7 @@ import { uiMessageText } from '@walden/contracts';
 import { afterEach, expect, it } from 'vitest';
 import { createNodeExecutionHost } from './execution-host';
 import { createNodeTurnRouter } from './turns';
-import { createTurnFixture } from './turns-fixtures';
+import { createTurnFixture, waitForPartial } from './turns-fixtures';
 
 const cleanup: Array<() => unknown | Promise<unknown>> = [];
 afterEach(async () => {
@@ -30,14 +30,7 @@ it('persists Stop before aborting the actual provider and keeps partial output',
   setMode('hold');
   const response = await router.router.get('turn').stream('turn', 0);
   const reading = response.text();
-  await expect
-    .poll(
-      async () =>
-        (await db
-          .prepare("SELECT COUNT(*) AS n FROM turn_events WHERE turn_id='turn'")
-          .first<{ n: number }>())!.n,
-    )
-    .toBeGreaterThan(3);
+  await waitForPartial(db);
   expect(await router.router.get('turn').stop('turn')).toBe(true);
   expect(
     await db.prepare("SELECT request_id FROM turn_cancellations WHERE owner_id='owner'").first(),
@@ -54,14 +47,7 @@ it('recovers a native in-flight checkpoint after the Node owner drains and resta
   setMode('hold');
   const response = await router.router.get('turn').stream('turn', 0);
   const reading = response.text();
-  await expect
-    .poll(
-      async () =>
-        (await db
-          .prepare("SELECT COUNT(*) AS n FROM turn_events WHERE turn_id='turn'")
-          .first<{ n: number }>())!.n,
-    )
-    .toBeGreaterThan(3);
+  await waitForPartial(db);
   await router.close();
   await reading;
   expect(await db.prepare("SELECT status FROM turns WHERE id='turn'").first()).toEqual({

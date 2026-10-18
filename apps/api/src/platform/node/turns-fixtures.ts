@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DEFAULT_PERSONAS } from '@walden/contracts';
+import { expect } from 'vitest';
 import type { AppDatabase } from '../../db/database';
 import type { Bindings } from '../../types';
 import { createNodeExecutionHost } from './execution-host';
@@ -10,6 +11,20 @@ import { openSqliteDatabase } from './sqlite';
 import { applySqliteMigrations } from './sqlite-migrations';
 import { createNodeTurnRouter } from './turns';
 export type Cleanup = () => unknown | Promise<unknown>;
+
+export async function waitForPartial(db: AppDatabase) {
+  await expect
+    .poll(
+      async () =>
+        (
+          await db
+            .prepare("SELECT event_json FROM turn_events WHERE turn_id='turn' ORDER BY sequence")
+            .all<{ event_json: string }>()
+        ).results.some((row) => JSON.parse(row.event_json).delta === 'Partial '),
+      { timeout: 20000 },
+    )
+    .toBe(true);
+}
 
 async function compatibleProvider(cleanup: Cleanup[]) {
   let mode: 'answer' | 'hold' = 'answer';
