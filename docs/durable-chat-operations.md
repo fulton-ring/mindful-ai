@@ -23,7 +23,7 @@ Each account has an anchored message window. Its first message opens a window of
 
 ## Production rollout
 
-Apply D1 migrations with `pnpm --filter @walden/api db:migrate:remote` before deploying the Worker, and deploy the API and bundled web assets together. `turns` and `turn_cancellations` hold turn state in D1; a running turn's chunks live only in its object. The schema is in `apps/api/migrations` (see `docs/database.md`).
+Deploy the API and bundled web assets together. The Worker and turn objects wait for bundled D1 migrations during initialization before processing application work. Pending migrations apply atomically with migration-ledger fencing so concurrent cold starts cannot run the same DDL twice. Keep a production backup for schema upgrades; `pnpm --filter @walden/api db:migrate:remote` remains available for explicit operator recovery. `turns` and `turn_cancellations` hold turn state in D1; a running turn's chunks live only in its object. The schema is in `apps/api/migrations` (see `docs/database.md`).
 
 After deployment, smoke-test a long answer, tab closure and reattachment, Stop, file reading, note proposals, and search. PostHog records `chat_turn_started` and `chat_turn_terminal` with bounded IDs and status only. If admission fails, check the Durable Object binding and minute reconciliation logs. If replay fails, check the authenticated events endpoint; a finished turn's chunks are cleared an hour after it ends, after which the endpoint answers 204 and the reply loads from D1.
 

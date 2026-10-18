@@ -29,8 +29,8 @@ x-distributed-env: &distributed-env
   S3_FORCE_PATH_STYLE: 'true'
 
 x-distributed-depends: &distributed-depends
-  migrate:
-    condition: service_completed_successfully
+  postgres:
+    condition: service_healthy
   valkey:
     condition: service_healthy
   seaweedfs:
@@ -96,19 +96,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
-
-  migrate:
-    <<: *runtime
-    profiles: [postgres]
-    restart: 'no'
-    environment:
-      <<: *distributed-env
-      APP_ROLE: migrate
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      disable: true
 
   http:
     <<: *runtime

@@ -91,11 +91,14 @@ async function startCloudflare(state, port, inference, environment) {
   const bundle = join(api, 'dist/worker.js');
   const modules = [{ type: 'ESModule', path: bundle, contents: await readFile(bundle, 'utf8') }];
   for (const file of await readdir(dirname(bundle)))
-    if (file.endsWith('.wasm'))
+    if (file.endsWith('.wasm') || file.endsWith('.sql'))
       modules.push({
-        type: 'CompiledWasm',
+        type: file.endsWith('.wasm') ? 'CompiledWasm' : 'Text',
         path: join(dirname(bundle), file),
-        contents: await readFile(join(dirname(bundle), file)),
+        contents: await readFile(
+          join(dirname(bundle), file),
+          file.endsWith('.sql') ? 'utf8' : undefined,
+        ),
       });
   const options = convertV4MiniflareOptions({
     name: 'provider-matrix',
@@ -122,7 +125,6 @@ async function startCloudflare(state, port, inference, environment) {
   const mf = new Miniflare(options);
   const initialized = await mf.dispatchFetch('http://provider-matrix/api/config');
   if (!initialized.ok) throw new Error(`Cloudflare initialization failed: ${initialized.status}`);
-  await migrateD1(mf);
   const { serve } = require('@hono/node-server');
   const server = serve({
     hostname: '127.0.0.1',
@@ -145,19 +147,6 @@ async function dispatch(mf, request) {
     headers: Object.fromEntries(request.headers),
     body: ['GET', 'HEAD'].includes(request.method) ? undefined : await request.arrayBuffer(),
   });
-}
-
-async function migrateD1(mf) {
-  const db = await mf.getD1Database('DB');
-  const exists = await db.prepare("SELECT name FROM sqlite_master WHERE name='users'").first();
-  if (!exists)
-    for (const file of (await readdir(join(api, 'migrations')))
-      .filter((f) => f.endsWith('.sql'))
-      .sort()) {
-      const source = await readFile(join(api, 'migrations', file), 'utf8');
-      for (const sql of source.split('--> statement-breakpoint').filter((s) => s.trim()))
-        await db.prepare(sql).run();
-    }
 }
 
 /** Same-origin static host only; every API request reaches the actual emitted Worker. */

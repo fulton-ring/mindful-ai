@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { MastraCompositeStore } from '@mastra/core/storage';
 import type { WaldenUIMessageChunk } from '@walden/contracts';
+import { ensureD1Schema } from '../../db/d1-startup';
 import { DoWorkflowsStorage } from '../../execution/do-workflows';
 import { DoSqliteCache } from '../../execution/sqlite-cache';
 import type { Bindings } from '../../types';
@@ -33,47 +34,56 @@ function objectStorage(storage: DurableObjectStorage): TurnStorage {
 
 /** One chat turn: runs it, buffers its chunks, and streams them to every reader. */
 export class ChatTurn extends DurableObject<Bindings> {
-  private readonly session: Promise<TurnSession>;
+  private session: Promise<TurnSession> | undefined;
 
   constructor(ctx: DurableObjectState, env: Bindings) {
     super(ctx, env);
-    // Importing this class at startup must not initialize the agent runtime.
-    this.session = import('./turn-session').then(
-      ({ TurnSession }) =>
-        new TurnSession(
-          env,
-          objectStorage(ctx.storage),
-          (task) => {
-            void task.catch(() => undefined);
-          },
-          {
-            storage: new MastraCompositeStore({
-              id: 'walden-turn-execution',
-              domains: { workflows: new DoWorkflowsStorage({ storage: ctx.storage }) },
-            }),
-            cache: new DoSqliteCache({ storage: ctx.storage, ttlMs: 60 * 60_000 }),
-          },
-        ),
+  }
+
+  private getSession(): Promise<TurnSession> {
+    this.session ??= this.createSession().catch((error) => {
+      this.session = undefined;
+      throw error;
+    });
+    return this.session;
+  }
+
+  private async createSession(): Promise<TurnSession> {
+    await ensureD1Schema(this.env.DB);
+    const { TurnSession } = await import('./turn-session');
+    return new TurnSession(
+      this.env,
+      objectStorage(this.ctx.storage),
+      (task) => {
+        void task.catch(() => undefined);
+      },
+      {
+        storage: new MastraCompositeStore({
+          id: 'walden-turn-execution',
+          domains: { workflows: new DoWorkflowsStorage({ storage: this.ctx.storage }) },
+        }),
+        cache: new DoSqliteCache({ storage: this.ctx.storage, ttlMs: 60 * 60_000 }),
+      },
     );
   }
 
   async start(turnId: string) {
-    return (await this.session).start(turnId);
+    return (await this.getSession()).start(turnId);
   }
 
   async stream(turnId: string, after: number) {
-    return (await this.session).stream(turnId, after);
+    return (await this.getSession()).stream(turnId, after);
   }
 
   async stop(turnId: string) {
-    return (await this.session).stop(turnId);
+    return (await this.getSession()).stop(turnId);
   }
 
   async purge(turnId: string) {
-    return (await this.session).purge(turnId);
+    return (await this.getSession()).purge(turnId);
   }
 
   override async alarm() {
-    return (await this.session).alarm();
+    return (await this.getSession()).alarm();
   }
 }

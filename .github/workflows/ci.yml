@@ -91,8 +91,8 @@ jobs:
               - 'apps/landing/**'
               - 'pnpm-lock.yaml'
 
-  # D1 migrations are not applied here: run `pnpm --filter @walden/api
-  # db:migrate:remote` by hand before pushing code that needs them.
+  # The Worker applies bundled D1 migrations during initialization before
+  # serving requests or scheduled work. No separate migration job is needed.
   deploy-app:
     needs: [verify, changes]
     if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'

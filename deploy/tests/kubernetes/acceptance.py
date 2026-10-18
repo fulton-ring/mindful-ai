@@ -83,5 +83,7 @@ assistant_count=int(sql("SELECT count(*) FROM messages WHERE turn_id='%s' AND ro
 assert assistant_count==1,assistant_count
 record('worker-crash-recovery-and-cursor-replay',turnId=recovered,killedWorkerPods=old_names,cursor=cursor,replayedEvents=len(ids),assistantMessages=assistant_count)
 ledger=sql('SELECT version FROM walden_migrations ORDER BY version').splitlines()
-record('migration-job-schema',migrations=ledger)
+expected=sorted(path.name for path in (Path(__file__).resolve().parents[3]/'apps/api/postgres-migrations').glob('*.sql'))
+assert ledger==expected,(ledger,expected)
+record('application-startup-schema',migrations=ledger)
 Path(os.environ.get('WALDEN_TEST_RESULTS','kubernetes-acceptance-results.json')).write_text(json.dumps(results,indent=2))

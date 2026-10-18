@@ -3,7 +3,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { AppDatabase } from '../../db/database';
 
-/** HTTP and worker processes never upgrade schemas while serving traffic. */
+/** Check the migrated schema before initialization; also guards explicit migrate:false callers. */
 export async function requireCompatibleSchema(db: AppDatabase, directory: string | URL) {
   const files = (await readdir(directory)).filter((name) => /^\d+.*\.sql$/.test(name)).sort();
   let applied: { name: string; checksum: string }[];
@@ -19,7 +19,7 @@ export async function requireCompatibleSchema(db: AppDatabase, directory: string
     ).results;
   } catch {
     throw new Error(
-      'Database schema is missing; run the migrate command before starting this role.',
+      'Database schema is missing; enable startup migrations or run the optional migrate command.',
     );
   }
   const expected = await Promise.all(
@@ -41,6 +41,6 @@ export async function requireCompatibleSchema(db: AppDatabase, directory: string
     )
   )
     throw new Error(
-      'Database migration version or checksum differs; stop traffic and run migrate with the matching release.',
+      'Database migration version or checksum differs from this release; startup cannot continue.',
     );
 }

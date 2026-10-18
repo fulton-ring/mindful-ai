@@ -33,6 +33,7 @@ import { applySqliteMigrations } from './sqlite-migrations';
 import { createNodeTurnRouter } from './turns';
 
 export type NodeRuntimeOptions = {
+  /** Default: migrate before initialization. Disable only for externally managed schemas. */
   migrate?: boolean;
   maintenance?: boolean;
   environment?: NodeJS.ProcessEnv;
@@ -318,11 +319,7 @@ export async function createNodeRuntime(config: NodeConfig, options: NodeRuntime
   const { background, close } = state;
   try {
     await mkdir(config.dataDir, { recursive: true });
-    const { db, sqlite, pool } = await database(
-      config,
-      options.migrate ?? config.role === 'all',
-      closers,
-    );
+    const { db, sqlite, pool } = await database(config, options.migrate ?? true, closers);
     const env: Bindings = {
       ...(options.environment ?? process.env),
       DB: db,

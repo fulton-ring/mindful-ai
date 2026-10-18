@@ -21,7 +21,10 @@ The six baseline scenarios run against:
 | `mixed` | Emitted Node server | Real file SQLite | Actual S3-compatible endpoint | File libSQL and persistent cache |
 
 Cloudflare serves the built frontend through a small same-origin static host that forwards every
-API request to the emitted Worker. Application routes, authentication middleware, execution,
+API request to the emitted Worker. Its loader includes Wrangler's emitted SQL Text and Wasm
+modules. The harness starts with empty D1 and does not apply migrations itself: the first actual
+Worker request must initialize the schema. Host restart likewise relies on application startup.
+Application routes, authentication middleware, execution,
 database queries, file operations, and streaming are not mocked. The inference fixture is a real
 HTTP OpenAI-compatible server with deterministic complete/held SSE responses, following the
 deployment fixture protocol in `deploy/tests/kubernetes/fixture-provider.cjs`.

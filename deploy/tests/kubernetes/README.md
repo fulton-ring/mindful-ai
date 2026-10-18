@@ -32,7 +32,7 @@ provider keys. Mount `fixture-provider.cjs` in a Node container as `/fixture/ser
 run `node /fixture/server.cjs`, and expose it as `walden-fixture:8080`.
 
 Install `deploy/helm/walden` with two HTTP replicas, two worker replicas, one
-scheduler, and these configuration values:
+scheduler, and these configuration values. Start against a fresh application database without a migration Job; the application processes migrate it automatically before becoming Ready:
 
 ```yaml
 image: {repository: walden, tag: local, pullPolicy: Never}
@@ -73,8 +73,8 @@ The `WALDEN_TEST_HTTP_A`, `WALDEN_TEST_HTTP_B`, `WALDEN_TEST_PROVIDER`,
 `WALDEN_TEST_ORIGIN`, and `WALDEN_TEST_NAMESPACE` variables can change the forwarded
 addresses and namespace. The context remains fixed to the disposable cluster.
 
-Re-run Helm upgrade with an innocuous config change to exercise the pre-upgrade
-migration hook and rolling deployments. Confirm the saved note and migration
+Re-run Helm upgrade with an innocuous config change to exercise automatic startup
+migrations and rolling deployments. Confirm the saved note and migration
 ledger remain unchanged. Probe Chromium with `chromiumSandbox: true` inside the
 worker; never add `--no-sandbox` or host capabilities to make the probe pass.
 
@@ -83,6 +83,11 @@ Clean up only this cluster:
 ```sh
 kind delete cluster --name walden-selfhost-test --kubeconfig "$KUBECONFIG"
 ```
+
+Run `node --test deploy/tests/startup-migrations.test.mjs` from the repository root
+to validate the actual Compose configuration and rendered Helm chart without a
+cluster. It checks that shared services are health dependencies and no separate
+migration service, Job or hook is required.
 
 The historical [Kubernetes verification](VERIFICATION.md) used MinIO. The new
 SeaweedFS backend has a separate [actual S3 adapter contract check](../storage/README.md);

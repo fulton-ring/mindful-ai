@@ -5,7 +5,6 @@ import { createNodeRuntime } from './runtime';
 assertNodeVersion();
 const config = readNodeConfig();
 const runtime = await createNodeRuntime(config, {
-  migrate: config.role === 'all' || config.role === 'migrate',
   maintenance: config.role === 'migrate',
 });
 if (config.role === 'migrate') {
