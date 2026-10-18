@@ -158,6 +158,8 @@ jobs:
             WALDEN_IMAGE_VERSION=${{ needs.metadata.outputs.version }}
             WALDEN_IMAGE_REVISION=${{ needs.metadata.outputs.revision }}
             WALDEN_APT_REFRESH=${{ env.APT_REFRESH }}
+            WALDEN_DEBIAN_INVENTORY_SHA256=${{ steps.sources.outputs.debian }}
+            WALDEN_NATIVE_PINS_SHA256=${{ steps.sources.outputs.native }}
       - name: Verify Debian Chromium rendering and non-root sandbox
         run: >-
           docker run --rm --network none --security-opt no-new-privileges:true
