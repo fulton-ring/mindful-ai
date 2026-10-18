@@ -2596,6 +2596,48 @@
       "tarball": "https://registry.npmjs.org/@napi-rs/canvas-linux-x64-musl/-/canvas-linux-x64-musl-1.0.11.tgz"
     }
   },
+  "@napi-rs/lzma-linux-x64-gnu@1.5.1": {
+    "files": [
+      {
+        "path": "platform/napi-rs-lzma-linux-x64-gnu-1.5.1-published-package.json.txt",
+        "source": "https://registry.npmjs.org/@napi-rs/lzma-linux-x64-gnu/-/lzma-linux-x64-gnu-1.5.1.tgz",
+        "sourceArchiveMember": "package/package.json",
+        "sourceArchiveIntegrity": "sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ==",
+        "sourceArchiveShasum": "e57d4306966078662038094fb38eb9146dc3aea9",
+        "sha256": "578e2a50ae69cd627c2953f8fa677efbf89f3087efeafff2db65aa31b81dc136"
+      },
+      {
+        "path": "legacy/MIT-license-terms.txt",
+        "source": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MIT.txt",
+        "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+        "canonicalTerms": true
+      }
+    ],
+    "notice": "The exact published @napi-rs/lzma-linux-x64-gnu@1.5.1 package.json declares MIT; its original bytes are preserved from the integrity-pinned npm tarball. Canonical MIT terms are a separately labeled reference for this declaration, not a recovered original-author license file. The platform and parent npm packages contain no author field or copyright notice, and no original license file or copyright notice was found in the exact upstream release or its 508-commit history. Template placeholders remain unchanged; no copyright holder or year has been invented.",
+    "provenance": {
+      "registry": "https://registry.npmjs.org/@napi-rs%2flzma-linux-x64-gnu/1.5.1",
+      "repository": "git+https://github.com/Brooooooklyn/lzma.git",
+      "gitHead": "f164df92d83e095f195d628b1a68a141ae2eb638",
+      "resolvedCommit": "f164df92d83e095f195d628b1a68a141ae2eb638",
+      "npmTarball": "https://registry.npmjs.org/@napi-rs/lzma-linux-x64-gnu/-/lzma-linux-x64-gnu-1.5.1.tgz",
+      "npmIntegrity": "sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ==",
+      "npmShasum": "e57d4306966078662038094fb38eb9146dc3aea9",
+      "npmArchiveSha256": "e69ca2a96510be330953f5b04b1d74617e7ce5d4487db4876c4b02b8364ef7e7",
+      "publishedLicenseDeclaration": "MIT",
+      "publishedAuthor": null,
+      "publishedCopyrightNotice": null,
+      "parentPackage": "@napi-rs/lzma@1.5.1",
+      "parentRegistry": "https://registry.npmjs.org/@napi-rs%2flzma/1.5.1",
+      "parentGitHead": "f164df92d83e095f195d628b1a68a141ae2eb638",
+      "parentOptionalDependencyVersion": "1.5.1",
+      "attestation": "https://registry.npmjs.org/-/npm/v1/attestations/@napi-rs%2flzma-linux-x64-gnu@1.5.1",
+      "attestationSubjectIntegrityMatchesRegistry": true,
+      "releaseSourceArchive": "https://codeload.github.com/Brooooooklyn/lzma/tar.gz/f164df92d83e095f195d628b1a68a141ae2eb638",
+      "releaseSourceArchiveSha256": "47259ecff2db4931dd43ff75409ee94b732aedcf7756e1a69191646e51794fd7",
+      "canonicalTermsCommit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "canonicalLicenseIdentifier": "MIT"
+    }
+  },
   "@posthog/browser-common@0.9.0": {
     "files": [
       {
