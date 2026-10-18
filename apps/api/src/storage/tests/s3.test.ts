@@ -53,7 +53,7 @@ it('signs a private staging PUT for 120 seconds with the declared content type',
   const store = new S3ObjectStore({
     bucket: 'private',
     region: 'us-east-1',
-    endpoint: 'http://localhost:9000',
+    endpoint: 'http://localhost:8333',
     forcePathStyle: true,
     credentials: { accessKeyId: 'test', secretAccessKey: 'test' },
   });
@@ -67,13 +67,14 @@ it('uses a browser-reachable public endpoint only when signing uploads', async (
   const store = new S3ObjectStore({
     bucket: 'private',
     region: 'us-east-1',
-    endpoint: 'http://minio:9000',
-    publicEndpoint: 'http://localhost:9000',
+    endpoint: 'http://seaweedfs:8333',
+    publicEndpoint: 'http://localhost:18333',
     forcePathStyle: true,
     credentials: { accessKeyId: 'test', secretAccessKey: 'test' },
   });
   const url = new URL(await store.presignPut('staging/owner/thread/id', 'text/plain'));
   expect(url.hostname).toBe('localhost');
+  expect(url.port).toBe('18333');
   expect(url.pathname).toBe('/private/staging/owner/thread/id');
 });
 

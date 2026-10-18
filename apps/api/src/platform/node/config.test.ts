@@ -1,5 +1,13 @@
+import { resolve } from 'node:path';
 import { expect, it } from 'vitest';
 import { assertNodeVersion, readNodeConfig } from './config';
+
+it('keeps default native runtime state in a hidden data directory', () => {
+  const config = readNodeConfig({});
+  expect(config.dataDir).toBe(resolve('.data'));
+  expect(config.sqlitePath).toBe(resolve('.data/walden.sqlite'));
+  expect(config.filesDir).toBe(resolve('.data/files'));
+});
 
 it('defaults to a single process with persistent local SQLite and files', () => {
   const config = readNodeConfig({ DATA_DIR: '/tmp/walden-test' });

@@ -4,21 +4,29 @@ These tests use only the `kind-walden-selfhost-test` context and a separate
 `KUBECONFIG`. Never point them at a shared cluster. The crash test deliberately
 force-deletes every worker pod in the `walden-validation` namespace.
 
-Build `walden:local` from `Dockerfile` and `walden-minio:local`
-from `deploy/docker/minio.Dockerfile` using the repository root as context.
+Build `walden:local` from `Dockerfile` using the repository root as context. Pull
+the pinned official SeaweedFS image used by `compose.yaml`; no custom storage
+image build is needed.
 Install kind, Helm, kubectl, Python 3, and Docker first.
 
 ```sh
 export KUBECONFIG="$(mktemp -d)/kubeconfig"
 kind create cluster --name walden-selfhost-test --kubeconfig "$KUBECONFIG"
-kind load docker-image walden:local walden-minio:local --name walden-selfhost-test
+docker pull chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
+docker tag chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d walden-seaweedfs:fixture
+kind load docker-image walden:local walden-seaweedfs:fixture --name walden-selfhost-test
 docker exec walden-selfhost-test-control-plane mkdir -p /var/lib/kubelet/seccomp/profiles
 docker cp deploy/docker/chromium-oci-seccomp.json walden-selfhost-test-control-plane:/var/lib/kubelet/seccomp/profiles/walden-chromium.json
 ```
 
-Create isolated PostgreSQL 17, Valkey 8, and MinIO services named
-`walden-postgres`, `walden-valkey`, and `walden-minio` in `walden-validation`.
-Create the private `walden` bucket. Generate disposable credentials; put database,
+Create isolated PostgreSQL 17, Valkey 8, and SeaweedFS services named
+`walden-postgres`, `walden-valkey`, and `walden-seaweedfs` in `walden-validation`.
+Use `walden-seaweedfs:fixture` with `imagePullPolicy: Never` for the storage pod.
+Run SeaweedFS with `mini -dir=/data -webdav=false -admin.ui=false
+-s3.port.iceberg=0 -s3.port.lance=0 -s3.allowedOrigins=http://localhost:18080`,
+and set `S3_BUCKET=walden`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` to
+pre-create the private bucket with disposable credentials. Expose its S3 service
+on port 8333. Put database,
 Valkey, and S3 credentials in the chart's `externalSecretName`. Do not use real
 provider keys. Mount `fixture-provider.cjs` in a Node container as `/fixture/server.cjs`,
 run `node /fixture/server.cjs`, and expose it as `walden-fixture:8080`.
@@ -35,7 +43,7 @@ config:
   APP_URL: http://localhost:18080
   AUTH_MODE: none
   FILE_STORAGE: s3
-  S3_ENDPOINT: http://walden-minio:9000
+  S3_ENDPOINT: http://walden-seaweedfs:8333
   S3_PUBLIC_ENDPOINT: http://localhost:19000
   S3_BUCKET: walden
   S3_REGION: us-east-1
@@ -48,7 +56,8 @@ config:
 
 Every Helm command must include `--kubeconfig "$KUBECONFIG" --kube-context
 kind-walden-selfhost-test --namespace walden-validation`. Forward **different HTTP
-pods** to ports 18082 and 18083, the fixture provider to 18081, and MinIO to 19000.
+pods** to ports 18082 and 18083, the fixture provider to 18081, and SeaweedFS's
+S3 port 8333 to 19000.
 Run:
 
 ```sh
@@ -74,3 +83,7 @@ Clean up only this cluster:
 ```sh
 kind delete cluster --name walden-selfhost-test --kubeconfig "$KUBECONFIG"
 ```
+
+The historical [Kubernetes verification](VERIFICATION.md) used MinIO. The new
+SeaweedFS backend has a separate [actual S3 adapter contract check](../storage/README.md);
+the full Kubernetes acceptance run has not been repeated against SeaweedFS.

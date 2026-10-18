@@ -1,5 +1,9 @@
 # Kubernetes verification — 2026-10-17
 
+This historical run used MinIO. Current fixture instructions use SeaweedFS;
+[its S3 adapter compatibility was verified separately](../storage/README.md).
+The complete Kubernetes acceptance below has not been rerun with SeaweedFS.
+
 Disposable local cluster: kind v0.33.0, Kubernetes v1.37.0, containerd 2.3.4,
 Linux ARM64. Docker Desktop provided 8 CPUs and 8 GiB. All commands used a private
 kubeconfig and `kind-walden-selfhost-test`; the user's current context and existing

@@ -6,6 +6,7 @@ node_modules
 **/.turbo
 **/.wrangler
 **/.cache
+**/.data
 **/.env
 **/.env.*
 !**/.env.example

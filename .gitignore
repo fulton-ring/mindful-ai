@@ -14,6 +14,7 @@ playwright-report/
 test-results/
 .DS_Store
 .cache/
+.data/
 .pnpm-store/
 .worktrees/
 .superpowers/

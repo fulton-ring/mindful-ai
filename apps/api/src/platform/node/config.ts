@@ -117,7 +117,7 @@ export function readNodeConfig(env: NodeJS.ProcessEnv = process.env): NodeConfig
   const { fileStorage, s3 } = storage(env);
   validateDeployment(role, replicas, databaseUrl, valkeyUrl, fileStorage);
   const appRoot = resolve(env.APP_ROOT ?? process.cwd());
-  const dataDir = resolve(env.DATA_DIR ?? './data');
+  const dataDir = resolve(env.DATA_DIR ?? './.data');
   return {
     role: role as NodeRole,
     appRoot,

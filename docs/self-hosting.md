@@ -38,14 +38,14 @@ Chromium's sandbox remains enabled. The host must permit unprivileged user names
 | `APP_ROLE` | `all`, `http`, `worker`, `scheduler`, or `migrate` |
 | `APP_URL` | Public origin, including scheme; must match browser access and auth URLs |
 | `HOST`, `PORT` | Listener address and port; image defaults to `0.0.0.0:3000` |
-| `DATA_DIR` | Persistent standalone directory; defaults to `/data` in the image |
+| `DATA_DIR` | Persistent directory; root launcher defaults to `<repo>/.data`, image uses `/data` |
 | `DATABASE_URL` | PostgreSQL connection URL; unset selects SQLite |
 | `FILES_DIR` | Local object volume directory; defaults to `DATA_DIR/files` |
 | `FILE_STORAGE` | `local` or `s3` |
 | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET` | S3-compatible service location and private bucket |
 | `S3_PUBLIC_ENDPOINT` | Browser-reachable signing endpoint, when different from `S3_ENDPOINT` |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Least-privilege private object credentials |
-| `S3_FORCE_PATH_STYLE` | `true` for services such as MinIO; `false` for virtual-host buckets |
+| `S3_FORCE_PATH_STYLE` | `true` for services such as SeaweedFS; `false` for virtual-host buckets |
 | `VALKEY_URL` | Shared coordination/cache URL; required for separate process roles |
 | `AUTH_MODE` | `none`, `better-auth`, or `clerk` |
 | `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` | Stable secret and public URL for built-in authentication |
@@ -98,19 +98,21 @@ Use `create-account` with the same email/name/password fields to add an account,
 
 For Clerk, set `AUTH_MODE=clerk`, `CLERK_SECRET_KEY`, and `CLERK_PUBLISHABLE_KEY` using keys from your own Clerk instance. Set `CLERK_AUTHORIZED_PARTIES` to the browser origin in `APP_URL` (comma-separated for multiple allowed origins), and configure that origin in Clerk. The server exposes only the publishable key to the browser and retains a stable subject-to-owner mapping. Never reuse inference or provisioning credentials for account administration.
 
-## PostgreSQL, Valkey and MinIO example
+## PostgreSQL, Valkey and SeaweedFS example
 
 The `postgres` profile contains disposable local service examples and separate runtime roles. Stop the standalone service before using the same public port:
 
 ```sh
 docker compose stop app
-docker compose --profile postgres up --build -d http worker scheduler
+docker compose --env-file .env.self-hosted --profile postgres up --build -d http worker scheduler
 curl --fail http://localhost:3000/health/ready
 # Additional workers share PostgreSQL and Valkey:
-docker compose --profile postgres up -d --scale worker=2 http worker scheduler
+docker compose --env-file .env.self-hosted --profile postgres up -d --scale worker=2 http worker scheduler
 ```
 
-The explicitly targeted services start their migration and storage dependencies; they do not start the standalone `app` service. PostgreSQL, Valkey and MinIO have separate named volumes. The local MinIO server and client are built from pinned upstream source commits because their former public image repositories are unavailable. The migration process must succeed before HTTP/workers/scheduler become ready. The MinIO bucket stays private; only short-lived, owner-scoped staging upload URLs leave the application. Its public signing endpoint defaults to `http://localhost:9000`, which is exposed on loopback. Set `S3_PUBLIC_ENDPOINT` for a different browser-reachable endpoint. Local sample passwords are for this loopback example; replace them when configuring another environment.
+The explicitly targeted services start their migration and storage dependencies; they do not start the standalone `app` service. PostgreSQL, Valkey and SeaweedFS have separate named volumes. SeaweedFS uses the official [4.48 image](https://github.com/seaweedfs/seaweedfs/releases/tag/4.48), pinned by digest. Its [single-process `mini` mode](https://github.com/seaweedfs/seaweedfs/wiki/Quick-Start-with-weed-mini) creates the `walden` bucket and seeds S3 credentials from `SEAWEEDFS_ACCESS_KEY_ID` and `SEAWEEDFS_SECRET_ACCESS_KEY`; anonymous object access is denied. WebDAV and the admin UI are disabled, and only the S3 port is published. The migration process must succeed and the bucket must become healthy before HTTP/workers/scheduler start. Only short-lived, owner-scoped staging upload URLs leave the application. The public signing endpoint defaults to `http://localhost:8333`, exposed on loopback; `SEAWEEDFS_PORT` changes that local port. Set `S3_PUBLIC_ENDPOINT` for another browser-reachable endpoint. CORS permits the origin in `APP_URL`. Local sample credentials are for this loopback example; replace them when configuring another environment.
+
+The SeaweedFS example is a single-node storage service; preserve its entire `seaweedfs-data` volume. Use an independently managed replicated SeaweedFS deployment when storage availability requires multiple nodes. The application continues to use its ordinary S3 configuration in either case. [The disposable S3 contract check](../deploy/tests/storage/README.md) exercises the shipped adapter against SeaweedFS, including presigned uploads and anonymous-access denial.
 
 For a standalone container using an existing PostgreSQL database, set `DATABASE_URL` in `.env.self-hosted`, then:
 
@@ -159,7 +161,9 @@ pnpm install --frozen-lockfile
 pnpm build:self-hosted
 pnpm --filter @walden/api exec playwright install --with-deps chromium
 node apps/api/scripts/download-embedding-model.mjs .cache/models/minilm
-EMBEDDING_MODEL_DIR="$PWD/.cache/models/minilm" pnpm --filter @walden/api start:node
+pnpm start:self-hosted
 ```
+
+Run these commands beside the root `package.json`. The root launcher loads `.env`, serves the built UI/API, and keeps SQLite databases and private files in `.data/`. This directory and `.cache/` are ignored by Git and excluded from image builds. Set `DATA_DIR` to override the location; relative paths resolve from the repository root with this launcher. Credentials in `.env` remain server-side. A local OpenRouter setup needs `AI_PROVIDER=openrouter` and `OPENROUTER_API_KEY`; set `AUTH_MODE=none` explicitly when using the shared default account alongside preconfigured Clerk keys. Preserve the whole `.data/` directory when moving or backing up local state.
 
 The manual/release `Self-hosted image` CI workflow builds and smokes native amd64 and arm64 images, checks non-root sandboxed Chromium, and exercises first-start readiness, UI assets and runtime configuration. It does not push images or deploy infrastructure. A complete operator smoke test additionally signs in when enabled, starts a note/chat, reconnects to its event stream, restarts a worker during an active turn, exercises Stop and retry, uploads/extracts a document, reads a public page, searches saved sources, and validates backup/restore against a disposable instance.
