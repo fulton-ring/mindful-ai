@@ -35,7 +35,7 @@ Chromium's sandbox remains enabled. The host must permit unprivileged user names
 
 ## Published images
 
-Versioned releases publish native amd64 and arm64 images at `ghcr.io/fulton-ring/mindful-ai`. Use a version tag from the [GitHub releases page](https://github.com/fulton-ring/mindful-ai/releases), or pin its reported image digest for repeatable deployments. `latest` follows successful stable releases. The `sha-<full-commit>` tag identifies the source revision.
+Versioned releases publish native amd64 and arm64 images at `ghcr.io/fulton-ring/mindful-ai`. Use a version tag from the [GitHub releases page](https://github.com/fulton-ring/mindful-ai/releases), or pin its reported image digest for repeatable deployments. `latest` points to the most recently published stable release, which can be a deliberate release on an older version line; pin a version tag or digest to control upgrades. The `sha-<full-commit>` tag identifies the source revision.
 
 Download the matching release's `chromium-seccomp.json`, then run the published image with the same options shown above, replacing `walden:local` with `ghcr.io/fulton-ring/mindful-ai:<version>` and the seccomp path with the downloaded file. Set the provider in a private environment file, for example:
 

@@ -70,17 +70,20 @@ COPY licenses/native/ /app/licenses/native/
 COPY scripts/container-notices.mjs /app/scripts/container-notices.mjs
 RUN node scripts/container-notices.mjs runtime /app/notices
 
-# Export sources separately; large archives never enter the runtime image.
-FROM packaged AS source-archives
-ARG TARGETARCH
-ARG WALDEN_SOURCE_ID=development
+# Release checks and source collection must run on the exact tested runtime inventory.
+FROM packaged AS tested-inventory
 ARG WALDEN_DEBIAN_INVENTORY_SHA256
 ARG WALDEN_NATIVE_PINS_SHA256
-RUN set -e; \
-    printf '%s  %s\n' \
+RUN printf '%s  %s\n' \
       "$WALDEN_DEBIAN_INVENTORY_SHA256" /app/notices/debian-packages.tsv \
       "$WALDEN_NATIVE_PINS_SHA256" /app/licenses/native/sources.json \
-      | sha256sum --check --strict -; \
+    | sha256sum --check --strict -
+
+# Export sources separately; large archives never enter the runtime image.
+FROM tested-inventory AS source-archives
+ARG TARGETARCH
+ARG WALDEN_SOURCE_ID=development
+RUN set -e; \
     sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/debian.sources; \
     apt-get update; \
     mkdir -p /sources/native /sources/debian /out; \
@@ -102,7 +105,7 @@ COPY --from=source-archives /out/ /
 
 # CI exercises the real research adapter with the installed browser. The test
 # helper stays in this separate target, outside the published runtime image.
-FROM packaged AS browser-check
+FROM tested-inventory AS browser-check
 COPY --from=build /workspace/container-browser-smoke.mjs /app/container-browser-smoke.mjs
 USER node
 ENTRYPOINT ["/usr/bin/tini", "--"]
