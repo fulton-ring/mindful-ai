@@ -1,0 +1,2835 @@
+{
+  "@astrojs/compiler-binding-darwin-arm64@0.5.2": {
+    "files": [
+      {
+        "path": "platform/withastro-compiler-rs-342e26603bf6-LICENSE",
+        "sha256": "ee92354a87bc4a402e022fa15e10a6c713136aba84c46095dccc2b8091132806",
+        "source": "https://raw.githubusercontent.com/withastro/compiler-rs/342e26603bf6416545a85b506b434d25226e1435/LICENSE"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": "342e26603bf6416545a85b506b434d25226e1435",
+      "integrity": "sha512-1ZG5Ar3dD8HtodX9XH1mRmE0qBXZlvjYXSFfpgFwocqfWnvhFuqtGUNseL8wgfImiRMztIjpQqlogQFQQtgiag==",
+      "registry": "https://registry.npmjs.org/%40astrojs%2Fcompiler-binding-darwin-arm64/0.5.2",
+      "repository": "git+https://github.com/withastro/compiler-rs.git",
+      "resolvedCommit": "342e26603bf6416545a85b506b434d25226e1435",
+      "tarball": "https://registry.npmjs.org/@astrojs/compiler-binding-darwin-arm64/-/compiler-binding-darwin-arm64-0.5.2.tgz"
+    }
+  },
+  "@astrojs/compiler-binding-linux-arm64-gnu@0.5.2": {
+    "files": [
+      {
+        "path": "platform/withastro-compiler-rs-342e26603bf6-LICENSE",
+        "sha256": "ee92354a87bc4a402e022fa15e10a6c713136aba84c46095dccc2b8091132806",
+        "source": "https://raw.githubusercontent.com/withastro/compiler-rs/342e26603bf6416545a85b506b434d25226e1435/LICENSE"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": "342e26603bf6416545a85b506b434d25226e1435",
+      "integrity": "sha512-BqlR0EHNQLPLwgL9+xogjsAc7zGf0cHho2CPdhv0P1yqbVMwGVaGAqrANP6VYAXCqSC43AF4Czcxc2n+oqdesg==",
+      "registry": "https://registry.npmjs.org/%40astrojs%2Fcompiler-binding-linux-arm64-gnu/0.5.2",
+      "repository": "git+https://github.com/withastro/compiler-rs.git",
+      "resolvedCommit": "342e26603bf6416545a85b506b434d25226e1435",
+      "tarball": "https://registry.npmjs.org/@astrojs/compiler-binding-linux-arm64-gnu/-/compiler-binding-linux-arm64-gnu-0.5.2.tgz"
+    }
+  },
+  "@astrojs/compiler-binding-linux-arm64-musl@0.5.2": {
+    "files": [
+      {
+        "path": "platform/withastro-compiler-rs-342e26603bf6-LICENSE",
+        "sha256": "ee92354a87bc4a402e022fa15e10a6c713136aba84c46095dccc2b8091132806",
+        "source": "https://raw.githubusercontent.com/withastro/compiler-rs/342e26603bf6416545a85b506b434d25226e1435/LICENSE"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": "342e26603bf6416545a85b506b434d25226e1435",
+      "integrity": "sha512-GRGyby3AZWw5d6JQzidyxPyvGgHWsSusrpgKyFVpDTKctABF7L3Pd5V1cRJbV36/rcu+Eh292/wL7pF7MkmGkQ==",
+      "registry": "https://registry.npmjs.org/%40astrojs%2Fcompiler-binding-linux-arm64-musl/0.5.2",
+      "repository": "git+https://github.com/withastro/compiler-rs.git",
+      "resolvedCommit": "342e26603bf6416545a85b506b434d25226e1435",
+      "tarball": "https://registry.npmjs.org/@astrojs/compiler-binding-linux-arm64-musl/-/compiler-binding-linux-arm64-musl-0.5.2.tgz"
+    }
+  },
+  "@astrojs/compiler-binding-linux-x64-gnu@0.5.2": {
+    "files": [
+      {
+        "path": "platform/withastro-compiler-rs-342e26603bf6-LICENSE",
+        "sha256": "ee92354a87bc4a402e022fa15e10a6c713136aba84c46095dccc2b8091132806",
+        "source": "https://raw.githubusercontent.com/withastro/compiler-rs/342e26603bf6416545a85b506b434d25226e1435/LICENSE"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": "342e26603bf6416545a85b506b434d25226e1435",
+      "integrity": "sha512-9XAqGTMQAtIslMsjK3xdyY6OI9d59OZqcLBB6pvD/DcoR0daYswfrKx2azdDERDY4AqAnWPC7odVM1BmxYv3Vw==",
+      "registry": "https://registry.npmjs.org/%40astrojs%2Fcompiler-binding-linux-x64-gnu/0.5.2",
+      "repository": "git+https://github.com/withastro/compiler-rs.git",
+      "resolvedCommit": "342e26603bf6416545a85b506b434d25226e1435",
+      "tarball": "https://registry.npmjs.org/@astrojs/compiler-binding-linux-x64-gnu/-/compiler-binding-linux-x64-gnu-0.5.2.tgz"
+    }
+  },
+  "@astrojs/compiler-binding-linux-x64-musl@0.5.2": {
+    "files": [
+      {
+        "path": "platform/withastro-compiler-rs-342e26603bf6-LICENSE",
+        "sha256": "ee92354a87bc4a402e022fa15e10a6c713136aba84c46095dccc2b8091132806",
+        "source": "https://raw.githubusercontent.com/withastro/compiler-rs/342e26603bf6416545a85b506b434d25226e1435/LICENSE"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": "342e26603bf6416545a85b506b434d25226e1435",
+      "integrity": "sha512-jOViewGeTh9bSfS8vK72ECxoy2yvmA+Pd/ZcEvBI5c7+7IcfHwZ5qA4L9fRYuOhSrAifvQ2dV4vm1XAtloaWBw==",
+      "registry": "https://registry.npmjs.org/%40astrojs%2Fcompiler-binding-linux-x64-musl/0.5.2",
+      "repository": "git+https://github.com/withastro/compiler-rs.git",
+      "resolvedCommit": "342e26603bf6416545a85b506b434d25226e1435",
+      "tarball": "https://registry.npmjs.org/@astrojs/compiler-binding-linux-x64-musl/-/compiler-binding-linux-x64-musl-0.5.2.tgz"
+    }
+  },
+  "@bruits/satteri-darwin-arm64@0.10.5": {
+    "files": [
+      {
+        "path": "platform/bruits-satteri-b3d38e1e341c-LICENSE",
+        "sha256": "902c04ca47795eb6e9b2a2f178a9d9e62f5330988a8d6e1818ee33aeb0f426c1",
+        "source": "https://raw.githubusercontent.com/bruits/satteri/b3d38e1e341c809b20b76a655e9b1601d11bd1f0/LICENSE"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": "b3d38e1e341c809b20b76a655e9b1601d11bd1f0",
+      "integrity": "sha512-27KTVl4TJkVahMy/ohyA7qd4938G5UNneFUz/PsScYfpIhj0IVAS23mpcJXdPF44sa6nva198lmV/cKIb2YPyA==",
+      "registry": "https://registry.npmjs.org/%40bruits%2Fsatteri-darwin-arm64/0.10.5",
+      "repository": "git+https://github.com/bruits/satteri.git",
+      "resolvedCommit": "b3d38e1e341c809b20b76a655e9b1601d11bd1f0",
+      "tarball": "https://registry.npmjs.org/@bruits/satteri-darwin-arm64/-/satteri-darwin-arm64-0.10.5.tgz"
+    }
+  },
+  "@bruits/satteri-linux-arm64-gnu@0.10.5": {
+    "files": [
+      {
+        "path": "platform/bruits-satteri-b3d38e1e341c-LICENSE",
+        "sha256": "902c04ca47795eb6e9b2a2f178a9d9e62f5330988a8d6e1818ee33aeb0f426c1",
+        "source": "https://raw.githubusercontent.com/bruits/satteri/b3d38e1e341c809b20b76a655e9b1601d11bd1f0/LICENSE"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": "b3d38e1e341c809b20b76a655e9b1601d11bd1f0",
+      "integrity": "sha512-glkYXZCJywjP13v67eAyAMSJdF+ncvEbYvgi/wOtffL9tQ27lr/zsyzUfgs+ovjJ9d8JNQKiXeiArJcX8PJL9w==",
+      "registry": "https://registry.npmjs.org/%40bruits%2Fsatteri-linux-arm64-gnu/0.10.5",
+      "repository": "git+https://github.com/bruits/satteri.git",
+      "resolvedCommit": "b3d38e1e341c809b20b76a655e9b1601d11bd1f0",
+      "tarball": "https://registry.npmjs.org/@bruits/satteri-linux-arm64-gnu/-/satteri-linux-arm64-gnu-0.10.5.tgz"
+    }
+  },
+  "@bruits/satteri-linux-arm64-musl@0.10.5": {
+    "files": [
+      {
+        "path": "platform/bruits-satteri-b3d38e1e341c-LICENSE",
+        "sha256": "902c04ca47795eb6e9b2a2f178a9d9e62f5330988a8d6e1818ee33aeb0f426c1",
+        "source": "https://raw.githubusercontent.com/bruits/satteri/b3d38e1e341c809b20b76a655e9b1601d11bd1f0/LICENSE"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": "b3d38e1e341c809b20b76a655e9b1601d11bd1f0",
+      "integrity": "sha512-yWdgG1g17Nh2QyGVlFUxGRa3FEFwiMcpZEyMNWkbM3deC94cmVc+/i9OuyFpdKuWo3GkgoCtYVOoxk1uCnCZIA==",
+      "registry": "https://registry.npmjs.org/%40bruits%2Fsatteri-linux-arm64-musl/0.10.5",
+      "repository": "git+https://github.com/bruits/satteri.git",
+      "resolvedCommit": "b3d38e1e341c809b20b76a655e9b1601d11bd1f0",
+      "tarball": "https://registry.npmjs.org/@bruits/satteri-linux-arm64-musl/-/satteri-linux-arm64-musl-0.10.5.tgz"
+    }
+  },
+  "@bruits/satteri-linux-x64-gnu@0.10.5": {
+    "files": [
+      {
+        "path": "platform/bruits-satteri-b3d38e1e341c-LICENSE",
+        "sha256": "902c04ca47795eb6e9b2a2f178a9d9e62f5330988a8d6e1818ee33aeb0f426c1",
+        "source": "https://raw.githubusercontent.com/bruits/satteri/b3d38e1e341c809b20b76a655e9b1601d11bd1f0/LICENSE"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": "b3d38e1e341c809b20b76a655e9b1601d11bd1f0",
+      "integrity": "sha512-FVaLoPT1fBgGl0J+AYebyyXJYBachGl8Oyyrf1lye4RTqCB4S0Gwkj1uM9RJyThUOvx5VUmAT1CnNh1SFHA+kw==",
+      "registry": "https://registry.npmjs.org/%40bruits%2Fsatteri-linux-x64-gnu/0.10.5",
+      "repository": "git+https://github.com/bruits/satteri.git",
+      "resolvedCommit": "b3d38e1e341c809b20b76a655e9b1601d11bd1f0",
+      "tarball": "https://registry.npmjs.org/@bruits/satteri-linux-x64-gnu/-/satteri-linux-x64-gnu-0.10.5.tgz"
+    }
+  },
+  "@bruits/satteri-linux-x64-musl@0.10.5": {
+    "files": [
+      {
+        "path": "platform/bruits-satteri-b3d38e1e341c-LICENSE",
+        "sha256": "902c04ca47795eb6e9b2a2f178a9d9e62f5330988a8d6e1818ee33aeb0f426c1",
+        "source": "https://raw.githubusercontent.com/bruits/satteri/b3d38e1e341c809b20b76a655e9b1601d11bd1f0/LICENSE"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": "b3d38e1e341c809b20b76a655e9b1601d11bd1f0",
+      "integrity": "sha512-EHpVAx2bqW3GINHTKkljtxVfQmVDGWIuwOYOP5YghTj+0PkBa2o8oKPRtQ9Kbsr1Fye8jtUcDjhwj2jMNugZKg==",
+      "registry": "https://registry.npmjs.org/%40bruits%2Fsatteri-linux-x64-musl/0.10.5",
+      "repository": "git+https://github.com/bruits/satteri.git",
+      "resolvedCommit": "b3d38e1e341c809b20b76a655e9b1601d11bd1f0",
+      "tarball": "https://registry.npmjs.org/@bruits/satteri-linux-x64-musl/-/satteri-linux-x64-musl-0.10.5.tgz"
+    }
+  },
+  "@esbuild/darwin-arm64@0.18.20": {
+    "files": [
+      {
+        "path": "platform/evanw-esbuild-22f0818cf810-LICENSE.md",
+        "sha256": "b40ec5baec7bb34fa5b1c09521fa3cd52d5fad7adafed74932a2010d3612a681",
+        "source": "https://raw.githubusercontent.com/evanw/esbuild/22f0818cf81024b63752d815c51fe737612b43ec/LICENSE.md"
+      },
+      {
+        "component": "Go runtime go1.20.7",
+        "path": "platform/golang-go-go1.20.7-adb775e309de-LICENSE",
+        "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "source": "https://raw.githubusercontent.com/golang/go/adb775e309dea43157e931835e920ac9e7769abe/LICENSE",
+        "sourceCommit": "adb775e309dea43157e931835e920ac9e7769abe"
+      },
+      {
+        "component": "golang.org/x/sys",
+        "path": "platform/golang-sys-c0bba94af5f8-LICENSE",
+        "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "source": "https://raw.githubusercontent.com/golang/sys/c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf/LICENSE",
+        "sourceCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "embeddedGo": {
+        "binarySha256": "df6f20944f1ccd20eaad71f9b5e7263702e0179e3623b7f608379814e98736b3",
+        "binaryVcsRevision": "22f0818cf81024b63752d815c51fe737612b43ec",
+        "binaryVersionEvidence": "Exact installed package bin/esbuild contains a unique go1.20.7 runtime version string and dependency build information. go version -m also reads structured build metadata for esbuild 0.18.20 and 0.25.12; the 0.28.x binaries retain version/dependency strings while structured Go build metadata is stripped.",
+        "commit": "adb775e309dea43157e931835e920ac9e7769abe",
+        "goModEvidence": "https://raw.githubusercontent.com/evanw/esbuild/22f0818cf81024b63752d815c51fe737612b43ec/go.mod",
+        "tag": "go1.20.7",
+        "tagResolutionEvidence": "git ls-remote --tags https://github.com/golang/go.git refs/tags/go1.20.7",
+        "version": "go1.20.7",
+        "xSysBinaryBuildInfo": "v0.0.0-20220715151400-c0bba94af5f8\th1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf",
+        "xSysCommitEvidence": "https://go.googlesource.com/sys/+show/c0bba94af5f8?format=JSON",
+        "xSysModuleSum": "h1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysVersion": "v0.0.0-20220715151400-c0bba94af5f8"
+      },
+      "gitHead": "22f0818cf81024b63752d815c51fe737612b43ec",
+      "integrity": "sha512-bxRHW5kHU38zS2lPTPOyuyTm+S+eobPUnTNkdJEfAddYgEcll4xkT8DB9d2008DtTbl7uJag2HuE5NZAZgnNEA==",
+      "registry": "https://registry.npmjs.org/%40esbuild%2Fdarwin-arm64/0.18.20",
+      "repository": "git+https://github.com/evanw/esbuild.git",
+      "resolvedCommit": "22f0818cf81024b63752d815c51fe737612b43ec",
+      "tarball": "https://registry.npmjs.org/@esbuild/darwin-arm64/-/darwin-arm64-0.18.20.tgz"
+    }
+  },
+  "@esbuild/darwin-arm64@0.25.12": {
+    "files": [
+      {
+        "path": "platform/evanw-esbuild-208f539945b1-LICENSE.md",
+        "sha256": "b40ec5baec7bb34fa5b1c09521fa3cd52d5fad7adafed74932a2010d3612a681",
+        "source": "https://raw.githubusercontent.com/evanw/esbuild/208f539945b145e7c9d6d844290f81c3fe5af320/LICENSE.md"
+      },
+      {
+        "component": "Go runtime go1.23.12",
+        "path": "platform/golang-go-go1.23.12-dd8b7ad9268c-LICENSE",
+        "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "source": "https://raw.githubusercontent.com/golang/go/dd8b7ad9268c2fbde675132a41b4e4da02eef94d/LICENSE",
+        "sourceCommit": "dd8b7ad9268c2fbde675132a41b4e4da02eef94d"
+      },
+      {
+        "component": "golang.org/x/sys",
+        "path": "platform/golang-sys-c0bba94af5f8-LICENSE",
+        "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "source": "https://raw.githubusercontent.com/golang/sys/c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf/LICENSE",
+        "sourceCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "embeddedGo": {
+        "binarySha256": "3e030ee2aa86ad3c33e5e95ae0e53bb03de40e0da35c9b1180a67de4a497cae5",
+        "binaryVcsRevision": "208f539945b145e7c9d6d844290f81c3fe5af320",
+        "binaryVersionEvidence": "Exact installed package bin/esbuild contains a unique go1.23.12 runtime version string and dependency build information. go version -m also reads structured build metadata for esbuild 0.18.20 and 0.25.12; the 0.28.x binaries retain version/dependency strings while structured Go build metadata is stripped.",
+        "commit": "dd8b7ad9268c2fbde675132a41b4e4da02eef94d",
+        "goModEvidence": "https://raw.githubusercontent.com/evanw/esbuild/208f539945b145e7c9d6d844290f81c3fe5af320/go.mod",
+        "tag": "go1.23.12",
+        "tagResolutionEvidence": "git ls-remote --tags https://github.com/golang/go.git refs/tags/go1.23.12",
+        "version": "go1.23.12",
+        "xSysBinaryBuildInfo": "v0.0.0-20220715151400-c0bba94af5f8\th1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf",
+        "xSysCommitEvidence": "https://go.googlesource.com/sys/+show/c0bba94af5f8?format=JSON",
+        "xSysModuleSum": "h1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysVersion": "v0.0.0-20220715151400-c0bba94af5f8"
+      },
+      "gitHead": "208f539945b145e7c9d6d844290f81c3fe5af320",
+      "integrity": "sha512-N3zl+lxHCifgIlcMUP5016ESkeQjLj/959RxxNYIthIg+CQHInujFuXeWbWMgnTo4cp5XVHqFPmpyu9J65C1Yg==",
+      "registry": "https://registry.npmjs.org/%40esbuild%2Fdarwin-arm64/0.25.12",
+      "repository": "git+https://github.com/evanw/esbuild.git",
+      "resolvedCommit": "208f539945b145e7c9d6d844290f81c3fe5af320",
+      "tarball": "https://registry.npmjs.org/@esbuild/darwin-arm64/-/darwin-arm64-0.25.12.tgz"
+    }
+  },
+  "@esbuild/darwin-arm64@0.28.1": {
+    "files": [
+      {
+        "path": "platform/evanw-esbuild-bb9db84c0243-LICENSE.md",
+        "sha256": "b40ec5baec7bb34fa5b1c09521fa3cd52d5fad7adafed74932a2010d3612a681",
+        "source": "https://raw.githubusercontent.com/evanw/esbuild/bb9db84c02433fbe37b3509f53f9f3e3cc48725e/LICENSE.md"
+      },
+      {
+        "component": "Go runtime go1.26.4",
+        "path": "platform/golang-go-go1.26.4-a9ce111d5805-LICENSE",
+        "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+        "source": "https://raw.githubusercontent.com/golang/go/a9ce111d580581fb925ae88f125c69b7d93504ea/LICENSE",
+        "sourceCommit": "a9ce111d580581fb925ae88f125c69b7d93504ea"
+      },
+      {
+        "component": "golang.org/x/sys",
+        "path": "platform/golang-sys-c0bba94af5f8-LICENSE",
+        "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "source": "https://raw.githubusercontent.com/golang/sys/c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf/LICENSE",
+        "sourceCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "embeddedGo": {
+        "binarySha256": "e2dc9a52440a2a34f09434a2f4843cb1e30f84e40dcf238976ec61ef8cd7f36a",
+        "binaryVcsRevision": null,
+        "binaryVersionEvidence": "Exact installed package bin/esbuild contains a unique go1.26.4 runtime version string and dependency build information. go version -m also reads structured build metadata for esbuild 0.18.20 and 0.25.12; the 0.28.x binaries retain version/dependency strings while structured Go build metadata is stripped.",
+        "commit": "a9ce111d580581fb925ae88f125c69b7d93504ea",
+        "goModEvidence": "https://raw.githubusercontent.com/evanw/esbuild/bb9db84c02433fbe37b3509f53f9f3e3cc48725e/go.mod",
+        "tag": "go1.26.4",
+        "tagResolutionEvidence": "git ls-remote --tags https://github.com/golang/go.git refs/tags/go1.26.4",
+        "version": "go1.26.4",
+        "xSysBinaryBuildInfo": "v0.0.0-20220715151400-c0bba94af5f8\th1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf",
+        "xSysCommitEvidence": "https://go.googlesource.com/sys/+show/c0bba94af5f8?format=JSON",
+        "xSysModuleSum": "h1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysVersion": "v0.0.0-20220715151400-c0bba94af5f8"
+      },
+      "gitHead": "bb9db84c02433fbe37b3509f53f9f3e3cc48725e",
+      "integrity": "sha512-TZbWkQY7kvTAXbXUT7uVACR5cMHsDiSz9z7ZKAX/RTq/WJEk3QyRr0wZpNhBDX+/0CtdqUIJlOiodQcta6tY3Q==",
+      "registry": "https://registry.npmjs.org/%40esbuild%2Fdarwin-arm64/0.28.1",
+      "repository": "git+https://github.com/evanw/esbuild.git",
+      "resolvedCommit": "bb9db84c02433fbe37b3509f53f9f3e3cc48725e",
+      "tarball": "https://registry.npmjs.org/@esbuild/darwin-arm64/-/darwin-arm64-0.28.1.tgz"
+    }
+  },
+  "@esbuild/darwin-arm64@0.28.2": {
+    "files": [
+      {
+        "path": "platform/evanw-esbuild-609683d89297-LICENSE.md",
+        "sha256": "b40ec5baec7bb34fa5b1c09521fa3cd52d5fad7adafed74932a2010d3612a681",
+        "source": "https://raw.githubusercontent.com/evanw/esbuild/609683d892977362a0f99026cb74b96263d728a9/LICENSE.md"
+      },
+      {
+        "component": "Go runtime go1.26.5",
+        "path": "platform/golang-go-go1.26.5-c19862e5f841-LICENSE",
+        "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+        "source": "https://raw.githubusercontent.com/golang/go/c19862e5f8415b4f24b189d065ed739517c548ba/LICENSE",
+        "sourceCommit": "c19862e5f8415b4f24b189d065ed739517c548ba"
+      },
+      {
+        "component": "golang.org/x/sys",
+        "path": "platform/golang-sys-c0bba94af5f8-LICENSE",
+        "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "source": "https://raw.githubusercontent.com/golang/sys/c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf/LICENSE",
+        "sourceCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "embeddedGo": {
+        "binarySha256": "10b6243df618d374bb2d5c9cfbe7052e1405f6aa4e53a6164f11a91b9f2e1384",
+        "binaryVcsRevision": null,
+        "binaryVersionEvidence": "Exact installed package bin/esbuild contains a unique go1.26.5 runtime version string and dependency build information. go version -m also reads structured build metadata for esbuild 0.18.20 and 0.25.12; the 0.28.x binaries retain version/dependency strings while structured Go build metadata is stripped.",
+        "commit": "c19862e5f8415b4f24b189d065ed739517c548ba",
+        "goModEvidence": "https://raw.githubusercontent.com/evanw/esbuild/609683d892977362a0f99026cb74b96263d728a9/go.mod",
+        "tag": "go1.26.5",
+        "tagResolutionEvidence": "git ls-remote --tags https://github.com/golang/go.git refs/tags/go1.26.5",
+        "version": "go1.26.5",
+        "xSysBinaryBuildInfo": "v0.0.0-20220715151400-c0bba94af5f8\th1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf",
+        "xSysCommitEvidence": "https://go.googlesource.com/sys/+show/c0bba94af5f8?format=JSON",
+        "xSysModuleSum": "h1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysVersion": "v0.0.0-20220715151400-c0bba94af5f8"
+      },
+      "gitHead": "609683d892977362a0f99026cb74b96263d728a9",
+      "integrity": "sha512-n4KqkOQrraxHJcgjM1RvwbigfQKIKJVpM7xp+KsxiyUSrRdIXnt73VhrPAx0fV44hgfmIVKjxMN9J1t5jySVkw==",
+      "registry": "https://registry.npmjs.org/%40esbuild%2Fdarwin-arm64/0.28.2",
+      "repository": "git+https://github.com/evanw/esbuild.git",
+      "resolvedCommit": "609683d892977362a0f99026cb74b96263d728a9",
+      "tarball": "https://registry.npmjs.org/@esbuild/darwin-arm64/-/darwin-arm64-0.28.2.tgz"
+    }
+  },
+  "@esbuild/linux-arm64@0.18.20": {
+    "files": [
+      {
+        "path": "platform/evanw-esbuild-22f0818cf810-LICENSE.md",
+        "sha256": "b40ec5baec7bb34fa5b1c09521fa3cd52d5fad7adafed74932a2010d3612a681",
+        "source": "https://raw.githubusercontent.com/evanw/esbuild/22f0818cf81024b63752d815c51fe737612b43ec/LICENSE.md"
+      },
+      {
+        "component": "Go runtime go1.20.7",
+        "path": "platform/golang-go-go1.20.7-adb775e309de-LICENSE",
+        "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "source": "https://raw.githubusercontent.com/golang/go/adb775e309dea43157e931835e920ac9e7769abe/LICENSE",
+        "sourceCommit": "adb775e309dea43157e931835e920ac9e7769abe"
+      },
+      {
+        "component": "golang.org/x/sys",
+        "path": "platform/golang-sys-c0bba94af5f8-LICENSE",
+        "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "source": "https://raw.githubusercontent.com/golang/sys/c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf/LICENSE",
+        "sourceCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "embeddedGo": {
+        "binarySha256": "63d0ba85e72246004f171dddcc7a2fddd49938484948bb6b75f88780e929d0cc",
+        "binaryVcsRevision": "22f0818cf81024b63752d815c51fe737612b43ec",
+        "binaryVersionEvidence": "Exact installed package bin/esbuild contains a unique go1.20.7 runtime version string and dependency build information. go version -m also reads structured build metadata for esbuild 0.18.20 and 0.25.12; the 0.28.x binaries retain version/dependency strings while structured Go build metadata is stripped.",
+        "commit": "adb775e309dea43157e931835e920ac9e7769abe",
+        "goModEvidence": "https://raw.githubusercontent.com/evanw/esbuild/22f0818cf81024b63752d815c51fe737612b43ec/go.mod",
+        "tag": "go1.20.7",
+        "tagResolutionEvidence": "git ls-remote --tags https://github.com/golang/go.git refs/tags/go1.20.7",
+        "version": "go1.20.7",
+        "xSysBinaryBuildInfo": "v0.0.0-20220715151400-c0bba94af5f8\th1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf",
+        "xSysCommitEvidence": "https://go.googlesource.com/sys/+show/c0bba94af5f8?format=JSON",
+        "xSysModuleSum": "h1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysVersion": "v0.0.0-20220715151400-c0bba94af5f8"
+      },
+      "gitHead": "22f0818cf81024b63752d815c51fe737612b43ec",
+      "integrity": "sha512-2YbscF+UL7SQAVIpnWvYwM+3LskyDmPhe31pE7/aoTMFKKzIc9lLbyGUpmmb8a8AixOL61sQ/mFh3jEjHYFvdA==",
+      "registry": "https://registry.npmjs.org/%40esbuild%2Flinux-arm64/0.18.20",
+      "repository": "git+https://github.com/evanw/esbuild.git",
+      "resolvedCommit": "22f0818cf81024b63752d815c51fe737612b43ec",
+      "tarball": "https://registry.npmjs.org/@esbuild/linux-arm64/-/linux-arm64-0.18.20.tgz"
+    }
+  },
+  "@esbuild/linux-arm64@0.25.12": {
+    "files": [
+      {
+        "path": "platform/evanw-esbuild-208f539945b1-LICENSE.md",
+        "sha256": "b40ec5baec7bb34fa5b1c09521fa3cd52d5fad7adafed74932a2010d3612a681",
+        "source": "https://raw.githubusercontent.com/evanw/esbuild/208f539945b145e7c9d6d844290f81c3fe5af320/LICENSE.md"
+      },
+      {
+        "component": "Go runtime go1.23.12",
+        "path": "platform/golang-go-go1.23.12-dd8b7ad9268c-LICENSE",
+        "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "source": "https://raw.githubusercontent.com/golang/go/dd8b7ad9268c2fbde675132a41b4e4da02eef94d/LICENSE",
+        "sourceCommit": "dd8b7ad9268c2fbde675132a41b4e4da02eef94d"
+      },
+      {
+        "component": "golang.org/x/sys",
+        "path": "platform/golang-sys-c0bba94af5f8-LICENSE",
+        "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "source": "https://raw.githubusercontent.com/golang/sys/c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf/LICENSE",
+        "sourceCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "embeddedGo": {
+        "binarySha256": "840ad255d6fd587b126d8b2d59ab506d8562785b9bc76249dc3b0e1bdd2ca449",
+        "binaryVcsRevision": "208f539945b145e7c9d6d844290f81c3fe5af320",
+        "binaryVersionEvidence": "Exact installed package bin/esbuild contains a unique go1.23.12 runtime version string and dependency build information. go version -m also reads structured build metadata for esbuild 0.18.20 and 0.25.12; the 0.28.x binaries retain version/dependency strings while structured Go build metadata is stripped.",
+        "commit": "dd8b7ad9268c2fbde675132a41b4e4da02eef94d",
+        "goModEvidence": "https://raw.githubusercontent.com/evanw/esbuild/208f539945b145e7c9d6d844290f81c3fe5af320/go.mod",
+        "tag": "go1.23.12",
+        "tagResolutionEvidence": "git ls-remote --tags https://github.com/golang/go.git refs/tags/go1.23.12",
+        "version": "go1.23.12",
+        "xSysBinaryBuildInfo": "v0.0.0-20220715151400-c0bba94af5f8\th1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf",
+        "xSysCommitEvidence": "https://go.googlesource.com/sys/+show/c0bba94af5f8?format=JSON",
+        "xSysModuleSum": "h1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysVersion": "v0.0.0-20220715151400-c0bba94af5f8"
+      },
+      "gitHead": "208f539945b145e7c9d6d844290f81c3fe5af320",
+      "integrity": "sha512-8bwX7a8FghIgrupcxb4aUmYDLp8pX06rGh5HqDT7bB+8Rdells6mHvrFHHW2JAOPZUbnjUpKTLg6ECyzvas2AQ==",
+      "registry": "https://registry.npmjs.org/%40esbuild%2Flinux-arm64/0.25.12",
+      "repository": "git+https://github.com/evanw/esbuild.git",
+      "resolvedCommit": "208f539945b145e7c9d6d844290f81c3fe5af320",
+      "tarball": "https://registry.npmjs.org/@esbuild/linux-arm64/-/linux-arm64-0.25.12.tgz"
+    }
+  },
+  "@esbuild/linux-arm64@0.28.1": {
+    "files": [
+      {
+        "path": "platform/evanw-esbuild-bb9db84c0243-LICENSE.md",
+        "sha256": "b40ec5baec7bb34fa5b1c09521fa3cd52d5fad7adafed74932a2010d3612a681",
+        "source": "https://raw.githubusercontent.com/evanw/esbuild/bb9db84c02433fbe37b3509f53f9f3e3cc48725e/LICENSE.md"
+      },
+      {
+        "component": "Go runtime go1.26.4",
+        "path": "platform/golang-go-go1.26.4-a9ce111d5805-LICENSE",
+        "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+        "source": "https://raw.githubusercontent.com/golang/go/a9ce111d580581fb925ae88f125c69b7d93504ea/LICENSE",
+        "sourceCommit": "a9ce111d580581fb925ae88f125c69b7d93504ea"
+      },
+      {
+        "component": "golang.org/x/sys",
+        "path": "platform/golang-sys-c0bba94af5f8-LICENSE",
+        "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "source": "https://raw.githubusercontent.com/golang/sys/c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf/LICENSE",
+        "sourceCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "embeddedGo": {
+        "binarySha256": "51e829ba36f36be6d9aea6e329ddc4f9350302339b16aaca96a3cb97f64a8ebb",
+        "binaryVcsRevision": null,
+        "binaryVersionEvidence": "Exact installed package bin/esbuild contains a unique go1.26.4 runtime version string and dependency build information. go version -m also reads structured build metadata for esbuild 0.18.20 and 0.25.12; the 0.28.x binaries retain version/dependency strings while structured Go build metadata is stripped.",
+        "commit": "a9ce111d580581fb925ae88f125c69b7d93504ea",
+        "goModEvidence": "https://raw.githubusercontent.com/evanw/esbuild/bb9db84c02433fbe37b3509f53f9f3e3cc48725e/go.mod",
+        "tag": "go1.26.4",
+        "tagResolutionEvidence": "git ls-remote --tags https://github.com/golang/go.git refs/tags/go1.26.4",
+        "version": "go1.26.4",
+        "xSysBinaryBuildInfo": "v0.0.0-20220715151400-c0bba94af5f8\th1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf",
+        "xSysCommitEvidence": "https://go.googlesource.com/sys/+show/c0bba94af5f8?format=JSON",
+        "xSysModuleSum": "h1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysVersion": "v0.0.0-20220715151400-c0bba94af5f8"
+      },
+      "gitHead": "bb9db84c02433fbe37b3509f53f9f3e3cc48725e",
+      "integrity": "sha512-yHs+0uc8+nvEAfAfxrWQKK5peSNzBc4PegcMO0EJ2hT71uA7vB8Ihg2e77R2P7SG5uYjPbHlLLmve4LLLRCf0g==",
+      "registry": "https://registry.npmjs.org/%40esbuild%2Flinux-arm64/0.28.1",
+      "repository": "git+https://github.com/evanw/esbuild.git",
+      "resolvedCommit": "bb9db84c02433fbe37b3509f53f9f3e3cc48725e",
+      "tarball": "https://registry.npmjs.org/@esbuild/linux-arm64/-/linux-arm64-0.28.1.tgz"
+    }
+  },
+  "@esbuild/linux-arm64@0.28.2": {
+    "files": [
+      {
+        "path": "platform/evanw-esbuild-609683d89297-LICENSE.md",
+        "sha256": "b40ec5baec7bb34fa5b1c09521fa3cd52d5fad7adafed74932a2010d3612a681",
+        "source": "https://raw.githubusercontent.com/evanw/esbuild/609683d892977362a0f99026cb74b96263d728a9/LICENSE.md"
+      },
+      {
+        "component": "Go runtime go1.26.5",
+        "path": "platform/golang-go-go1.26.5-c19862e5f841-LICENSE",
+        "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+        "source": "https://raw.githubusercontent.com/golang/go/c19862e5f8415b4f24b189d065ed739517c548ba/LICENSE",
+        "sourceCommit": "c19862e5f8415b4f24b189d065ed739517c548ba"
+      },
+      {
+        "component": "golang.org/x/sys",
+        "path": "platform/golang-sys-c0bba94af5f8-LICENSE",
+        "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "source": "https://raw.githubusercontent.com/golang/sys/c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf/LICENSE",
+        "sourceCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "embeddedGo": {
+        "binarySha256": "90bd269553d258e80b19e3ccab4f98f0831f87442a2f056510ce24fd1b425fc2",
+        "binaryVcsRevision": null,
+        "binaryVersionEvidence": "Exact installed package bin/esbuild contains a unique go1.26.5 runtime version string and dependency build information. go version -m also reads structured build metadata for esbuild 0.18.20 and 0.25.12; the 0.28.x binaries retain version/dependency strings while structured Go build metadata is stripped.",
+        "commit": "c19862e5f8415b4f24b189d065ed739517c548ba",
+        "goModEvidence": "https://raw.githubusercontent.com/evanw/esbuild/609683d892977362a0f99026cb74b96263d728a9/go.mod",
+        "tag": "go1.26.5",
+        "tagResolutionEvidence": "git ls-remote --tags https://github.com/golang/go.git refs/tags/go1.26.5",
+        "version": "go1.26.5",
+        "xSysBinaryBuildInfo": "v0.0.0-20220715151400-c0bba94af5f8\th1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf",
+        "xSysCommitEvidence": "https://go.googlesource.com/sys/+show/c0bba94af5f8?format=JSON",
+        "xSysModuleSum": "h1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysVersion": "v0.0.0-20220715151400-c0bba94af5f8"
+      },
+      "gitHead": "609683d892977362a0f99026cb74b96263d728a9",
+      "integrity": "sha512-pW4AC0P3it8c7do9MVM4p51FzHzdM/TZrerurgRcHJ2WTa1VQ1CIq18xncfpBJw4ojkiZZrKW2yIBWBP92j6Ug==",
+      "registry": "https://registry.npmjs.org/%40esbuild%2Flinux-arm64/0.28.2",
+      "repository": "git+https://github.com/evanw/esbuild.git",
+      "resolvedCommit": "609683d892977362a0f99026cb74b96263d728a9",
+      "tarball": "https://registry.npmjs.org/@esbuild/linux-arm64/-/linux-arm64-0.28.2.tgz"
+    }
+  },
+  "@esbuild/linux-x64@0.18.20": {
+    "files": [
+      {
+        "path": "platform/evanw-esbuild-22f0818cf810-LICENSE.md",
+        "sha256": "b40ec5baec7bb34fa5b1c09521fa3cd52d5fad7adafed74932a2010d3612a681",
+        "source": "https://raw.githubusercontent.com/evanw/esbuild/22f0818cf81024b63752d815c51fe737612b43ec/LICENSE.md"
+      },
+      {
+        "component": "Go runtime go1.20.7",
+        "path": "platform/golang-go-go1.20.7-adb775e309de-LICENSE",
+        "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "source": "https://raw.githubusercontent.com/golang/go/adb775e309dea43157e931835e920ac9e7769abe/LICENSE",
+        "sourceCommit": "adb775e309dea43157e931835e920ac9e7769abe"
+      },
+      {
+        "component": "golang.org/x/sys",
+        "path": "platform/golang-sys-c0bba94af5f8-LICENSE",
+        "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "source": "https://raw.githubusercontent.com/golang/sys/c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf/LICENSE",
+        "sourceCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "embeddedGo": {
+        "binarySha256": "82afa0d18098bef823ba5b5c89bb5cfbea1a25f0721416d29a9dd7ba73fd237d",
+        "binaryVcsRevision": "22f0818cf81024b63752d815c51fe737612b43ec",
+        "binaryVersionEvidence": "Exact installed package bin/esbuild contains a unique go1.20.7 runtime version string and dependency build information. go version -m also reads structured build metadata for esbuild 0.18.20 and 0.25.12; the 0.28.x binaries retain version/dependency strings while structured Go build metadata is stripped.",
+        "commit": "adb775e309dea43157e931835e920ac9e7769abe",
+        "goModEvidence": "https://raw.githubusercontent.com/evanw/esbuild/22f0818cf81024b63752d815c51fe737612b43ec/go.mod",
+        "tag": "go1.20.7",
+        "tagResolutionEvidence": "git ls-remote --tags https://github.com/golang/go.git refs/tags/go1.20.7",
+        "version": "go1.20.7",
+        "xSysBinaryBuildInfo": "v0.0.0-20220715151400-c0bba94af5f8\th1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf",
+        "xSysCommitEvidence": "https://go.googlesource.com/sys/+show/c0bba94af5f8?format=JSON",
+        "xSysModuleSum": "h1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysVersion": "v0.0.0-20220715151400-c0bba94af5f8"
+      },
+      "gitHead": "22f0818cf81024b63752d815c51fe737612b43ec",
+      "integrity": "sha512-UYqiqemphJcNsFEskc73jQ7B9jgwjWrSayxawS6UVFZGWrAAtkzjxSqnoclCXxWtfwLdzU+vTpcNYhpn43uP1w==",
+      "registry": "https://registry.npmjs.org/%40esbuild%2Flinux-x64/0.18.20",
+      "repository": "git+https://github.com/evanw/esbuild.git",
+      "resolvedCommit": "22f0818cf81024b63752d815c51fe737612b43ec",
+      "tarball": "https://registry.npmjs.org/@esbuild/linux-x64/-/linux-x64-0.18.20.tgz"
+    }
+  },
+  "@esbuild/linux-x64@0.25.12": {
+    "files": [
+      {
+        "path": "platform/evanw-esbuild-208f539945b1-LICENSE.md",
+        "sha256": "b40ec5baec7bb34fa5b1c09521fa3cd52d5fad7adafed74932a2010d3612a681",
+        "source": "https://raw.githubusercontent.com/evanw/esbuild/208f539945b145e7c9d6d844290f81c3fe5af320/LICENSE.md"
+      },
+      {
+        "component": "Go runtime go1.23.12",
+        "path": "platform/golang-go-go1.23.12-dd8b7ad9268c-LICENSE",
+        "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "source": "https://raw.githubusercontent.com/golang/go/dd8b7ad9268c2fbde675132a41b4e4da02eef94d/LICENSE",
+        "sourceCommit": "dd8b7ad9268c2fbde675132a41b4e4da02eef94d"
+      },
+      {
+        "component": "golang.org/x/sys",
+        "path": "platform/golang-sys-c0bba94af5f8-LICENSE",
+        "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "source": "https://raw.githubusercontent.com/golang/sys/c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf/LICENSE",
+        "sourceCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "embeddedGo": {
+        "binarySha256": "bab29b2ca7a9e89b67cf720b77b2d743f9f31f5cf0d5bd74ee8c8de30ced7014",
+        "binaryVcsRevision": "208f539945b145e7c9d6d844290f81c3fe5af320",
+        "binaryVersionEvidence": "Exact installed package bin/esbuild contains a unique go1.23.12 runtime version string and dependency build information. go version -m also reads structured build metadata for esbuild 0.18.20 and 0.25.12; the 0.28.x binaries retain version/dependency strings while structured Go build metadata is stripped.",
+        "commit": "dd8b7ad9268c2fbde675132a41b4e4da02eef94d",
+        "goModEvidence": "https://raw.githubusercontent.com/evanw/esbuild/208f539945b145e7c9d6d844290f81c3fe5af320/go.mod",
+        "tag": "go1.23.12",
+        "tagResolutionEvidence": "git ls-remote --tags https://github.com/golang/go.git refs/tags/go1.23.12",
+        "version": "go1.23.12",
+        "xSysBinaryBuildInfo": "v0.0.0-20220715151400-c0bba94af5f8\th1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf",
+        "xSysCommitEvidence": "https://go.googlesource.com/sys/+show/c0bba94af5f8?format=JSON",
+        "xSysModuleSum": "h1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysVersion": "v0.0.0-20220715151400-c0bba94af5f8"
+      },
+      "gitHead": "208f539945b145e7c9d6d844290f81c3fe5af320",
+      "integrity": "sha512-uqZMTLr/zR/ed4jIGnwSLkaHmPjOjJvnm6TVVitAa08SLS9Z0VM8wIRx7gWbJB5/J54YuIMInDquWyYvQLZkgw==",
+      "registry": "https://registry.npmjs.org/%40esbuild%2Flinux-x64/0.25.12",
+      "repository": "git+https://github.com/evanw/esbuild.git",
+      "resolvedCommit": "208f539945b145e7c9d6d844290f81c3fe5af320",
+      "tarball": "https://registry.npmjs.org/@esbuild/linux-x64/-/linux-x64-0.25.12.tgz"
+    }
+  },
+  "@esbuild/linux-x64@0.28.1": {
+    "files": [
+      {
+        "path": "platform/evanw-esbuild-bb9db84c0243-LICENSE.md",
+        "sha256": "b40ec5baec7bb34fa5b1c09521fa3cd52d5fad7adafed74932a2010d3612a681",
+        "source": "https://raw.githubusercontent.com/evanw/esbuild/bb9db84c02433fbe37b3509f53f9f3e3cc48725e/LICENSE.md"
+      },
+      {
+        "component": "Go runtime go1.26.4",
+        "path": "platform/golang-go-go1.26.4-a9ce111d5805-LICENSE",
+        "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+        "source": "https://raw.githubusercontent.com/golang/go/a9ce111d580581fb925ae88f125c69b7d93504ea/LICENSE",
+        "sourceCommit": "a9ce111d580581fb925ae88f125c69b7d93504ea"
+      },
+      {
+        "component": "golang.org/x/sys",
+        "path": "platform/golang-sys-c0bba94af5f8-LICENSE",
+        "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "source": "https://raw.githubusercontent.com/golang/sys/c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf/LICENSE",
+        "sourceCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "embeddedGo": {
+        "binarySha256": "0c6588b092a2c291a72bab90659f3c9e0e25e0fe59c9ac12b4dae4d945e5548c",
+        "binaryVcsRevision": null,
+        "binaryVersionEvidence": "Exact installed package bin/esbuild contains a unique go1.26.4 runtime version string and dependency build information. go version -m also reads structured build metadata for esbuild 0.18.20 and 0.25.12; the 0.28.x binaries retain version/dependency strings while structured Go build metadata is stripped.",
+        "commit": "a9ce111d580581fb925ae88f125c69b7d93504ea",
+        "goModEvidence": "https://raw.githubusercontent.com/evanw/esbuild/bb9db84c02433fbe37b3509f53f9f3e3cc48725e/go.mod",
+        "tag": "go1.26.4",
+        "tagResolutionEvidence": "git ls-remote --tags https://github.com/golang/go.git refs/tags/go1.26.4",
+        "version": "go1.26.4",
+        "xSysBinaryBuildInfo": "v0.0.0-20220715151400-c0bba94af5f8\th1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf",
+        "xSysCommitEvidence": "https://go.googlesource.com/sys/+show/c0bba94af5f8?format=JSON",
+        "xSysModuleSum": "h1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysVersion": "v0.0.0-20220715151400-c0bba94af5f8"
+      },
+      "gitHead": "bb9db84c02433fbe37b3509f53f9f3e3cc48725e",
+      "integrity": "sha512-u/anNYF2mmVOEDwLtnQ1wOr3EZ9sTNGLWrsYGYwHWzGA3Si84IOkHXlbWTD1NB+9/1lcnweYKO54uhxZydNzfA==",
+      "registry": "https://registry.npmjs.org/%40esbuild%2Flinux-x64/0.28.1",
+      "repository": "git+https://github.com/evanw/esbuild.git",
+      "resolvedCommit": "bb9db84c02433fbe37b3509f53f9f3e3cc48725e",
+      "tarball": "https://registry.npmjs.org/@esbuild/linux-x64/-/linux-x64-0.28.1.tgz"
+    }
+  },
+  "@esbuild/linux-x64@0.28.2": {
+    "files": [
+      {
+        "path": "platform/evanw-esbuild-609683d89297-LICENSE.md",
+        "sha256": "b40ec5baec7bb34fa5b1c09521fa3cd52d5fad7adafed74932a2010d3612a681",
+        "source": "https://raw.githubusercontent.com/evanw/esbuild/609683d892977362a0f99026cb74b96263d728a9/LICENSE.md"
+      },
+      {
+        "component": "Go runtime go1.26.5",
+        "path": "platform/golang-go-go1.26.5-c19862e5f841-LICENSE",
+        "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+        "source": "https://raw.githubusercontent.com/golang/go/c19862e5f8415b4f24b189d065ed739517c548ba/LICENSE",
+        "sourceCommit": "c19862e5f8415b4f24b189d065ed739517c548ba"
+      },
+      {
+        "component": "golang.org/x/sys",
+        "path": "platform/golang-sys-c0bba94af5f8-LICENSE",
+        "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "source": "https://raw.githubusercontent.com/golang/sys/c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf/LICENSE",
+        "sourceCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "embeddedGo": {
+        "binarySha256": "e1698a3d5c6c0798fee4fd3b5cc816651f460c63d390a7a26ea4beb0b1884100",
+        "binaryVcsRevision": null,
+        "binaryVersionEvidence": "Exact installed package bin/esbuild contains a unique go1.26.5 runtime version string and dependency build information. go version -m also reads structured build metadata for esbuild 0.18.20 and 0.25.12; the 0.28.x binaries retain version/dependency strings while structured Go build metadata is stripped.",
+        "commit": "c19862e5f8415b4f24b189d065ed739517c548ba",
+        "goModEvidence": "https://raw.githubusercontent.com/evanw/esbuild/609683d892977362a0f99026cb74b96263d728a9/go.mod",
+        "tag": "go1.26.5",
+        "tagResolutionEvidence": "git ls-remote --tags https://github.com/golang/go.git refs/tags/go1.26.5",
+        "version": "go1.26.5",
+        "xSysBinaryBuildInfo": "v0.0.0-20220715151400-c0bba94af5f8\th1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysCommit": "c0bba94af5f85fbad9f6dc2e04ed5b8fac9696cf",
+        "xSysCommitEvidence": "https://go.googlesource.com/sys/+show/c0bba94af5f8?format=JSON",
+        "xSysModuleSum": "h1:0A+M6Uqn+Eje4kHMK80dtF3JCXC4ykBgQG4Fe06QRhQ=",
+        "xSysVersion": "v0.0.0-20220715151400-c0bba94af5f8"
+      },
+      "gitHead": "609683d892977362a0f99026cb74b96263d728a9",
+      "integrity": "sha512-4xTZr1FUmSoQW4XIWmit3tzQrUTZM+N3P0XV8xROKYF50XfI7xeO90+1bZvNwxIufQ9hDQVRJH5YhgPVF8A/HQ==",
+      "registry": "https://registry.npmjs.org/%40esbuild%2Flinux-x64/0.28.2",
+      "repository": "git+https://github.com/evanw/esbuild.git",
+      "resolvedCommit": "609683d892977362a0f99026cb74b96263d728a9",
+      "tarball": "https://registry.npmjs.org/@esbuild/linux-x64/-/linux-x64-0.28.2.tgz"
+    }
+  },
+  "@libsql/darwin-arm64@0.5.29": {
+    "files": [
+      {
+        "path": "platform/tursodatabase-libsql-js-55bee86d1c28-LICENSE",
+        "sha256": "81680d013513cf3003b03b7074948609dfb90dfeca0b8292b3c16e0172a189f4",
+        "source": "https://raw.githubusercontent.com/tursodatabase/libsql-js/55bee86d1c284f1ddf2b9e280e870d2b6cef884a/LICENSE"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": null,
+      "integrity": "sha512-K+2RIB1OGFPYQbfay48GakLhqf3ArcbHqPFu7EZiaUcRgFcdw8RoltsMyvbj5ix2fY0HV3Q3Ioa/ByvQdaSM0A==",
+      "parentGitHead": "55bee86d1c284f1ddf2b9e280e870d2b6cef884a",
+      "parentOptionalDependencyVersion": "0.5.29",
+      "parentPackage": "libsql@0.5.29",
+      "parentRegistry": "https://registry.npmjs.org/libsql/0.5.29",
+      "registry": "https://registry.npmjs.org/%40libsql%2Fdarwin-arm64/0.5.29",
+      "repository": "git+https://github.com/tursodatabase/libsql-js.git",
+      "resolvedCommit": "55bee86d1c284f1ddf2b9e280e870d2b6cef884a",
+      "tarball": "https://registry.npmjs.org/@libsql/darwin-arm64/-/darwin-arm64-0.5.29.tgz"
+    }
+  },
+  "@libsql/linux-arm64-gnu@0.5.29": {
+    "files": [
+      {
+        "path": "platform/tursodatabase-libsql-js-55bee86d1c28-LICENSE",
+        "sha256": "81680d013513cf3003b03b7074948609dfb90dfeca0b8292b3c16e0172a189f4",
+        "source": "https://raw.githubusercontent.com/tursodatabase/libsql-js/55bee86d1c284f1ddf2b9e280e870d2b6cef884a/LICENSE"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": null,
+      "integrity": "sha512-gURBqaiXIGGwFNEaUj8Ldk7Hps4STtG+31aEidCk5evMMdtsdfL3HPCpvys+ZF/tkOs2MWlRWoSq7SOuCE9k3w==",
+      "parentGitHead": "55bee86d1c284f1ddf2b9e280e870d2b6cef884a",
+      "parentOptionalDependencyVersion": "0.5.29",
+      "parentPackage": "libsql@0.5.29",
+      "parentRegistry": "https://registry.npmjs.org/libsql/0.5.29",
+      "registry": "https://registry.npmjs.org/%40libsql%2Flinux-arm64-gnu/0.5.29",
+      "repository": "git+https://github.com/tursodatabase/libsql-js.git",
+      "resolvedCommit": "55bee86d1c284f1ddf2b9e280e870d2b6cef884a",
+      "tarball": "https://registry.npmjs.org/@libsql/linux-arm64-gnu/-/linux-arm64-gnu-0.5.29.tgz"
+    }
+  },
+  "@libsql/linux-arm64-musl@0.5.29": {
+    "files": [
+      {
+        "path": "platform/tursodatabase-libsql-js-55bee86d1c28-LICENSE",
+        "sha256": "81680d013513cf3003b03b7074948609dfb90dfeca0b8292b3c16e0172a189f4",
+        "source": "https://raw.githubusercontent.com/tursodatabase/libsql-js/55bee86d1c284f1ddf2b9e280e870d2b6cef884a/LICENSE"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": null,
+      "integrity": "sha512-fwgYZ0H8mUkyVqXZHF3mT/92iIh1N94Owi/f66cPVNsk9BdGKq5gVpoKO+7UxaNzuEH1roJp2QEwsCZMvBLpqg==",
+      "parentGitHead": "55bee86d1c284f1ddf2b9e280e870d2b6cef884a",
+      "parentOptionalDependencyVersion": "0.5.29",
+      "parentPackage": "libsql@0.5.29",
+      "parentRegistry": "https://registry.npmjs.org/libsql/0.5.29",
+      "registry": "https://registry.npmjs.org/%40libsql%2Flinux-arm64-musl/0.5.29",
+      "repository": "git+https://github.com/tursodatabase/libsql-js.git",
+      "resolvedCommit": "55bee86d1c284f1ddf2b9e280e870d2b6cef884a",
+      "tarball": "https://registry.npmjs.org/@libsql/linux-arm64-musl/-/linux-arm64-musl-0.5.29.tgz"
+    }
+  },
+  "@libsql/linux-x64-gnu@0.5.29": {
+    "files": [
+      {
+        "path": "platform/tursodatabase-libsql-js-55bee86d1c28-LICENSE",
+        "sha256": "81680d013513cf3003b03b7074948609dfb90dfeca0b8292b3c16e0172a189f4",
+        "source": "https://raw.githubusercontent.com/tursodatabase/libsql-js/55bee86d1c284f1ddf2b9e280e870d2b6cef884a/LICENSE"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": null,
+      "integrity": "sha512-y14V0vY0nmMC6G0pHeJcEarcnGU2H6cm21ZceRkacWHvQAEhAG0latQkCtoS2njFOXiYIg+JYPfAoWKbi82rkg==",
+      "parentGitHead": "55bee86d1c284f1ddf2b9e280e870d2b6cef884a",
+      "parentOptionalDependencyVersion": "0.5.29",
+      "parentPackage": "libsql@0.5.29",
+      "parentRegistry": "https://registry.npmjs.org/libsql/0.5.29",
+      "registry": "https://registry.npmjs.org/%40libsql%2Flinux-x64-gnu/0.5.29",
+      "repository": "git+https://github.com/tursodatabase/libsql-js.git",
+      "resolvedCommit": "55bee86d1c284f1ddf2b9e280e870d2b6cef884a",
+      "tarball": "https://registry.npmjs.org/@libsql/linux-x64-gnu/-/linux-x64-gnu-0.5.29.tgz"
+    }
+  },
+  "@libsql/linux-x64-musl@0.5.29": {
+    "files": [
+      {
+        "path": "platform/tursodatabase-libsql-js-55bee86d1c28-LICENSE",
+        "sha256": "81680d013513cf3003b03b7074948609dfb90dfeca0b8292b3c16e0172a189f4",
+        "source": "https://raw.githubusercontent.com/tursodatabase/libsql-js/55bee86d1c284f1ddf2b9e280e870d2b6cef884a/LICENSE"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": null,
+      "integrity": "sha512-gquqwA/39tH4pFl+J9n3SOMSymjX+6kZ3kWgY3b94nXFTwac9bnFNMffIomgvlFaC4ArVqMnOZD3nuJ3H3VO1w==",
+      "parentGitHead": "55bee86d1c284f1ddf2b9e280e870d2b6cef884a",
+      "parentOptionalDependencyVersion": "0.5.29",
+      "parentPackage": "libsql@0.5.29",
+      "parentRegistry": "https://registry.npmjs.org/libsql/0.5.29",
+      "registry": "https://registry.npmjs.org/%40libsql%2Flinux-x64-musl/0.5.29",
+      "repository": "git+https://github.com/tursodatabase/libsql-js.git",
+      "resolvedCommit": "55bee86d1c284f1ddf2b9e280e870d2b6cef884a",
+      "tarball": "https://registry.npmjs.org/@libsql/linux-x64-musl/-/linux-x64-musl-0.5.29.tgz"
+    }
+  },
+  "@napi-rs/canvas-darwin-arm64@1.0.11": {
+    "files": [
+      {
+        "path": "platform/Brooooooklyn-canvas-adce718ec8ff-LICENSE",
+        "sha256": "8802fecf9da4367bc23bcf20b21cc143785fc6c92b152f3fa7fbe6ce08d344d6",
+        "source": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/LICENSE"
+      },
+      {
+        "component": "expat",
+        "path": "platform/canvas-expat-6154446fccef-COPYING",
+        "sha256": "31b15de82aa19a845156169a17a5488bf597e561b2c318d159ed583139b25e87",
+        "source": "https://chromium.googlesource.com/external/github.com/libexpat/libexpat.git/+/6154446fccefbf3ca644894f598969113b0c7bcd/COPYING?format=TEXT",
+        "sourceCommit": "6154446fccefbf3ca644894f598969113b0c7bcd",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-LICENSE.TXT",
+        "sha256": "bd36c8b474855fa294c2ec5c184544478ef3720aad37d65a6296a4f264fd2d3b",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/LICENSE.TXT?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-docs-FTL.TXT",
+        "sha256": "5a5ee54c5001bbad1cdc1a57cc3dd4c42199b2da09d39c7ee41fab002d02967f",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/docs/FTL.TXT?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-src-bdf-README",
+        "sha256": "7984455e7e5a9faba3797c8bf095fbe10cc846316b7320aff8c58402e22b82fe",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/bdf/README?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-src-pcf-README",
+        "sha256": "18d9782898d9eac04476e2f744678137b2a889689ed3e923e052fc396a86f86b",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/pcf/README?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-src-gzip-zlib.h",
+        "sha256": "c86a25c27f74cb97b8fa07b175f479f063d5064ace9995b4684063643c81cf1b",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/gzip/zlib.h?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-src-base-fthash.c",
+        "sha256": "693e5a54b3ce30140975a94a3369dbe706eb1f280c69e80da426d39cc45b94ef",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/base/fthash.c?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-include-freetype-internal-fthash.h",
+        "sha256": "023d88d49d29ecf3833db7717a3f7ae223c17ec2012bdb5bf33bb67abaf616c4",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/include/freetype/internal/fthash.h?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "brotli",
+        "path": "platform/canvas-brotli-6d03dfbedda1-LICENSE",
+        "sha256": "3d180008e36922a4e8daec11c34c7af264fed5962d07924aea928c38e8663c94",
+        "source": "https://skia.googlesource.com/external/github.com/google/brotli.git/+/6d03dfbedda1615c4cba1211f8d81735575209c8/LICENSE?format=TEXT",
+        "sourceCommit": "6d03dfbedda1615c4cba1211f8d81735575209c8",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "harfbuzz",
+        "path": "platform/canvas-harfbuzz-9cb1fee51069-COPYING",
+        "sha256": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64",
+        "source": "https://chromium.googlesource.com/external/github.com/harfbuzz/harfbuzz.git/+/9cb1fee51069b206effb4736e443b038d230789d/COPYING?format=TEXT",
+        "sourceCommit": "9cb1fee51069b206effb4736e443b038d230789d",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "icu",
+        "path": "platform/canvas-icu-d578f2e8b7bd-LICENSE",
+        "sha256": "e55522d81edc687a341a4411e0776e54ca654e90147f354a90458aaced4116af",
+        "source": "https://chromium.googlesource.com/chromium/deps/icu.git/+/d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738/LICENSE?format=TEXT",
+        "sourceCommit": "d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "icu",
+        "path": "platform/canvas-icu-d578f2e8b7bd-license.html",
+        "sha256": "c62d7697c03979f5056d28b338fafc7a1152820f7b379adf4a9d88cd37160f96",
+        "source": "https://chromium.googlesource.com/chromium/deps/icu.git/+/d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738/license.html?format=TEXT",
+        "sourceCommit": "d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libjxl",
+        "path": "platform/canvas-libjxl-332feb17d173-LICENSE",
+        "sha256": "8405932022a556380c2d8c272eff154a923feb197233f348ce5f7334fb0a5ede",
+        "source": "https://chromium.googlesource.com/external/gitlab.com/wg1/jpeg-xl.git/+/332feb17d17311c748445f7ee75c4fb55cc38530/LICENSE?format=TEXT",
+        "sourceCommit": "332feb17d17311c748445f7ee75c4fb55cc38530",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libjxl",
+        "path": "platform/canvas-libjxl-332feb17d173-PATENTS",
+        "sha256": "91915f8ae056a68a3c5bdf05d9f6f78bb6903e27a8ca3a8434c9e4ac87300575",
+        "source": "https://chromium.googlesource.com/external/gitlab.com/wg1/jpeg-xl.git/+/332feb17d17311c748445f7ee75c4fb55cc38530/PATENTS?format=TEXT",
+        "sourceCommit": "332feb17d17311c748445f7ee75c4fb55cc38530",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "highway",
+        "path": "platform/canvas-highway-457c891775a7-LICENSE",
+        "sha256": "43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1",
+        "source": "https://chromium.googlesource.com/external/github.com/google/highway.git/+/457c891775a7397bdb0376bb1031e6e027af1c48/LICENSE?format=TEXT",
+        "sourceCommit": "457c891775a7397bdb0376bb1031e6e027af1c48",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "highway",
+        "path": "platform/canvas-highway-457c891775a7-LICENSE-BSD3",
+        "sha256": "d25e82e26acd42ca3ccc9993622631163425b869b9e16284226d534cff6470f2",
+        "source": "https://chromium.googlesource.com/external/github.com/google/highway.git/+/457c891775a7397bdb0376bb1031e6e027af1c48/LICENSE-BSD3?format=TEXT",
+        "sourceCommit": "457c891775a7397bdb0376bb1031e6e027af1c48",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libjpeg-turbo",
+        "path": "platform/canvas-libjpeg-turbo-e14cbfaa8552-LICENSE.md",
+        "sha256": "96f5b328adbb78eeaaec6980d73fd558cb1e4d62560ed615646bc3cf5e532430",
+        "source": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad/LICENSE.md?format=TEXT",
+        "sourceCommit": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libjpeg-turbo",
+        "path": "platform/canvas-libjpeg-turbo-e14cbfaa8552-README.ijg",
+        "sha256": "75815e3bf6484201a3c3d17a1bbf10f2e8e3237f84df10a2357ea896db2a81d6",
+        "source": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad/README.ijg?format=TEXT",
+        "sourceCommit": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libpng",
+        "path": "platform/canvas-libpng-d5515b5b8be3-LICENSE",
+        "sha256": "bdb0a645ea18c60507d0368379b1ac5474b92255fcc2d115e07486a7672ba526",
+        "source": "https://skia.googlesource.com/third_party/libpng.git/+/d5515b5b8be3901aac04e5bd8bd5c89f287bcd33/LICENSE?format=TEXT",
+        "sourceCommit": "d5515b5b8be3901aac04e5bd8bd5c89f287bcd33",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libwebp",
+        "path": "platform/canvas-libwebp-845d5476a866-COPYING",
+        "sha256": "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf",
+        "source": "https://chromium.googlesource.com/webm/libwebp.git/+/845d5476a866141ba35ac133f856fa62f0b7445f/COPYING?format=TEXT",
+        "sourceCommit": "845d5476a866141ba35ac133f856fa62f0b7445f",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libwebp",
+        "path": "platform/canvas-libwebp-845d5476a866-PATENTS",
+        "sha256": "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c",
+        "source": "https://chromium.googlesource.com/webm/libwebp.git/+/845d5476a866141ba35ac133f856fa62f0b7445f/PATENTS?format=TEXT",
+        "sourceCommit": "845d5476a866141ba35ac133f856fa62f0b7445f",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "wuffs",
+        "path": "platform/canvas-wuffs-e3f919ccfe3e-LICENSE",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "source": "https://skia.googlesource.com/external/github.com/google/wuffs-mirror-release-c.git/+/e3f919ccfe3ef542cfc983a82146070258fb57f8/LICENSE?format=TEXT",
+        "sourceCommit": "e3f919ccfe3ef542cfc983a82146070258fb57f8",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "zlib",
+        "path": "platform/canvas-zlib-646b7f569718-LICENSE",
+        "sha256": "e1cfcc55c325b3f78cf55df9664abaa066e2271dffe8213347d9fccdfbac8f2c",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/zlib/+/646b7f569718921d7d4b5b8e22572ff6c76f2596/LICENSE?format=TEXT",
+        "sourceCommit": "646b7f569718921d7d4b5b8e22572ff6c76f2596",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-LICENSE",
+        "sha256": "5f787c1dee3c56547f09ccc2906ab5f5293c4d8dd6c8654e573216c38e908dbd",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-modules-skcms-LICENSE",
+        "sha256": "e59bb5c5c6ba426a9ac4ba9fe667ad14c5166b12aa25be8af1d122b14fbe2e36",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/modules/skcms/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-third_party-etc1-LICENSE",
+        "sha256": "5366e97b4478f15a1e2fd7e6094337426597df28de50cd9fed3f2e7e87f1229e",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/third_party/etc1/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-third_party-expat-LICENSE",
+        "sha256": "cca48bacd6e7ed63f00b42a346bcc8549a460b41efe75d93db350fc882f54dca",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/third_party/expat/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-third_party-harfbuzz-LICENSE",
+        "sha256": "cca48bacd6e7ed63f00b42a346bcc8549a460b41efe75d93db350fc882f54dca",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/third_party/harfbuzz/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-third_party-wuffs-LICENSE",
+        "sha256": "e59bb5c5c6ba426a9ac4ba9fe667ad14c5166b12aa25be8af1d122b14fbe2e36",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/third_party/wuffs/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "libjpeg-turbo",
+        "path": "platform/canvas-libjpeg-turbo-e14cbfaa8552-simd-nasm-jsimdext.inc",
+        "sha256": "000b2df5469d2f94ea20a1b3d638b94031dad296f006600e1dbff79eded5facb",
+        "source": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad/simd/nasm/jsimdext.inc?format=TEXT",
+        "sourceCommit": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+        "sourceEncoding": "base64"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "embeddedSkia": {
+        "buildFlagsEvidence": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/scripts/skia-gn-args.cjs",
+        "commit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f",
+        "dependencyEvidence": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/DEPS",
+        "enabledDependencyEvidence": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/scripts/generate-sbom.mjs",
+        "repository": "https://github.com/google/skia",
+        "submoduleEvidence": "https://api.github.com/repos/Brooooooklyn/canvas/git/trees/adce718ec8ff82f9e896875752fd621c46b1c04e",
+        "submodulePath": "skia",
+        "submoduleRepositoryEvidence": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/.gitmodules",
+        "vendoredDependencies": {
+          "brotli": {
+            "commit": "6d03dfbedda1615c4cba1211f8d81735575209c8",
+            "repository": "https://skia.googlesource.com/external/github.com/google/brotli.git"
+          },
+          "expat": {
+            "commit": "6154446fccefbf3ca644894f598969113b0c7bcd",
+            "repository": "https://chromium.googlesource.com/external/github.com/libexpat/libexpat.git"
+          },
+          "freetype": {
+            "commit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+            "repository": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git"
+          },
+          "harfbuzz": {
+            "commit": "9cb1fee51069b206effb4736e443b038d230789d",
+            "repository": "https://chromium.googlesource.com/external/github.com/harfbuzz/harfbuzz.git"
+          },
+          "highway": {
+            "commit": "457c891775a7397bdb0376bb1031e6e027af1c48",
+            "repository": "https://chromium.googlesource.com/external/github.com/google/highway.git"
+          },
+          "icu": {
+            "commit": "d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738",
+            "repository": "https://chromium.googlesource.com/chromium/deps/icu.git"
+          },
+          "libjpeg-turbo": {
+            "commit": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+            "repository": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git"
+          },
+          "libjxl": {
+            "commit": "332feb17d17311c748445f7ee75c4fb55cc38530",
+            "repository": "https://chromium.googlesource.com/external/gitlab.com/wg1/jpeg-xl.git"
+          },
+          "libpng": {
+            "commit": "d5515b5b8be3901aac04e5bd8bd5c89f287bcd33",
+            "repository": "https://skia.googlesource.com/third_party/libpng.git"
+          },
+          "libwebp": {
+            "commit": "845d5476a866141ba35ac133f856fa62f0b7445f",
+            "repository": "https://chromium.googlesource.com/webm/libwebp.git"
+          },
+          "wuffs": {
+            "commit": "e3f919ccfe3ef542cfc983a82146070258fb57f8",
+            "repository": "https://skia.googlesource.com/external/github.com/google/wuffs-mirror-release-c.git"
+          },
+          "zlib": {
+            "commit": "646b7f569718921d7d4b5b8e22572ff6c76f2596",
+            "repository": "https://chromium.googlesource.com/chromium/src/third_party/zlib"
+          }
+        }
+      },
+      "gitHead": null,
+      "integrity": "sha512-J/JylWoJTG8OQqZaiqly4IODyAxNofUlZo0wtSBJtHk6AdymbdIkPynAM1JvQaZpPaG5h+msk9QuK8y4i1ooqw==",
+      "parentGitHead": "adce718ec8ff82f9e896875752fd621c46b1c04e",
+      "parentOptionalDependencyVersion": "1.0.11",
+      "parentPackage": "@napi-rs/canvas@1.0.11",
+      "parentRegistry": "https://registry.npmjs.org/%40napi-rs%2Fcanvas/1.0.11",
+      "registry": "https://registry.npmjs.org/%40napi-rs%2Fcanvas-darwin-arm64/1.0.11",
+      "repository": "git+https://github.com/Brooooooklyn/canvas.git",
+      "resolvedCommit": "adce718ec8ff82f9e896875752fd621c46b1c04e",
+      "tarball": "https://registry.npmjs.org/@napi-rs/canvas-darwin-arm64/-/canvas-darwin-arm64-1.0.11.tgz"
+    }
+  },
+  "@napi-rs/canvas-linux-arm64-gnu@1.0.11": {
+    "files": [
+      {
+        "path": "platform/Brooooooklyn-canvas-adce718ec8ff-LICENSE",
+        "sha256": "8802fecf9da4367bc23bcf20b21cc143785fc6c92b152f3fa7fbe6ce08d344d6",
+        "source": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/LICENSE"
+      },
+      {
+        "component": "expat",
+        "path": "platform/canvas-expat-6154446fccef-COPYING",
+        "sha256": "31b15de82aa19a845156169a17a5488bf597e561b2c318d159ed583139b25e87",
+        "source": "https://chromium.googlesource.com/external/github.com/libexpat/libexpat.git/+/6154446fccefbf3ca644894f598969113b0c7bcd/COPYING?format=TEXT",
+        "sourceCommit": "6154446fccefbf3ca644894f598969113b0c7bcd",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-LICENSE.TXT",
+        "sha256": "bd36c8b474855fa294c2ec5c184544478ef3720aad37d65a6296a4f264fd2d3b",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/LICENSE.TXT?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-docs-FTL.TXT",
+        "sha256": "5a5ee54c5001bbad1cdc1a57cc3dd4c42199b2da09d39c7ee41fab002d02967f",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/docs/FTL.TXT?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-src-bdf-README",
+        "sha256": "7984455e7e5a9faba3797c8bf095fbe10cc846316b7320aff8c58402e22b82fe",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/bdf/README?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-src-pcf-README",
+        "sha256": "18d9782898d9eac04476e2f744678137b2a889689ed3e923e052fc396a86f86b",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/pcf/README?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-src-gzip-zlib.h",
+        "sha256": "c86a25c27f74cb97b8fa07b175f479f063d5064ace9995b4684063643c81cf1b",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/gzip/zlib.h?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-src-base-fthash.c",
+        "sha256": "693e5a54b3ce30140975a94a3369dbe706eb1f280c69e80da426d39cc45b94ef",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/base/fthash.c?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-include-freetype-internal-fthash.h",
+        "sha256": "023d88d49d29ecf3833db7717a3f7ae223c17ec2012bdb5bf33bb67abaf616c4",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/include/freetype/internal/fthash.h?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "brotli",
+        "path": "platform/canvas-brotli-6d03dfbedda1-LICENSE",
+        "sha256": "3d180008e36922a4e8daec11c34c7af264fed5962d07924aea928c38e8663c94",
+        "source": "https://skia.googlesource.com/external/github.com/google/brotli.git/+/6d03dfbedda1615c4cba1211f8d81735575209c8/LICENSE?format=TEXT",
+        "sourceCommit": "6d03dfbedda1615c4cba1211f8d81735575209c8",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "harfbuzz",
+        "path": "platform/canvas-harfbuzz-9cb1fee51069-COPYING",
+        "sha256": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64",
+        "source": "https://chromium.googlesource.com/external/github.com/harfbuzz/harfbuzz.git/+/9cb1fee51069b206effb4736e443b038d230789d/COPYING?format=TEXT",
+        "sourceCommit": "9cb1fee51069b206effb4736e443b038d230789d",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "icu",
+        "path": "platform/canvas-icu-d578f2e8b7bd-LICENSE",
+        "sha256": "e55522d81edc687a341a4411e0776e54ca654e90147f354a90458aaced4116af",
+        "source": "https://chromium.googlesource.com/chromium/deps/icu.git/+/d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738/LICENSE?format=TEXT",
+        "sourceCommit": "d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "icu",
+        "path": "platform/canvas-icu-d578f2e8b7bd-license.html",
+        "sha256": "c62d7697c03979f5056d28b338fafc7a1152820f7b379adf4a9d88cd37160f96",
+        "source": "https://chromium.googlesource.com/chromium/deps/icu.git/+/d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738/license.html?format=TEXT",
+        "sourceCommit": "d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libjxl",
+        "path": "platform/canvas-libjxl-332feb17d173-LICENSE",
+        "sha256": "8405932022a556380c2d8c272eff154a923feb197233f348ce5f7334fb0a5ede",
+        "source": "https://chromium.googlesource.com/external/gitlab.com/wg1/jpeg-xl.git/+/332feb17d17311c748445f7ee75c4fb55cc38530/LICENSE?format=TEXT",
+        "sourceCommit": "332feb17d17311c748445f7ee75c4fb55cc38530",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libjxl",
+        "path": "platform/canvas-libjxl-332feb17d173-PATENTS",
+        "sha256": "91915f8ae056a68a3c5bdf05d9f6f78bb6903e27a8ca3a8434c9e4ac87300575",
+        "source": "https://chromium.googlesource.com/external/gitlab.com/wg1/jpeg-xl.git/+/332feb17d17311c748445f7ee75c4fb55cc38530/PATENTS?format=TEXT",
+        "sourceCommit": "332feb17d17311c748445f7ee75c4fb55cc38530",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "highway",
+        "path": "platform/canvas-highway-457c891775a7-LICENSE",
+        "sha256": "43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1",
+        "source": "https://chromium.googlesource.com/external/github.com/google/highway.git/+/457c891775a7397bdb0376bb1031e6e027af1c48/LICENSE?format=TEXT",
+        "sourceCommit": "457c891775a7397bdb0376bb1031e6e027af1c48",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "highway",
+        "path": "platform/canvas-highway-457c891775a7-LICENSE-BSD3",
+        "sha256": "d25e82e26acd42ca3ccc9993622631163425b869b9e16284226d534cff6470f2",
+        "source": "https://chromium.googlesource.com/external/github.com/google/highway.git/+/457c891775a7397bdb0376bb1031e6e027af1c48/LICENSE-BSD3?format=TEXT",
+        "sourceCommit": "457c891775a7397bdb0376bb1031e6e027af1c48",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libjpeg-turbo",
+        "path": "platform/canvas-libjpeg-turbo-e14cbfaa8552-LICENSE.md",
+        "sha256": "96f5b328adbb78eeaaec6980d73fd558cb1e4d62560ed615646bc3cf5e532430",
+        "source": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad/LICENSE.md?format=TEXT",
+        "sourceCommit": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libjpeg-turbo",
+        "path": "platform/canvas-libjpeg-turbo-e14cbfaa8552-README.ijg",
+        "sha256": "75815e3bf6484201a3c3d17a1bbf10f2e8e3237f84df10a2357ea896db2a81d6",
+        "source": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad/README.ijg?format=TEXT",
+        "sourceCommit": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libpng",
+        "path": "platform/canvas-libpng-d5515b5b8be3-LICENSE",
+        "sha256": "bdb0a645ea18c60507d0368379b1ac5474b92255fcc2d115e07486a7672ba526",
+        "source": "https://skia.googlesource.com/third_party/libpng.git/+/d5515b5b8be3901aac04e5bd8bd5c89f287bcd33/LICENSE?format=TEXT",
+        "sourceCommit": "d5515b5b8be3901aac04e5bd8bd5c89f287bcd33",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libwebp",
+        "path": "platform/canvas-libwebp-845d5476a866-COPYING",
+        "sha256": "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf",
+        "source": "https://chromium.googlesource.com/webm/libwebp.git/+/845d5476a866141ba35ac133f856fa62f0b7445f/COPYING?format=TEXT",
+        "sourceCommit": "845d5476a866141ba35ac133f856fa62f0b7445f",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libwebp",
+        "path": "platform/canvas-libwebp-845d5476a866-PATENTS",
+        "sha256": "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c",
+        "source": "https://chromium.googlesource.com/webm/libwebp.git/+/845d5476a866141ba35ac133f856fa62f0b7445f/PATENTS?format=TEXT",
+        "sourceCommit": "845d5476a866141ba35ac133f856fa62f0b7445f",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "wuffs",
+        "path": "platform/canvas-wuffs-e3f919ccfe3e-LICENSE",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "source": "https://skia.googlesource.com/external/github.com/google/wuffs-mirror-release-c.git/+/e3f919ccfe3ef542cfc983a82146070258fb57f8/LICENSE?format=TEXT",
+        "sourceCommit": "e3f919ccfe3ef542cfc983a82146070258fb57f8",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "zlib",
+        "path": "platform/canvas-zlib-646b7f569718-LICENSE",
+        "sha256": "e1cfcc55c325b3f78cf55df9664abaa066e2271dffe8213347d9fccdfbac8f2c",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/zlib/+/646b7f569718921d7d4b5b8e22572ff6c76f2596/LICENSE?format=TEXT",
+        "sourceCommit": "646b7f569718921d7d4b5b8e22572ff6c76f2596",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-LICENSE",
+        "sha256": "5f787c1dee3c56547f09ccc2906ab5f5293c4d8dd6c8654e573216c38e908dbd",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-modules-skcms-LICENSE",
+        "sha256": "e59bb5c5c6ba426a9ac4ba9fe667ad14c5166b12aa25be8af1d122b14fbe2e36",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/modules/skcms/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-third_party-etc1-LICENSE",
+        "sha256": "5366e97b4478f15a1e2fd7e6094337426597df28de50cd9fed3f2e7e87f1229e",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/third_party/etc1/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-third_party-expat-LICENSE",
+        "sha256": "cca48bacd6e7ed63f00b42a346bcc8549a460b41efe75d93db350fc882f54dca",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/third_party/expat/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-third_party-harfbuzz-LICENSE",
+        "sha256": "cca48bacd6e7ed63f00b42a346bcc8549a460b41efe75d93db350fc882f54dca",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/third_party/harfbuzz/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-third_party-wuffs-LICENSE",
+        "sha256": "e59bb5c5c6ba426a9ac4ba9fe667ad14c5166b12aa25be8af1d122b14fbe2e36",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/third_party/wuffs/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "libjpeg-turbo",
+        "path": "platform/canvas-libjpeg-turbo-e14cbfaa8552-simd-nasm-jsimdext.inc",
+        "sha256": "000b2df5469d2f94ea20a1b3d638b94031dad296f006600e1dbff79eded5facb",
+        "source": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad/simd/nasm/jsimdext.inc?format=TEXT",
+        "sourceCommit": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "llvm/llvm-project/libcxx",
+        "path": "platform/canvas-llvm-llvm-project-cd708029e0b2-libcxx-LICENSE.TXT",
+        "sha256": "539dd7aed86e8a4f12cbdd0e6c50c189c7d74847e4fecc64ce2c6ee3a01da38b",
+        "source": "https://raw.githubusercontent.com/llvm/llvm-project/cd708029e0b2869e80abe31ddb175f7c35361f90/libcxx/LICENSE.TXT",
+        "sourceCommit": "cd708029e0b2869e80abe31ddb175f7c35361f90"
+      },
+      {
+        "component": "llvm/llvm-project/libcxxabi",
+        "path": "platform/canvas-llvm-llvm-project-cd708029e0b2-libcxxabi-LICENSE.TXT",
+        "sha256": "e2b35be49f7284a45b7baca8fc7b3ab7440e7902392b2528a457816b5bb2a15c",
+        "source": "https://raw.githubusercontent.com/llvm/llvm-project/cd708029e0b2869e80abe31ddb175f7c35361f90/libcxxabi/LICENSE.TXT",
+        "sourceCommit": "cd708029e0b2869e80abe31ddb175f7c35361f90"
+      },
+      {
+        "component": "llvm/llvm-project/libunwind",
+        "path": "platform/canvas-llvm-llvm-project-cd708029e0b2-libunwind-LICENSE.TXT",
+        "sha256": "b5efebcaca80879234098e52d1725e6d9eb8fb96a19fce625d39184b705f7b6d",
+        "source": "https://raw.githubusercontent.com/llvm/llvm-project/cd708029e0b2869e80abe31ddb175f7c35361f90/libunwind/LICENSE.TXT",
+        "sourceCommit": "cd708029e0b2869e80abe31ddb175f7c35361f90"
+      },
+      {
+        "component": "llvm/llvm-project/compiler-rt",
+        "path": "platform/canvas-llvm-llvm-project-cd708029e0b2-compiler-rt-LICENSE.TXT",
+        "sha256": "1a8f1058753f1ba890de984e48f0242a3a5c29a6a8f2ed9fd813f36985387e8d",
+        "source": "https://raw.githubusercontent.com/llvm/llvm-project/cd708029e0b2869e80abe31ddb175f7c35361f90/compiler-rt/LICENSE.TXT",
+        "sourceCommit": "cd708029e0b2869e80abe31ddb175f7c35361f90"
+      }
+    ],
+    "provenance": {
+      "cxxRuntimes": {
+        "gnuBuildEvidence": [
+          "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/Dockerfile",
+          "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/aarch64.Dockerfile"
+        ],
+        "gnuVersionLimitation": "The GNU Dockerfiles request LLVM major 19 from apt.llvm.org and use mutable builder image tags, without a package patch version or image digest. The exact GNU runtime patch/build is not established by repository source. LLVM 19.1.7 is the exact version used by the separate upstream runtime build script and supplies original LLVM runtime license texts.",
+        "llvmCommit": "cd708029e0b2869e80abe31ddb175f7c35361f90",
+        "llvmRuntimeBuildEvidence": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/scripts/build-c++abi.mjs",
+        "llvmTag": "llvmorg-19.1.7",
+        "llvmVersion": "19.1.7",
+        "llvmVersionEvidence": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/llvm-version"
+      },
+      "declaredLicense": "MIT",
+      "embeddedSkia": {
+        "buildFlagsEvidence": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/scripts/skia-gn-args.cjs",
+        "commit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f",
+        "dependencyEvidence": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/DEPS",
+        "enabledDependencyEvidence": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/scripts/generate-sbom.mjs",
+        "repository": "https://github.com/google/skia",
+        "submoduleEvidence": "https://api.github.com/repos/Brooooooklyn/canvas/git/trees/adce718ec8ff82f9e896875752fd621c46b1c04e",
+        "submodulePath": "skia",
+        "submoduleRepositoryEvidence": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/.gitmodules",
+        "vendoredDependencies": {
+          "brotli": {
+            "commit": "6d03dfbedda1615c4cba1211f8d81735575209c8",
+            "repository": "https://skia.googlesource.com/external/github.com/google/brotli.git"
+          },
+          "expat": {
+            "commit": "6154446fccefbf3ca644894f598969113b0c7bcd",
+            "repository": "https://chromium.googlesource.com/external/github.com/libexpat/libexpat.git"
+          },
+          "freetype": {
+            "commit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+            "repository": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git"
+          },
+          "harfbuzz": {
+            "commit": "9cb1fee51069b206effb4736e443b038d230789d",
+            "repository": "https://chromium.googlesource.com/external/github.com/harfbuzz/harfbuzz.git"
+          },
+          "highway": {
+            "commit": "457c891775a7397bdb0376bb1031e6e027af1c48",
+            "repository": "https://chromium.googlesource.com/external/github.com/google/highway.git"
+          },
+          "icu": {
+            "commit": "d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738",
+            "repository": "https://chromium.googlesource.com/chromium/deps/icu.git"
+          },
+          "libjpeg-turbo": {
+            "commit": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+            "repository": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git"
+          },
+          "libjxl": {
+            "commit": "332feb17d17311c748445f7ee75c4fb55cc38530",
+            "repository": "https://chromium.googlesource.com/external/gitlab.com/wg1/jpeg-xl.git"
+          },
+          "libpng": {
+            "commit": "d5515b5b8be3901aac04e5bd8bd5c89f287bcd33",
+            "repository": "https://skia.googlesource.com/third_party/libpng.git"
+          },
+          "libwebp": {
+            "commit": "845d5476a866141ba35ac133f856fa62f0b7445f",
+            "repository": "https://chromium.googlesource.com/webm/libwebp.git"
+          },
+          "wuffs": {
+            "commit": "e3f919ccfe3ef542cfc983a82146070258fb57f8",
+            "repository": "https://skia.googlesource.com/external/github.com/google/wuffs-mirror-release-c.git"
+          },
+          "zlib": {
+            "commit": "646b7f569718921d7d4b5b8e22572ff6c76f2596",
+            "repository": "https://chromium.googlesource.com/chromium/src/third_party/zlib"
+          }
+        }
+      },
+      "gitHead": null,
+      "integrity": "sha512-55sykACGENj5j1rhj+81AO8JbR9HYgGjRZ7/H+pNr4VE1DvINKYNMTcutk8ZmWxk276jAQvUKJ3+Kdj9GXU3lQ==",
+      "parentGitHead": "adce718ec8ff82f9e896875752fd621c46b1c04e",
+      "parentOptionalDependencyVersion": "1.0.11",
+      "parentPackage": "@napi-rs/canvas@1.0.11",
+      "parentRegistry": "https://registry.npmjs.org/%40napi-rs%2Fcanvas/1.0.11",
+      "registry": "https://registry.npmjs.org/%40napi-rs%2Fcanvas-linux-arm64-gnu/1.0.11",
+      "repository": "git+https://github.com/Brooooooklyn/canvas.git",
+      "resolvedCommit": "adce718ec8ff82f9e896875752fd621c46b1c04e",
+      "tarball": "https://registry.npmjs.org/@napi-rs/canvas-linux-arm64-gnu/-/canvas-linux-arm64-gnu-1.0.11.tgz"
+    }
+  },
+  "@napi-rs/canvas-linux-arm64-musl@1.0.11": {
+    "files": [
+      {
+        "path": "platform/Brooooooklyn-canvas-adce718ec8ff-LICENSE",
+        "sha256": "8802fecf9da4367bc23bcf20b21cc143785fc6c92b152f3fa7fbe6ce08d344d6",
+        "source": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/LICENSE"
+      },
+      {
+        "component": "expat",
+        "path": "platform/canvas-expat-6154446fccef-COPYING",
+        "sha256": "31b15de82aa19a845156169a17a5488bf597e561b2c318d159ed583139b25e87",
+        "source": "https://chromium.googlesource.com/external/github.com/libexpat/libexpat.git/+/6154446fccefbf3ca644894f598969113b0c7bcd/COPYING?format=TEXT",
+        "sourceCommit": "6154446fccefbf3ca644894f598969113b0c7bcd",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-LICENSE.TXT",
+        "sha256": "bd36c8b474855fa294c2ec5c184544478ef3720aad37d65a6296a4f264fd2d3b",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/LICENSE.TXT?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-docs-FTL.TXT",
+        "sha256": "5a5ee54c5001bbad1cdc1a57cc3dd4c42199b2da09d39c7ee41fab002d02967f",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/docs/FTL.TXT?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-src-bdf-README",
+        "sha256": "7984455e7e5a9faba3797c8bf095fbe10cc846316b7320aff8c58402e22b82fe",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/bdf/README?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-src-pcf-README",
+        "sha256": "18d9782898d9eac04476e2f744678137b2a889689ed3e923e052fc396a86f86b",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/pcf/README?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-src-gzip-zlib.h",
+        "sha256": "c86a25c27f74cb97b8fa07b175f479f063d5064ace9995b4684063643c81cf1b",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/gzip/zlib.h?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-src-base-fthash.c",
+        "sha256": "693e5a54b3ce30140975a94a3369dbe706eb1f280c69e80da426d39cc45b94ef",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/base/fthash.c?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-include-freetype-internal-fthash.h",
+        "sha256": "023d88d49d29ecf3833db7717a3f7ae223c17ec2012bdb5bf33bb67abaf616c4",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/include/freetype/internal/fthash.h?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "brotli",
+        "path": "platform/canvas-brotli-6d03dfbedda1-LICENSE",
+        "sha256": "3d180008e36922a4e8daec11c34c7af264fed5962d07924aea928c38e8663c94",
+        "source": "https://skia.googlesource.com/external/github.com/google/brotli.git/+/6d03dfbedda1615c4cba1211f8d81735575209c8/LICENSE?format=TEXT",
+        "sourceCommit": "6d03dfbedda1615c4cba1211f8d81735575209c8",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "harfbuzz",
+        "path": "platform/canvas-harfbuzz-9cb1fee51069-COPYING",
+        "sha256": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64",
+        "source": "https://chromium.googlesource.com/external/github.com/harfbuzz/harfbuzz.git/+/9cb1fee51069b206effb4736e443b038d230789d/COPYING?format=TEXT",
+        "sourceCommit": "9cb1fee51069b206effb4736e443b038d230789d",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "icu",
+        "path": "platform/canvas-icu-d578f2e8b7bd-LICENSE",
+        "sha256": "e55522d81edc687a341a4411e0776e54ca654e90147f354a90458aaced4116af",
+        "source": "https://chromium.googlesource.com/chromium/deps/icu.git/+/d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738/LICENSE?format=TEXT",
+        "sourceCommit": "d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "icu",
+        "path": "platform/canvas-icu-d578f2e8b7bd-license.html",
+        "sha256": "c62d7697c03979f5056d28b338fafc7a1152820f7b379adf4a9d88cd37160f96",
+        "source": "https://chromium.googlesource.com/chromium/deps/icu.git/+/d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738/license.html?format=TEXT",
+        "sourceCommit": "d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libjxl",
+        "path": "platform/canvas-libjxl-332feb17d173-LICENSE",
+        "sha256": "8405932022a556380c2d8c272eff154a923feb197233f348ce5f7334fb0a5ede",
+        "source": "https://chromium.googlesource.com/external/gitlab.com/wg1/jpeg-xl.git/+/332feb17d17311c748445f7ee75c4fb55cc38530/LICENSE?format=TEXT",
+        "sourceCommit": "332feb17d17311c748445f7ee75c4fb55cc38530",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libjxl",
+        "path": "platform/canvas-libjxl-332feb17d173-PATENTS",
+        "sha256": "91915f8ae056a68a3c5bdf05d9f6f78bb6903e27a8ca3a8434c9e4ac87300575",
+        "source": "https://chromium.googlesource.com/external/gitlab.com/wg1/jpeg-xl.git/+/332feb17d17311c748445f7ee75c4fb55cc38530/PATENTS?format=TEXT",
+        "sourceCommit": "332feb17d17311c748445f7ee75c4fb55cc38530",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "highway",
+        "path": "platform/canvas-highway-457c891775a7-LICENSE",
+        "sha256": "43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1",
+        "source": "https://chromium.googlesource.com/external/github.com/google/highway.git/+/457c891775a7397bdb0376bb1031e6e027af1c48/LICENSE?format=TEXT",
+        "sourceCommit": "457c891775a7397bdb0376bb1031e6e027af1c48",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "highway",
+        "path": "platform/canvas-highway-457c891775a7-LICENSE-BSD3",
+        "sha256": "d25e82e26acd42ca3ccc9993622631163425b869b9e16284226d534cff6470f2",
+        "source": "https://chromium.googlesource.com/external/github.com/google/highway.git/+/457c891775a7397bdb0376bb1031e6e027af1c48/LICENSE-BSD3?format=TEXT",
+        "sourceCommit": "457c891775a7397bdb0376bb1031e6e027af1c48",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libjpeg-turbo",
+        "path": "platform/canvas-libjpeg-turbo-e14cbfaa8552-LICENSE.md",
+        "sha256": "96f5b328adbb78eeaaec6980d73fd558cb1e4d62560ed615646bc3cf5e532430",
+        "source": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad/LICENSE.md?format=TEXT",
+        "sourceCommit": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libjpeg-turbo",
+        "path": "platform/canvas-libjpeg-turbo-e14cbfaa8552-README.ijg",
+        "sha256": "75815e3bf6484201a3c3d17a1bbf10f2e8e3237f84df10a2357ea896db2a81d6",
+        "source": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad/README.ijg?format=TEXT",
+        "sourceCommit": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libpng",
+        "path": "platform/canvas-libpng-d5515b5b8be3-LICENSE",
+        "sha256": "bdb0a645ea18c60507d0368379b1ac5474b92255fcc2d115e07486a7672ba526",
+        "source": "https://skia.googlesource.com/third_party/libpng.git/+/d5515b5b8be3901aac04e5bd8bd5c89f287bcd33/LICENSE?format=TEXT",
+        "sourceCommit": "d5515b5b8be3901aac04e5bd8bd5c89f287bcd33",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libwebp",
+        "path": "platform/canvas-libwebp-845d5476a866-COPYING",
+        "sha256": "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf",
+        "source": "https://chromium.googlesource.com/webm/libwebp.git/+/845d5476a866141ba35ac133f856fa62f0b7445f/COPYING?format=TEXT",
+        "sourceCommit": "845d5476a866141ba35ac133f856fa62f0b7445f",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libwebp",
+        "path": "platform/canvas-libwebp-845d5476a866-PATENTS",
+        "sha256": "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c",
+        "source": "https://chromium.googlesource.com/webm/libwebp.git/+/845d5476a866141ba35ac133f856fa62f0b7445f/PATENTS?format=TEXT",
+        "sourceCommit": "845d5476a866141ba35ac133f856fa62f0b7445f",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "wuffs",
+        "path": "platform/canvas-wuffs-e3f919ccfe3e-LICENSE",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "source": "https://skia.googlesource.com/external/github.com/google/wuffs-mirror-release-c.git/+/e3f919ccfe3ef542cfc983a82146070258fb57f8/LICENSE?format=TEXT",
+        "sourceCommit": "e3f919ccfe3ef542cfc983a82146070258fb57f8",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "zlib",
+        "path": "platform/canvas-zlib-646b7f569718-LICENSE",
+        "sha256": "e1cfcc55c325b3f78cf55df9664abaa066e2271dffe8213347d9fccdfbac8f2c",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/zlib/+/646b7f569718921d7d4b5b8e22572ff6c76f2596/LICENSE?format=TEXT",
+        "sourceCommit": "646b7f569718921d7d4b5b8e22572ff6c76f2596",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-LICENSE",
+        "sha256": "5f787c1dee3c56547f09ccc2906ab5f5293c4d8dd6c8654e573216c38e908dbd",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-modules-skcms-LICENSE",
+        "sha256": "e59bb5c5c6ba426a9ac4ba9fe667ad14c5166b12aa25be8af1d122b14fbe2e36",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/modules/skcms/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-third_party-etc1-LICENSE",
+        "sha256": "5366e97b4478f15a1e2fd7e6094337426597df28de50cd9fed3f2e7e87f1229e",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/third_party/etc1/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-third_party-expat-LICENSE",
+        "sha256": "cca48bacd6e7ed63f00b42a346bcc8549a460b41efe75d93db350fc882f54dca",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/third_party/expat/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-third_party-harfbuzz-LICENSE",
+        "sha256": "cca48bacd6e7ed63f00b42a346bcc8549a460b41efe75d93db350fc882f54dca",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/third_party/harfbuzz/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-third_party-wuffs-LICENSE",
+        "sha256": "e59bb5c5c6ba426a9ac4ba9fe667ad14c5166b12aa25be8af1d122b14fbe2e36",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/third_party/wuffs/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "libjpeg-turbo",
+        "path": "platform/canvas-libjpeg-turbo-e14cbfaa8552-simd-nasm-jsimdext.inc",
+        "sha256": "000b2df5469d2f94ea20a1b3d638b94031dad296f006600e1dbff79eded5facb",
+        "source": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad/simd/nasm/jsimdext.inc?format=TEXT",
+        "sourceCommit": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "ziglang/zig/LICENSE",
+        "path": "platform/canvas-ziglang-zig-3db960767d12-LICENSE",
+        "sha256": "5c537d6853e005298a285d508cff9ac7192cea23576c840d485b2b586a7ff177",
+        "source": "https://raw.githubusercontent.com/ziglang/zig/3db960767d12b6214bcf43f1966a037c7a586a12/LICENSE",
+        "sourceCommit": "3db960767d12b6214bcf43f1966a037c7a586a12"
+      },
+      {
+        "component": "ziglang/zig/lib",
+        "path": "platform/canvas-ziglang-zig-3db960767d12-lib-libcxx-LICENSE.TXT",
+        "sha256": "539dd7aed86e8a4f12cbdd0e6c50c189c7d74847e4fecc64ce2c6ee3a01da38b",
+        "source": "https://raw.githubusercontent.com/ziglang/zig/3db960767d12b6214bcf43f1966a037c7a586a12/lib/libcxx/LICENSE.TXT",
+        "sourceCommit": "3db960767d12b6214bcf43f1966a037c7a586a12"
+      },
+      {
+        "component": "ziglang/zig/lib",
+        "path": "platform/canvas-ziglang-zig-3db960767d12-lib-libcxxabi-LICENSE.TXT",
+        "sha256": "e2b35be49f7284a45b7baca8fc7b3ab7440e7902392b2528a457816b5bb2a15c",
+        "source": "https://raw.githubusercontent.com/ziglang/zig/3db960767d12b6214bcf43f1966a037c7a586a12/lib/libcxxabi/LICENSE.TXT",
+        "sourceCommit": "3db960767d12b6214bcf43f1966a037c7a586a12"
+      },
+      {
+        "component": "ziglang/zig/lib",
+        "path": "platform/canvas-ziglang-zig-3db960767d12-lib-libunwind-LICENSE.TXT",
+        "sha256": "b5efebcaca80879234098e52d1725e6d9eb8fb96a19fce625d39184b705f7b6d",
+        "source": "https://raw.githubusercontent.com/ziglang/zig/3db960767d12b6214bcf43f1966a037c7a586a12/lib/libunwind/LICENSE.TXT",
+        "sourceCommit": "3db960767d12b6214bcf43f1966a037c7a586a12"
+      }
+    ],
+    "provenance": {
+      "cxxRuntimes": {
+        "zigCommit": "3db960767d12b6214bcf43f1966a037c7a586a12",
+        "zigTag": "0.15.1",
+        "zigVersion": "0.15.1",
+        "zigVersionEvidence": [
+          "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/.github/workflows/CI.yaml",
+          "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/.github/workflows/skia.yaml"
+        ]
+      },
+      "declaredLicense": "MIT",
+      "embeddedSkia": {
+        "buildFlagsEvidence": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/scripts/skia-gn-args.cjs",
+        "commit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f",
+        "dependencyEvidence": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/DEPS",
+        "enabledDependencyEvidence": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/scripts/generate-sbom.mjs",
+        "repository": "https://github.com/google/skia",
+        "submoduleEvidence": "https://api.github.com/repos/Brooooooklyn/canvas/git/trees/adce718ec8ff82f9e896875752fd621c46b1c04e",
+        "submodulePath": "skia",
+        "submoduleRepositoryEvidence": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/.gitmodules",
+        "vendoredDependencies": {
+          "brotli": {
+            "commit": "6d03dfbedda1615c4cba1211f8d81735575209c8",
+            "repository": "https://skia.googlesource.com/external/github.com/google/brotli.git"
+          },
+          "expat": {
+            "commit": "6154446fccefbf3ca644894f598969113b0c7bcd",
+            "repository": "https://chromium.googlesource.com/external/github.com/libexpat/libexpat.git"
+          },
+          "freetype": {
+            "commit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+            "repository": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git"
+          },
+          "harfbuzz": {
+            "commit": "9cb1fee51069b206effb4736e443b038d230789d",
+            "repository": "https://chromium.googlesource.com/external/github.com/harfbuzz/harfbuzz.git"
+          },
+          "highway": {
+            "commit": "457c891775a7397bdb0376bb1031e6e027af1c48",
+            "repository": "https://chromium.googlesource.com/external/github.com/google/highway.git"
+          },
+          "icu": {
+            "commit": "d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738",
+            "repository": "https://chromium.googlesource.com/chromium/deps/icu.git"
+          },
+          "libjpeg-turbo": {
+            "commit": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+            "repository": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git"
+          },
+          "libjxl": {
+            "commit": "332feb17d17311c748445f7ee75c4fb55cc38530",
+            "repository": "https://chromium.googlesource.com/external/gitlab.com/wg1/jpeg-xl.git"
+          },
+          "libpng": {
+            "commit": "d5515b5b8be3901aac04e5bd8bd5c89f287bcd33",
+            "repository": "https://skia.googlesource.com/third_party/libpng.git"
+          },
+          "libwebp": {
+            "commit": "845d5476a866141ba35ac133f856fa62f0b7445f",
+            "repository": "https://chromium.googlesource.com/webm/libwebp.git"
+          },
+          "wuffs": {
+            "commit": "e3f919ccfe3ef542cfc983a82146070258fb57f8",
+            "repository": "https://skia.googlesource.com/external/github.com/google/wuffs-mirror-release-c.git"
+          },
+          "zlib": {
+            "commit": "646b7f569718921d7d4b5b8e22572ff6c76f2596",
+            "repository": "https://chromium.googlesource.com/chromium/src/third_party/zlib"
+          }
+        }
+      },
+      "gitHead": null,
+      "integrity": "sha512-6Jz6jys17yXydO+WdJgu7JhoB4K7/w9sWHByzzTmLjQghUx3TDMWvLv+UcCdnWhg4oprET67EMymnrETdeGNAg==",
+      "parentGitHead": "adce718ec8ff82f9e896875752fd621c46b1c04e",
+      "parentOptionalDependencyVersion": "1.0.11",
+      "parentPackage": "@napi-rs/canvas@1.0.11",
+      "parentRegistry": "https://registry.npmjs.org/%40napi-rs%2Fcanvas/1.0.11",
+      "registry": "https://registry.npmjs.org/%40napi-rs%2Fcanvas-linux-arm64-musl/1.0.11",
+      "repository": "git+https://github.com/Brooooooklyn/canvas.git",
+      "resolvedCommit": "adce718ec8ff82f9e896875752fd621c46b1c04e",
+      "tarball": "https://registry.npmjs.org/@napi-rs/canvas-linux-arm64-musl/-/canvas-linux-arm64-musl-1.0.11.tgz"
+    }
+  },
+  "@napi-rs/canvas-linux-x64-gnu@1.0.11": {
+    "files": [
+      {
+        "path": "platform/Brooooooklyn-canvas-adce718ec8ff-LICENSE",
+        "sha256": "8802fecf9da4367bc23bcf20b21cc143785fc6c92b152f3fa7fbe6ce08d344d6",
+        "source": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/LICENSE"
+      },
+      {
+        "component": "expat",
+        "path": "platform/canvas-expat-6154446fccef-COPYING",
+        "sha256": "31b15de82aa19a845156169a17a5488bf597e561b2c318d159ed583139b25e87",
+        "source": "https://chromium.googlesource.com/external/github.com/libexpat/libexpat.git/+/6154446fccefbf3ca644894f598969113b0c7bcd/COPYING?format=TEXT",
+        "sourceCommit": "6154446fccefbf3ca644894f598969113b0c7bcd",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-LICENSE.TXT",
+        "sha256": "bd36c8b474855fa294c2ec5c184544478ef3720aad37d65a6296a4f264fd2d3b",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/LICENSE.TXT?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-docs-FTL.TXT",
+        "sha256": "5a5ee54c5001bbad1cdc1a57cc3dd4c42199b2da09d39c7ee41fab002d02967f",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/docs/FTL.TXT?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-src-bdf-README",
+        "sha256": "7984455e7e5a9faba3797c8bf095fbe10cc846316b7320aff8c58402e22b82fe",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/bdf/README?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-src-pcf-README",
+        "sha256": "18d9782898d9eac04476e2f744678137b2a889689ed3e923e052fc396a86f86b",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/pcf/README?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-src-gzip-zlib.h",
+        "sha256": "c86a25c27f74cb97b8fa07b175f479f063d5064ace9995b4684063643c81cf1b",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/gzip/zlib.h?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-src-base-fthash.c",
+        "sha256": "693e5a54b3ce30140975a94a3369dbe706eb1f280c69e80da426d39cc45b94ef",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/base/fthash.c?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-include-freetype-internal-fthash.h",
+        "sha256": "023d88d49d29ecf3833db7717a3f7ae223c17ec2012bdb5bf33bb67abaf616c4",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/include/freetype/internal/fthash.h?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "brotli",
+        "path": "platform/canvas-brotli-6d03dfbedda1-LICENSE",
+        "sha256": "3d180008e36922a4e8daec11c34c7af264fed5962d07924aea928c38e8663c94",
+        "source": "https://skia.googlesource.com/external/github.com/google/brotli.git/+/6d03dfbedda1615c4cba1211f8d81735575209c8/LICENSE?format=TEXT",
+        "sourceCommit": "6d03dfbedda1615c4cba1211f8d81735575209c8",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "harfbuzz",
+        "path": "platform/canvas-harfbuzz-9cb1fee51069-COPYING",
+        "sha256": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64",
+        "source": "https://chromium.googlesource.com/external/github.com/harfbuzz/harfbuzz.git/+/9cb1fee51069b206effb4736e443b038d230789d/COPYING?format=TEXT",
+        "sourceCommit": "9cb1fee51069b206effb4736e443b038d230789d",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "icu",
+        "path": "platform/canvas-icu-d578f2e8b7bd-LICENSE",
+        "sha256": "e55522d81edc687a341a4411e0776e54ca654e90147f354a90458aaced4116af",
+        "source": "https://chromium.googlesource.com/chromium/deps/icu.git/+/d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738/LICENSE?format=TEXT",
+        "sourceCommit": "d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "icu",
+        "path": "platform/canvas-icu-d578f2e8b7bd-license.html",
+        "sha256": "c62d7697c03979f5056d28b338fafc7a1152820f7b379adf4a9d88cd37160f96",
+        "source": "https://chromium.googlesource.com/chromium/deps/icu.git/+/d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738/license.html?format=TEXT",
+        "sourceCommit": "d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libjxl",
+        "path": "platform/canvas-libjxl-332feb17d173-LICENSE",
+        "sha256": "8405932022a556380c2d8c272eff154a923feb197233f348ce5f7334fb0a5ede",
+        "source": "https://chromium.googlesource.com/external/gitlab.com/wg1/jpeg-xl.git/+/332feb17d17311c748445f7ee75c4fb55cc38530/LICENSE?format=TEXT",
+        "sourceCommit": "332feb17d17311c748445f7ee75c4fb55cc38530",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libjxl",
+        "path": "platform/canvas-libjxl-332feb17d173-PATENTS",
+        "sha256": "91915f8ae056a68a3c5bdf05d9f6f78bb6903e27a8ca3a8434c9e4ac87300575",
+        "source": "https://chromium.googlesource.com/external/gitlab.com/wg1/jpeg-xl.git/+/332feb17d17311c748445f7ee75c4fb55cc38530/PATENTS?format=TEXT",
+        "sourceCommit": "332feb17d17311c748445f7ee75c4fb55cc38530",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "highway",
+        "path": "platform/canvas-highway-457c891775a7-LICENSE",
+        "sha256": "43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1",
+        "source": "https://chromium.googlesource.com/external/github.com/google/highway.git/+/457c891775a7397bdb0376bb1031e6e027af1c48/LICENSE?format=TEXT",
+        "sourceCommit": "457c891775a7397bdb0376bb1031e6e027af1c48",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "highway",
+        "path": "platform/canvas-highway-457c891775a7-LICENSE-BSD3",
+        "sha256": "d25e82e26acd42ca3ccc9993622631163425b869b9e16284226d534cff6470f2",
+        "source": "https://chromium.googlesource.com/external/github.com/google/highway.git/+/457c891775a7397bdb0376bb1031e6e027af1c48/LICENSE-BSD3?format=TEXT",
+        "sourceCommit": "457c891775a7397bdb0376bb1031e6e027af1c48",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libjpeg-turbo",
+        "path": "platform/canvas-libjpeg-turbo-e14cbfaa8552-LICENSE.md",
+        "sha256": "96f5b328adbb78eeaaec6980d73fd558cb1e4d62560ed615646bc3cf5e532430",
+        "source": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad/LICENSE.md?format=TEXT",
+        "sourceCommit": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libjpeg-turbo",
+        "path": "platform/canvas-libjpeg-turbo-e14cbfaa8552-README.ijg",
+        "sha256": "75815e3bf6484201a3c3d17a1bbf10f2e8e3237f84df10a2357ea896db2a81d6",
+        "source": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad/README.ijg?format=TEXT",
+        "sourceCommit": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libpng",
+        "path": "platform/canvas-libpng-d5515b5b8be3-LICENSE",
+        "sha256": "bdb0a645ea18c60507d0368379b1ac5474b92255fcc2d115e07486a7672ba526",
+        "source": "https://skia.googlesource.com/third_party/libpng.git/+/d5515b5b8be3901aac04e5bd8bd5c89f287bcd33/LICENSE?format=TEXT",
+        "sourceCommit": "d5515b5b8be3901aac04e5bd8bd5c89f287bcd33",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libwebp",
+        "path": "platform/canvas-libwebp-845d5476a866-COPYING",
+        "sha256": "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf",
+        "source": "https://chromium.googlesource.com/webm/libwebp.git/+/845d5476a866141ba35ac133f856fa62f0b7445f/COPYING?format=TEXT",
+        "sourceCommit": "845d5476a866141ba35ac133f856fa62f0b7445f",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libwebp",
+        "path": "platform/canvas-libwebp-845d5476a866-PATENTS",
+        "sha256": "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c",
+        "source": "https://chromium.googlesource.com/webm/libwebp.git/+/845d5476a866141ba35ac133f856fa62f0b7445f/PATENTS?format=TEXT",
+        "sourceCommit": "845d5476a866141ba35ac133f856fa62f0b7445f",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "wuffs",
+        "path": "platform/canvas-wuffs-e3f919ccfe3e-LICENSE",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "source": "https://skia.googlesource.com/external/github.com/google/wuffs-mirror-release-c.git/+/e3f919ccfe3ef542cfc983a82146070258fb57f8/LICENSE?format=TEXT",
+        "sourceCommit": "e3f919ccfe3ef542cfc983a82146070258fb57f8",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "zlib",
+        "path": "platform/canvas-zlib-646b7f569718-LICENSE",
+        "sha256": "e1cfcc55c325b3f78cf55df9664abaa066e2271dffe8213347d9fccdfbac8f2c",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/zlib/+/646b7f569718921d7d4b5b8e22572ff6c76f2596/LICENSE?format=TEXT",
+        "sourceCommit": "646b7f569718921d7d4b5b8e22572ff6c76f2596",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-LICENSE",
+        "sha256": "5f787c1dee3c56547f09ccc2906ab5f5293c4d8dd6c8654e573216c38e908dbd",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-modules-skcms-LICENSE",
+        "sha256": "e59bb5c5c6ba426a9ac4ba9fe667ad14c5166b12aa25be8af1d122b14fbe2e36",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/modules/skcms/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-third_party-etc1-LICENSE",
+        "sha256": "5366e97b4478f15a1e2fd7e6094337426597df28de50cd9fed3f2e7e87f1229e",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/third_party/etc1/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-third_party-expat-LICENSE",
+        "sha256": "cca48bacd6e7ed63f00b42a346bcc8549a460b41efe75d93db350fc882f54dca",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/third_party/expat/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-third_party-harfbuzz-LICENSE",
+        "sha256": "cca48bacd6e7ed63f00b42a346bcc8549a460b41efe75d93db350fc882f54dca",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/third_party/harfbuzz/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-third_party-wuffs-LICENSE",
+        "sha256": "e59bb5c5c6ba426a9ac4ba9fe667ad14c5166b12aa25be8af1d122b14fbe2e36",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/third_party/wuffs/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "libjpeg-turbo",
+        "path": "platform/canvas-libjpeg-turbo-e14cbfaa8552-simd-nasm-jsimdext.inc",
+        "sha256": "000b2df5469d2f94ea20a1b3d638b94031dad296f006600e1dbff79eded5facb",
+        "source": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad/simd/nasm/jsimdext.inc?format=TEXT",
+        "sourceCommit": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "llvm/llvm-project/libcxx",
+        "path": "platform/canvas-llvm-llvm-project-cd708029e0b2-libcxx-LICENSE.TXT",
+        "sha256": "539dd7aed86e8a4f12cbdd0e6c50c189c7d74847e4fecc64ce2c6ee3a01da38b",
+        "source": "https://raw.githubusercontent.com/llvm/llvm-project/cd708029e0b2869e80abe31ddb175f7c35361f90/libcxx/LICENSE.TXT",
+        "sourceCommit": "cd708029e0b2869e80abe31ddb175f7c35361f90"
+      },
+      {
+        "component": "llvm/llvm-project/libcxxabi",
+        "path": "platform/canvas-llvm-llvm-project-cd708029e0b2-libcxxabi-LICENSE.TXT",
+        "sha256": "e2b35be49f7284a45b7baca8fc7b3ab7440e7902392b2528a457816b5bb2a15c",
+        "source": "https://raw.githubusercontent.com/llvm/llvm-project/cd708029e0b2869e80abe31ddb175f7c35361f90/libcxxabi/LICENSE.TXT",
+        "sourceCommit": "cd708029e0b2869e80abe31ddb175f7c35361f90"
+      },
+      {
+        "component": "llvm/llvm-project/libunwind",
+        "path": "platform/canvas-llvm-llvm-project-cd708029e0b2-libunwind-LICENSE.TXT",
+        "sha256": "b5efebcaca80879234098e52d1725e6d9eb8fb96a19fce625d39184b705f7b6d",
+        "source": "https://raw.githubusercontent.com/llvm/llvm-project/cd708029e0b2869e80abe31ddb175f7c35361f90/libunwind/LICENSE.TXT",
+        "sourceCommit": "cd708029e0b2869e80abe31ddb175f7c35361f90"
+      },
+      {
+        "component": "llvm/llvm-project/compiler-rt",
+        "path": "platform/canvas-llvm-llvm-project-cd708029e0b2-compiler-rt-LICENSE.TXT",
+        "sha256": "1a8f1058753f1ba890de984e48f0242a3a5c29a6a8f2ed9fd813f36985387e8d",
+        "source": "https://raw.githubusercontent.com/llvm/llvm-project/cd708029e0b2869e80abe31ddb175f7c35361f90/compiler-rt/LICENSE.TXT",
+        "sourceCommit": "cd708029e0b2869e80abe31ddb175f7c35361f90"
+      }
+    ],
+    "provenance": {
+      "cxxRuntimes": {
+        "gnuBuildEvidence": [
+          "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/Dockerfile",
+          "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/aarch64.Dockerfile"
+        ],
+        "gnuVersionLimitation": "The GNU Dockerfiles request LLVM major 19 from apt.llvm.org and use mutable builder image tags, without a package patch version or image digest. The exact GNU runtime patch/build is not established by repository source. LLVM 19.1.7 is the exact version used by the separate upstream runtime build script and supplies original LLVM runtime license texts.",
+        "llvmCommit": "cd708029e0b2869e80abe31ddb175f7c35361f90",
+        "llvmRuntimeBuildEvidence": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/scripts/build-c++abi.mjs",
+        "llvmTag": "llvmorg-19.1.7",
+        "llvmVersion": "19.1.7",
+        "llvmVersionEvidence": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/llvm-version"
+      },
+      "declaredLicense": "MIT",
+      "embeddedSkia": {
+        "buildFlagsEvidence": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/scripts/skia-gn-args.cjs",
+        "commit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f",
+        "dependencyEvidence": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/DEPS",
+        "enabledDependencyEvidence": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/scripts/generate-sbom.mjs",
+        "repository": "https://github.com/google/skia",
+        "submoduleEvidence": "https://api.github.com/repos/Brooooooklyn/canvas/git/trees/adce718ec8ff82f9e896875752fd621c46b1c04e",
+        "submodulePath": "skia",
+        "submoduleRepositoryEvidence": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/.gitmodules",
+        "vendoredDependencies": {
+          "brotli": {
+            "commit": "6d03dfbedda1615c4cba1211f8d81735575209c8",
+            "repository": "https://skia.googlesource.com/external/github.com/google/brotli.git"
+          },
+          "expat": {
+            "commit": "6154446fccefbf3ca644894f598969113b0c7bcd",
+            "repository": "https://chromium.googlesource.com/external/github.com/libexpat/libexpat.git"
+          },
+          "freetype": {
+            "commit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+            "repository": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git"
+          },
+          "harfbuzz": {
+            "commit": "9cb1fee51069b206effb4736e443b038d230789d",
+            "repository": "https://chromium.googlesource.com/external/github.com/harfbuzz/harfbuzz.git"
+          },
+          "highway": {
+            "commit": "457c891775a7397bdb0376bb1031e6e027af1c48",
+            "repository": "https://chromium.googlesource.com/external/github.com/google/highway.git"
+          },
+          "icu": {
+            "commit": "d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738",
+            "repository": "https://chromium.googlesource.com/chromium/deps/icu.git"
+          },
+          "libjpeg-turbo": {
+            "commit": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+            "repository": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git"
+          },
+          "libjxl": {
+            "commit": "332feb17d17311c748445f7ee75c4fb55cc38530",
+            "repository": "https://chromium.googlesource.com/external/gitlab.com/wg1/jpeg-xl.git"
+          },
+          "libpng": {
+            "commit": "d5515b5b8be3901aac04e5bd8bd5c89f287bcd33",
+            "repository": "https://skia.googlesource.com/third_party/libpng.git"
+          },
+          "libwebp": {
+            "commit": "845d5476a866141ba35ac133f856fa62f0b7445f",
+            "repository": "https://chromium.googlesource.com/webm/libwebp.git"
+          },
+          "wuffs": {
+            "commit": "e3f919ccfe3ef542cfc983a82146070258fb57f8",
+            "repository": "https://skia.googlesource.com/external/github.com/google/wuffs-mirror-release-c.git"
+          },
+          "zlib": {
+            "commit": "646b7f569718921d7d4b5b8e22572ff6c76f2596",
+            "repository": "https://chromium.googlesource.com/chromium/src/third_party/zlib"
+          }
+        }
+      },
+      "gitHead": null,
+      "integrity": "sha512-iDapw7nFSE5tsmQxcH2+KotJhyfVPmHd6vUOQN/Em+8WNbkZJwJ/rDowlJMFnMl0SYSDSfgKCNUGi6Sn5++Smg==",
+      "parentGitHead": "adce718ec8ff82f9e896875752fd621c46b1c04e",
+      "parentOptionalDependencyVersion": "1.0.11",
+      "parentPackage": "@napi-rs/canvas@1.0.11",
+      "parentRegistry": "https://registry.npmjs.org/%40napi-rs%2Fcanvas/1.0.11",
+      "registry": "https://registry.npmjs.org/%40napi-rs%2Fcanvas-linux-x64-gnu/1.0.11",
+      "repository": "git+https://github.com/Brooooooklyn/canvas.git",
+      "resolvedCommit": "adce718ec8ff82f9e896875752fd621c46b1c04e",
+      "tarball": "https://registry.npmjs.org/@napi-rs/canvas-linux-x64-gnu/-/canvas-linux-x64-gnu-1.0.11.tgz"
+    }
+  },
+  "@napi-rs/canvas-linux-x64-musl@1.0.11": {
+    "files": [
+      {
+        "path": "platform/Brooooooklyn-canvas-adce718ec8ff-LICENSE",
+        "sha256": "8802fecf9da4367bc23bcf20b21cc143785fc6c92b152f3fa7fbe6ce08d344d6",
+        "source": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/LICENSE"
+      },
+      {
+        "component": "expat",
+        "path": "platform/canvas-expat-6154446fccef-COPYING",
+        "sha256": "31b15de82aa19a845156169a17a5488bf597e561b2c318d159ed583139b25e87",
+        "source": "https://chromium.googlesource.com/external/github.com/libexpat/libexpat.git/+/6154446fccefbf3ca644894f598969113b0c7bcd/COPYING?format=TEXT",
+        "sourceCommit": "6154446fccefbf3ca644894f598969113b0c7bcd",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-LICENSE.TXT",
+        "sha256": "bd36c8b474855fa294c2ec5c184544478ef3720aad37d65a6296a4f264fd2d3b",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/LICENSE.TXT?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-docs-FTL.TXT",
+        "sha256": "5a5ee54c5001bbad1cdc1a57cc3dd4c42199b2da09d39c7ee41fab002d02967f",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/docs/FTL.TXT?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-src-bdf-README",
+        "sha256": "7984455e7e5a9faba3797c8bf095fbe10cc846316b7320aff8c58402e22b82fe",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/bdf/README?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-src-pcf-README",
+        "sha256": "18d9782898d9eac04476e2f744678137b2a889689ed3e923e052fc396a86f86b",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/pcf/README?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-src-gzip-zlib.h",
+        "sha256": "c86a25c27f74cb97b8fa07b175f479f063d5064ace9995b4684063643c81cf1b",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/gzip/zlib.h?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-src-base-fthash.c",
+        "sha256": "693e5a54b3ce30140975a94a3369dbe706eb1f280c69e80da426d39cc45b94ef",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/src/base/fthash.c?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "freetype",
+        "path": "platform/canvas-freetype-264b5fbf5b91-include-freetype-internal-fthash.h",
+        "sha256": "023d88d49d29ecf3833db7717a3f7ae223c17ec2012bdb5bf33bb67abaf616c4",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git/+/264b5fbf5b912b39f98d038bf75d39be0a73f21b/include/freetype/internal/fthash.h?format=TEXT",
+        "sourceCommit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "brotli",
+        "path": "platform/canvas-brotli-6d03dfbedda1-LICENSE",
+        "sha256": "3d180008e36922a4e8daec11c34c7af264fed5962d07924aea928c38e8663c94",
+        "source": "https://skia.googlesource.com/external/github.com/google/brotli.git/+/6d03dfbedda1615c4cba1211f8d81735575209c8/LICENSE?format=TEXT",
+        "sourceCommit": "6d03dfbedda1615c4cba1211f8d81735575209c8",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "harfbuzz",
+        "path": "platform/canvas-harfbuzz-9cb1fee51069-COPYING",
+        "sha256": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64",
+        "source": "https://chromium.googlesource.com/external/github.com/harfbuzz/harfbuzz.git/+/9cb1fee51069b206effb4736e443b038d230789d/COPYING?format=TEXT",
+        "sourceCommit": "9cb1fee51069b206effb4736e443b038d230789d",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "icu",
+        "path": "platform/canvas-icu-d578f2e8b7bd-LICENSE",
+        "sha256": "e55522d81edc687a341a4411e0776e54ca654e90147f354a90458aaced4116af",
+        "source": "https://chromium.googlesource.com/chromium/deps/icu.git/+/d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738/LICENSE?format=TEXT",
+        "sourceCommit": "d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "icu",
+        "path": "platform/canvas-icu-d578f2e8b7bd-license.html",
+        "sha256": "c62d7697c03979f5056d28b338fafc7a1152820f7b379adf4a9d88cd37160f96",
+        "source": "https://chromium.googlesource.com/chromium/deps/icu.git/+/d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738/license.html?format=TEXT",
+        "sourceCommit": "d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libjxl",
+        "path": "platform/canvas-libjxl-332feb17d173-LICENSE",
+        "sha256": "8405932022a556380c2d8c272eff154a923feb197233f348ce5f7334fb0a5ede",
+        "source": "https://chromium.googlesource.com/external/gitlab.com/wg1/jpeg-xl.git/+/332feb17d17311c748445f7ee75c4fb55cc38530/LICENSE?format=TEXT",
+        "sourceCommit": "332feb17d17311c748445f7ee75c4fb55cc38530",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libjxl",
+        "path": "platform/canvas-libjxl-332feb17d173-PATENTS",
+        "sha256": "91915f8ae056a68a3c5bdf05d9f6f78bb6903e27a8ca3a8434c9e4ac87300575",
+        "source": "https://chromium.googlesource.com/external/gitlab.com/wg1/jpeg-xl.git/+/332feb17d17311c748445f7ee75c4fb55cc38530/PATENTS?format=TEXT",
+        "sourceCommit": "332feb17d17311c748445f7ee75c4fb55cc38530",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "highway",
+        "path": "platform/canvas-highway-457c891775a7-LICENSE",
+        "sha256": "43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1",
+        "source": "https://chromium.googlesource.com/external/github.com/google/highway.git/+/457c891775a7397bdb0376bb1031e6e027af1c48/LICENSE?format=TEXT",
+        "sourceCommit": "457c891775a7397bdb0376bb1031e6e027af1c48",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "highway",
+        "path": "platform/canvas-highway-457c891775a7-LICENSE-BSD3",
+        "sha256": "d25e82e26acd42ca3ccc9993622631163425b869b9e16284226d534cff6470f2",
+        "source": "https://chromium.googlesource.com/external/github.com/google/highway.git/+/457c891775a7397bdb0376bb1031e6e027af1c48/LICENSE-BSD3?format=TEXT",
+        "sourceCommit": "457c891775a7397bdb0376bb1031e6e027af1c48",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libjpeg-turbo",
+        "path": "platform/canvas-libjpeg-turbo-e14cbfaa8552-LICENSE.md",
+        "sha256": "96f5b328adbb78eeaaec6980d73fd558cb1e4d62560ed615646bc3cf5e532430",
+        "source": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad/LICENSE.md?format=TEXT",
+        "sourceCommit": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libjpeg-turbo",
+        "path": "platform/canvas-libjpeg-turbo-e14cbfaa8552-README.ijg",
+        "sha256": "75815e3bf6484201a3c3d17a1bbf10f2e8e3237f84df10a2357ea896db2a81d6",
+        "source": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad/README.ijg?format=TEXT",
+        "sourceCommit": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libpng",
+        "path": "platform/canvas-libpng-d5515b5b8be3-LICENSE",
+        "sha256": "bdb0a645ea18c60507d0368379b1ac5474b92255fcc2d115e07486a7672ba526",
+        "source": "https://skia.googlesource.com/third_party/libpng.git/+/d5515b5b8be3901aac04e5bd8bd5c89f287bcd33/LICENSE?format=TEXT",
+        "sourceCommit": "d5515b5b8be3901aac04e5bd8bd5c89f287bcd33",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libwebp",
+        "path": "platform/canvas-libwebp-845d5476a866-COPYING",
+        "sha256": "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf",
+        "source": "https://chromium.googlesource.com/webm/libwebp.git/+/845d5476a866141ba35ac133f856fa62f0b7445f/COPYING?format=TEXT",
+        "sourceCommit": "845d5476a866141ba35ac133f856fa62f0b7445f",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "libwebp",
+        "path": "platform/canvas-libwebp-845d5476a866-PATENTS",
+        "sha256": "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c",
+        "source": "https://chromium.googlesource.com/webm/libwebp.git/+/845d5476a866141ba35ac133f856fa62f0b7445f/PATENTS?format=TEXT",
+        "sourceCommit": "845d5476a866141ba35ac133f856fa62f0b7445f",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "wuffs",
+        "path": "platform/canvas-wuffs-e3f919ccfe3e-LICENSE",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "source": "https://skia.googlesource.com/external/github.com/google/wuffs-mirror-release-c.git/+/e3f919ccfe3ef542cfc983a82146070258fb57f8/LICENSE?format=TEXT",
+        "sourceCommit": "e3f919ccfe3ef542cfc983a82146070258fb57f8",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "zlib",
+        "path": "platform/canvas-zlib-646b7f569718-LICENSE",
+        "sha256": "e1cfcc55c325b3f78cf55df9664abaa066e2271dffe8213347d9fccdfbac8f2c",
+        "source": "https://chromium.googlesource.com/chromium/src/third_party/zlib/+/646b7f569718921d7d4b5b8e22572ff6c76f2596/LICENSE?format=TEXT",
+        "sourceCommit": "646b7f569718921d7d4b5b8e22572ff6c76f2596",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-LICENSE",
+        "sha256": "5f787c1dee3c56547f09ccc2906ab5f5293c4d8dd6c8654e573216c38e908dbd",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-modules-skcms-LICENSE",
+        "sha256": "e59bb5c5c6ba426a9ac4ba9fe667ad14c5166b12aa25be8af1d122b14fbe2e36",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/modules/skcms/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-third_party-etc1-LICENSE",
+        "sha256": "5366e97b4478f15a1e2fd7e6094337426597df28de50cd9fed3f2e7e87f1229e",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/third_party/etc1/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-third_party-expat-LICENSE",
+        "sha256": "cca48bacd6e7ed63f00b42a346bcc8549a460b41efe75d93db350fc882f54dca",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/third_party/expat/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-third_party-harfbuzz-LICENSE",
+        "sha256": "cca48bacd6e7ed63f00b42a346bcc8549a460b41efe75d93db350fc882f54dca",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/third_party/harfbuzz/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "skia",
+        "path": "platform/canvas-skia-95ee33d7ec77-third_party-wuffs-LICENSE",
+        "sha256": "e59bb5c5c6ba426a9ac4ba9fe667ad14c5166b12aa25be8af1d122b14fbe2e36",
+        "source": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/third_party/wuffs/LICENSE",
+        "sourceCommit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f"
+      },
+      {
+        "component": "libjpeg-turbo",
+        "path": "platform/canvas-libjpeg-turbo-e14cbfaa8552-simd-nasm-jsimdext.inc",
+        "sha256": "000b2df5469d2f94ea20a1b3d638b94031dad296f006600e1dbff79eded5facb",
+        "source": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git/+/e14cbfaa85529d47f9f55b0f104a579c1061f9ad/simd/nasm/jsimdext.inc?format=TEXT",
+        "sourceCommit": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+        "sourceEncoding": "base64"
+      },
+      {
+        "component": "ziglang/zig/LICENSE",
+        "path": "platform/canvas-ziglang-zig-3db960767d12-LICENSE",
+        "sha256": "5c537d6853e005298a285d508cff9ac7192cea23576c840d485b2b586a7ff177",
+        "source": "https://raw.githubusercontent.com/ziglang/zig/3db960767d12b6214bcf43f1966a037c7a586a12/LICENSE",
+        "sourceCommit": "3db960767d12b6214bcf43f1966a037c7a586a12"
+      },
+      {
+        "component": "ziglang/zig/lib",
+        "path": "platform/canvas-ziglang-zig-3db960767d12-lib-libcxx-LICENSE.TXT",
+        "sha256": "539dd7aed86e8a4f12cbdd0e6c50c189c7d74847e4fecc64ce2c6ee3a01da38b",
+        "source": "https://raw.githubusercontent.com/ziglang/zig/3db960767d12b6214bcf43f1966a037c7a586a12/lib/libcxx/LICENSE.TXT",
+        "sourceCommit": "3db960767d12b6214bcf43f1966a037c7a586a12"
+      },
+      {
+        "component": "ziglang/zig/lib",
+        "path": "platform/canvas-ziglang-zig-3db960767d12-lib-libcxxabi-LICENSE.TXT",
+        "sha256": "e2b35be49f7284a45b7baca8fc7b3ab7440e7902392b2528a457816b5bb2a15c",
+        "source": "https://raw.githubusercontent.com/ziglang/zig/3db960767d12b6214bcf43f1966a037c7a586a12/lib/libcxxabi/LICENSE.TXT",
+        "sourceCommit": "3db960767d12b6214bcf43f1966a037c7a586a12"
+      },
+      {
+        "component": "ziglang/zig/lib",
+        "path": "platform/canvas-ziglang-zig-3db960767d12-lib-libunwind-LICENSE.TXT",
+        "sha256": "b5efebcaca80879234098e52d1725e6d9eb8fb96a19fce625d39184b705f7b6d",
+        "source": "https://raw.githubusercontent.com/ziglang/zig/3db960767d12b6214bcf43f1966a037c7a586a12/lib/libunwind/LICENSE.TXT",
+        "sourceCommit": "3db960767d12b6214bcf43f1966a037c7a586a12"
+      }
+    ],
+    "provenance": {
+      "cxxRuntimes": {
+        "zigCommit": "3db960767d12b6214bcf43f1966a037c7a586a12",
+        "zigTag": "0.15.1",
+        "zigVersion": "0.15.1",
+        "zigVersionEvidence": [
+          "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/.github/workflows/CI.yaml",
+          "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/.github/workflows/skia.yaml"
+        ]
+      },
+      "declaredLicense": "MIT",
+      "embeddedSkia": {
+        "buildFlagsEvidence": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/scripts/skia-gn-args.cjs",
+        "commit": "95ee33d7ec7791ab9c071675710a14fe6408ae4f",
+        "dependencyEvidence": "https://raw.githubusercontent.com/google/skia/95ee33d7ec7791ab9c071675710a14fe6408ae4f/DEPS",
+        "enabledDependencyEvidence": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/scripts/generate-sbom.mjs",
+        "repository": "https://github.com/google/skia",
+        "submoduleEvidence": "https://api.github.com/repos/Brooooooklyn/canvas/git/trees/adce718ec8ff82f9e896875752fd621c46b1c04e",
+        "submodulePath": "skia",
+        "submoduleRepositoryEvidence": "https://raw.githubusercontent.com/Brooooooklyn/canvas/adce718ec8ff82f9e896875752fd621c46b1c04e/.gitmodules",
+        "vendoredDependencies": {
+          "brotli": {
+            "commit": "6d03dfbedda1615c4cba1211f8d81735575209c8",
+            "repository": "https://skia.googlesource.com/external/github.com/google/brotli.git"
+          },
+          "expat": {
+            "commit": "6154446fccefbf3ca644894f598969113b0c7bcd",
+            "repository": "https://chromium.googlesource.com/external/github.com/libexpat/libexpat.git"
+          },
+          "freetype": {
+            "commit": "264b5fbf5b912b39f98d038bf75d39be0a73f21b",
+            "repository": "https://chromium.googlesource.com/chromium/src/third_party/freetype2.git"
+          },
+          "harfbuzz": {
+            "commit": "9cb1fee51069b206effb4736e443b038d230789d",
+            "repository": "https://chromium.googlesource.com/external/github.com/harfbuzz/harfbuzz.git"
+          },
+          "highway": {
+            "commit": "457c891775a7397bdb0376bb1031e6e027af1c48",
+            "repository": "https://chromium.googlesource.com/external/github.com/google/highway.git"
+          },
+          "icu": {
+            "commit": "d578f2e8b7bd5938e21cfb6bf15c079e0aa5b738",
+            "repository": "https://chromium.googlesource.com/chromium/deps/icu.git"
+          },
+          "libjpeg-turbo": {
+            "commit": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+            "repository": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git"
+          },
+          "libjxl": {
+            "commit": "332feb17d17311c748445f7ee75c4fb55cc38530",
+            "repository": "https://chromium.googlesource.com/external/gitlab.com/wg1/jpeg-xl.git"
+          },
+          "libpng": {
+            "commit": "d5515b5b8be3901aac04e5bd8bd5c89f287bcd33",
+            "repository": "https://skia.googlesource.com/third_party/libpng.git"
+          },
+          "libwebp": {
+            "commit": "845d5476a866141ba35ac133f856fa62f0b7445f",
+            "repository": "https://chromium.googlesource.com/webm/libwebp.git"
+          },
+          "wuffs": {
+            "commit": "e3f919ccfe3ef542cfc983a82146070258fb57f8",
+            "repository": "https://skia.googlesource.com/external/github.com/google/wuffs-mirror-release-c.git"
+          },
+          "zlib": {
+            "commit": "646b7f569718921d7d4b5b8e22572ff6c76f2596",
+            "repository": "https://chromium.googlesource.com/chromium/src/third_party/zlib"
+          }
+        }
+      },
+      "gitHead": null,
+      "integrity": "sha512-26q26AyITo3CGZX4HWFIMgBMA1lu3YN07gxzBm4tW6Hglq/OVyTP50kDrmWuKybCX6dh3m8Ly+c7YhI+sqCgCQ==",
+      "parentGitHead": "adce718ec8ff82f9e896875752fd621c46b1c04e",
+      "parentOptionalDependencyVersion": "1.0.11",
+      "parentPackage": "@napi-rs/canvas@1.0.11",
+      "parentRegistry": "https://registry.npmjs.org/%40napi-rs%2Fcanvas/1.0.11",
+      "registry": "https://registry.npmjs.org/%40napi-rs%2Fcanvas-linux-x64-musl/1.0.11",
+      "repository": "git+https://github.com/Brooooooklyn/canvas.git",
+      "resolvedCommit": "adce718ec8ff82f9e896875752fd621c46b1c04e",
+      "tarball": "https://registry.npmjs.org/@napi-rs/canvas-linux-x64-musl/-/canvas-linux-x64-musl-1.0.11.tgz"
+    }
+  },
+  "@rolldown/binding-darwin-arm64@1.2.14": {
+    "files": [
+      {
+        "path": "platform/rolldown-rolldown-c9a8cda42bc0-LICENSE",
+        "sha256": "23ecfff35a5a2e80d92142f75228912c3b1abc4b5a8337a821ff4397e2f9f734",
+        "source": "https://raw.githubusercontent.com/rolldown/rolldown/c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7/LICENSE"
+      },
+      {
+        "path": "platform/rolldown-rolldown-c9a8cda42bc0-THIRD-PARTY-LICENSE",
+        "sha256": "a877291d800ed43692f3f9ae09d8e01cc6f7293ad39d43896059c188ffbb8b7c",
+        "source": "https://raw.githubusercontent.com/rolldown/rolldown/c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7/THIRD-PARTY-LICENSE"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": null,
+      "integrity": "sha512-lTQOzHuBIooh3jIr5XINQkjPGEuGy+Dsy0meXDr6Sjty0b99kYgGh4uBC/8mJX1T0kC8d6S0aPP1Y+bHkh6aBw==",
+      "parentGitHead": null,
+      "parentOptionalDependencyVersion": "1.2.14",
+      "parentPackage": "rolldown@1.2.14",
+      "parentRegistry": "https://registry.npmjs.org/rolldown/1.2.14",
+      "registry": "https://registry.npmjs.org/%40rolldown%2Fbinding-darwin-arm64/1.2.14",
+      "repository": "git+https://github.com/rolldown/rolldown.git",
+      "resolvedCommit": "c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7",
+      "tag": "v1.2.14",
+      "tagObject": "c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7",
+      "tagResolution": "https://api.github.com/repos/rolldown/rolldown/git/ref/tags/v1.2.14",
+      "tarball": "https://registry.npmjs.org/@rolldown/binding-darwin-arm64/-/binding-darwin-arm64-1.2.14.tgz",
+      "versionEvidence": "https://raw.githubusercontent.com/rolldown/rolldown/c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7/packages/rolldown/package.json"
+    }
+  },
+  "@rolldown/binding-linux-arm64-gnu@1.2.14": {
+    "files": [
+      {
+        "path": "platform/rolldown-rolldown-c9a8cda42bc0-LICENSE",
+        "sha256": "23ecfff35a5a2e80d92142f75228912c3b1abc4b5a8337a821ff4397e2f9f734",
+        "source": "https://raw.githubusercontent.com/rolldown/rolldown/c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7/LICENSE"
+      },
+      {
+        "path": "platform/rolldown-rolldown-c9a8cda42bc0-THIRD-PARTY-LICENSE",
+        "sha256": "a877291d800ed43692f3f9ae09d8e01cc6f7293ad39d43896059c188ffbb8b7c",
+        "source": "https://raw.githubusercontent.com/rolldown/rolldown/c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7/THIRD-PARTY-LICENSE"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": null,
+      "integrity": "sha512-SD9kY8M009x/7s57Z1dgUVlP5+uYBgKQK0Tkr1WIWngrtUJmRCW1RJFMY7QDla2khXhmg2i5Io7MUjcmZNZ/KQ==",
+      "parentGitHead": null,
+      "parentOptionalDependencyVersion": "1.2.14",
+      "parentPackage": "rolldown@1.2.14",
+      "parentRegistry": "https://registry.npmjs.org/rolldown/1.2.14",
+      "registry": "https://registry.npmjs.org/%40rolldown%2Fbinding-linux-arm64-gnu/1.2.14",
+      "repository": "git+https://github.com/rolldown/rolldown.git",
+      "resolvedCommit": "c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7",
+      "tag": "v1.2.14",
+      "tagObject": "c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7",
+      "tagResolution": "https://api.github.com/repos/rolldown/rolldown/git/ref/tags/v1.2.14",
+      "tarball": "https://registry.npmjs.org/@rolldown/binding-linux-arm64-gnu/-/binding-linux-arm64-gnu-1.2.14.tgz",
+      "versionEvidence": "https://raw.githubusercontent.com/rolldown/rolldown/c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7/packages/rolldown/package.json"
+    }
+  },
+  "@rolldown/binding-linux-arm64-musl@1.2.14": {
+    "files": [
+      {
+        "path": "platform/rolldown-rolldown-c9a8cda42bc0-LICENSE",
+        "sha256": "23ecfff35a5a2e80d92142f75228912c3b1abc4b5a8337a821ff4397e2f9f734",
+        "source": "https://raw.githubusercontent.com/rolldown/rolldown/c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7/LICENSE"
+      },
+      {
+        "path": "platform/rolldown-rolldown-c9a8cda42bc0-THIRD-PARTY-LICENSE",
+        "sha256": "a877291d800ed43692f3f9ae09d8e01cc6f7293ad39d43896059c188ffbb8b7c",
+        "source": "https://raw.githubusercontent.com/rolldown/rolldown/c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7/THIRD-PARTY-LICENSE"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": null,
+      "integrity": "sha512-BJ2CL19M6uuWesMgnqJzgxoI+N+eV7b0A9O9vLV42y+gitC41fNa8KElau1tHVzuLWX5GzEuxMPhAO0tQXQMkg==",
+      "parentGitHead": null,
+      "parentOptionalDependencyVersion": "1.2.14",
+      "parentPackage": "rolldown@1.2.14",
+      "parentRegistry": "https://registry.npmjs.org/rolldown/1.2.14",
+      "registry": "https://registry.npmjs.org/%40rolldown%2Fbinding-linux-arm64-musl/1.2.14",
+      "repository": "git+https://github.com/rolldown/rolldown.git",
+      "resolvedCommit": "c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7",
+      "tag": "v1.2.14",
+      "tagObject": "c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7",
+      "tagResolution": "https://api.github.com/repos/rolldown/rolldown/git/ref/tags/v1.2.14",
+      "tarball": "https://registry.npmjs.org/@rolldown/binding-linux-arm64-musl/-/binding-linux-arm64-musl-1.2.14.tgz",
+      "versionEvidence": "https://raw.githubusercontent.com/rolldown/rolldown/c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7/packages/rolldown/package.json"
+    }
+  },
+  "@rolldown/binding-linux-x64-gnu@1.2.14": {
+    "files": [
+      {
+        "path": "platform/rolldown-rolldown-c9a8cda42bc0-LICENSE",
+        "sha256": "23ecfff35a5a2e80d92142f75228912c3b1abc4b5a8337a821ff4397e2f9f734",
+        "source": "https://raw.githubusercontent.com/rolldown/rolldown/c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7/LICENSE"
+      },
+      {
+        "path": "platform/rolldown-rolldown-c9a8cda42bc0-THIRD-PARTY-LICENSE",
+        "sha256": "a877291d800ed43692f3f9ae09d8e01cc6f7293ad39d43896059c188ffbb8b7c",
+        "source": "https://raw.githubusercontent.com/rolldown/rolldown/c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7/THIRD-PARTY-LICENSE"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": null,
+      "integrity": "sha512-WxalXzgrLVpKC93xfpaJ3gCXUWzeCr+FRCbDVD2mUAy4L6Vo3lNVz0epUEUpxPWJkLNYUwM4OSIikv36OJ9mLg==",
+      "parentGitHead": null,
+      "parentOptionalDependencyVersion": "1.2.14",
+      "parentPackage": "rolldown@1.2.14",
+      "parentRegistry": "https://registry.npmjs.org/rolldown/1.2.14",
+      "registry": "https://registry.npmjs.org/%40rolldown%2Fbinding-linux-x64-gnu/1.2.14",
+      "repository": "git+https://github.com/rolldown/rolldown.git",
+      "resolvedCommit": "c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7",
+      "tag": "v1.2.14",
+      "tagObject": "c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7",
+      "tagResolution": "https://api.github.com/repos/rolldown/rolldown/git/ref/tags/v1.2.14",
+      "tarball": "https://registry.npmjs.org/@rolldown/binding-linux-x64-gnu/-/binding-linux-x64-gnu-1.2.14.tgz",
+      "versionEvidence": "https://raw.githubusercontent.com/rolldown/rolldown/c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7/packages/rolldown/package.json"
+    }
+  },
+  "@rolldown/binding-linux-x64-musl@1.2.14": {
+    "files": [
+      {
+        "path": "platform/rolldown-rolldown-c9a8cda42bc0-LICENSE",
+        "sha256": "23ecfff35a5a2e80d92142f75228912c3b1abc4b5a8337a821ff4397e2f9f734",
+        "source": "https://raw.githubusercontent.com/rolldown/rolldown/c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7/LICENSE"
+      },
+      {
+        "path": "platform/rolldown-rolldown-c9a8cda42bc0-THIRD-PARTY-LICENSE",
+        "sha256": "a877291d800ed43692f3f9ae09d8e01cc6f7293ad39d43896059c188ffbb8b7c",
+        "source": "https://raw.githubusercontent.com/rolldown/rolldown/c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7/THIRD-PARTY-LICENSE"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": null,
+      "integrity": "sha512-3G3tnAmTpdk9jO3GQtyHXqeFD2SlecfTws/Y3M2mmj9nMBwwuLT4kur8sZKeu7ENUHSpVO3cIsm5A52LEWWwlg==",
+      "parentGitHead": null,
+      "parentOptionalDependencyVersion": "1.2.14",
+      "parentPackage": "rolldown@1.2.14",
+      "parentRegistry": "https://registry.npmjs.org/rolldown/1.2.14",
+      "registry": "https://registry.npmjs.org/%40rolldown%2Fbinding-linux-x64-musl/1.2.14",
+      "repository": "git+https://github.com/rolldown/rolldown.git",
+      "resolvedCommit": "c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7",
+      "tag": "v1.2.14",
+      "tagObject": "c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7",
+      "tagResolution": "https://api.github.com/repos/rolldown/rolldown/git/ref/tags/v1.2.14",
+      "tarball": "https://registry.npmjs.org/@rolldown/binding-linux-x64-musl/-/binding-linux-x64-musl-1.2.14.tgz",
+      "versionEvidence": "https://raw.githubusercontent.com/rolldown/rolldown/c9a8cda42bc0fdd84c7b4b4e6d7f95ae83e8b5f7/packages/rolldown/package.json"
+    }
+  },
+  "@rollup/rollup-darwin-arm64@4.63.3": {
+    "files": [
+      {
+        "path": "platform/rollup-rollup-250deca2945f-LICENSE.md",
+        "sha256": "fa1bd040c5bdeefe65b3821cebf474f2733ce65df13089bd151dda1778e62fe8",
+        "source": "https://raw.githubusercontent.com/rollup/rollup/250deca2945f8817350564f7d52bab0f79175d1b/LICENSE.md"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": "250deca2945f8817350564f7d52bab0f79175d1b",
+      "integrity": "sha512-oxhrd1jmXLwWZ83eQYDXxuqRdkqkzrjR3JobKeuUyfdNZo11FuQIvqEOZhyIT7OBHxXoGslDDjN0cQcM6T0TqQ==",
+      "registry": "https://registry.npmjs.org/%40rollup%2Frollup-darwin-arm64/4.63.3",
+      "repository": "git+https://github.com/rollup/rollup.git",
+      "resolvedCommit": "250deca2945f8817350564f7d52bab0f79175d1b",
+      "tarball": "https://registry.npmjs.org/@rollup/rollup-darwin-arm64/-/rollup-darwin-arm64-4.63.3.tgz"
+    }
+  },
+  "@rollup/rollup-linux-arm64-gnu@4.63.3": {
+    "files": [
+      {
+        "path": "platform/rollup-rollup-250deca2945f-LICENSE.md",
+        "sha256": "fa1bd040c5bdeefe65b3821cebf474f2733ce65df13089bd151dda1778e62fe8",
+        "source": "https://raw.githubusercontent.com/rollup/rollup/250deca2945f8817350564f7d52bab0f79175d1b/LICENSE.md"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": "250deca2945f8817350564f7d52bab0f79175d1b",
+      "integrity": "sha512-cR0kjpRXR2KJ2oQK8E2KTPtphs+b9hZ8IhTZubNryt/RsqgdOZBQ2Zq0q5UedtiIi0rs3jVhJh55RE1ZHUVGUA==",
+      "registry": "https://registry.npmjs.org/%40rollup%2Frollup-linux-arm64-gnu/4.63.3",
+      "repository": "git+https://github.com/rollup/rollup.git",
+      "resolvedCommit": "250deca2945f8817350564f7d52bab0f79175d1b",
+      "tarball": "https://registry.npmjs.org/@rollup/rollup-linux-arm64-gnu/-/rollup-linux-arm64-gnu-4.63.3.tgz"
+    }
+  },
+  "@rollup/rollup-linux-arm64-musl@4.63.3": {
+    "files": [
+      {
+        "path": "platform/rollup-rollup-250deca2945f-LICENSE.md",
+        "sha256": "fa1bd040c5bdeefe65b3821cebf474f2733ce65df13089bd151dda1778e62fe8",
+        "source": "https://raw.githubusercontent.com/rollup/rollup/250deca2945f8817350564f7d52bab0f79175d1b/LICENSE.md"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": "250deca2945f8817350564f7d52bab0f79175d1b",
+      "integrity": "sha512-y1RYi4Q3/9ByVWSSt9kX2ustE0B7kFYbJ6zZdVZVyqopZs3yhCTwRfrjIX4vezUJInma/Gs6BOFDJg7yZmJ0IQ==",
+      "registry": "https://registry.npmjs.org/%40rollup%2Frollup-linux-arm64-musl/4.63.3",
+      "repository": "git+https://github.com/rollup/rollup.git",
+      "resolvedCommit": "250deca2945f8817350564f7d52bab0f79175d1b",
+      "tarball": "https://registry.npmjs.org/@rollup/rollup-linux-arm64-musl/-/rollup-linux-arm64-musl-4.63.3.tgz"
+    }
+  },
+  "@rollup/rollup-linux-x64-gnu@4.63.3": {
+    "files": [
+      {
+        "path": "platform/rollup-rollup-250deca2945f-LICENSE.md",
+        "sha256": "fa1bd040c5bdeefe65b3821cebf474f2733ce65df13089bd151dda1778e62fe8",
+        "source": "https://raw.githubusercontent.com/rollup/rollup/250deca2945f8817350564f7d52bab0f79175d1b/LICENSE.md"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": "250deca2945f8817350564f7d52bab0f79175d1b",
+      "integrity": "sha512-SXagRwnI2Wlwlitllu59UK/nGVbD1CKPcNqDplHwIC4BqJcpXFjD32d1R/RbuISa95HdQrZM3/7v4bKiowFaLA==",
+      "registry": "https://registry.npmjs.org/%40rollup%2Frollup-linux-x64-gnu/4.63.3",
+      "repository": "git+https://github.com/rollup/rollup.git",
+      "resolvedCommit": "250deca2945f8817350564f7d52bab0f79175d1b",
+      "tarball": "https://registry.npmjs.org/@rollup/rollup-linux-x64-gnu/-/rollup-linux-x64-gnu-4.63.3.tgz"
+    }
+  },
+  "@rollup/rollup-linux-x64-musl@4.63.3": {
+    "files": [
+      {
+        "path": "platform/rollup-rollup-250deca2945f-LICENSE.md",
+        "sha256": "fa1bd040c5bdeefe65b3821cebf474f2733ce65df13089bd151dda1778e62fe8",
+        "source": "https://raw.githubusercontent.com/rollup/rollup/250deca2945f8817350564f7d52bab0f79175d1b/LICENSE.md"
+      }
+    ],
+    "provenance": {
+      "declaredLicense": "MIT",
+      "gitHead": "250deca2945f8817350564f7d52bab0f79175d1b",
+      "integrity": "sha512-2IPozoEALRCziGqE8O9KMK60PMu5TS1huv4fwoeCexj+WjmcwFtX9CTOVbfXCUqcELAubEwRFPYlzb/WvwY2HQ==",
+      "registry": "https://registry.npmjs.org/%40rollup%2Frollup-linux-x64-musl/4.63.3",
+      "repository": "git+https://github.com/rollup/rollup.git",
+      "resolvedCommit": "250deca2945f8817350564f7d52bab0f79175d1b",
+      "tarball": "https://registry.npmjs.org/@rollup/rollup-linux-x64-musl/-/rollup-linux-x64-musl-4.63.3.tgz"
+    }
+  }
+}

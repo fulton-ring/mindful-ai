@@ -1,0 +1,86 @@
+{
+  "onnxruntime-common@1.30.0": {
+    "provenance": {
+      "registry": "https://registry.npmjs.org/onnxruntime-common/1.30.0",
+      "gitHead": "f2c39fe2f838cf35ce7da92824f5a5e3ee6e88a7",
+      "release": "https://github.com/microsoft/onnxruntime/tree/v1.30.0",
+      "note": "Stable release tag resolved to commit; development package version contains its upstream commit prefix.",
+      "packageSource": "https://raw.githubusercontent.com/microsoft/onnxruntime/f2c39fe2f838cf35ce7da92824f5a5e3ee6e88a7/js/common/package.json"
+    },
+    "files": [
+      {
+        "path": "onnx/f2c39fe2f838cf35ce7da92824f5a5e3ee6e88a7-LICENSE",
+        "source": "https://raw.githubusercontent.com/microsoft/onnxruntime/f2c39fe2f838cf35ce7da92824f5a5e3ee6e88a7/LICENSE",
+        "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+      },
+      {
+        "path": "onnx/f2c39fe2f838cf35ce7da92824f5a5e3ee6e88a7-ThirdPartyNotices.txt",
+        "source": "https://raw.githubusercontent.com/microsoft/onnxruntime/f2c39fe2f838cf35ce7da92824f5a5e3ee6e88a7/ThirdPartyNotices.txt",
+        "sha256": "143764b952fdb1a7c69ce653bfba74a7744d6a8a573bfb73e235fba356c83de3"
+      }
+    ]
+  },
+  "onnxruntime-common@1.31.0-dev.20260911-2a43ec07e": {
+    "provenance": {
+      "registry": "https://registry.npmjs.org/onnxruntime-common/1.31.0-dev.20260911-2a43ec07e",
+      "gitHead": "2a43ec07e67df9263c7c56c15da76cc7f74d7b32",
+      "release": "https://github.com/microsoft/onnxruntime/tree/2a43ec07e",
+      "note": "Stable release tag resolved to commit; development package version contains its upstream commit prefix.",
+      "packageSource": "https://raw.githubusercontent.com/microsoft/onnxruntime/2a43ec07e67df9263c7c56c15da76cc7f74d7b32/js/common/package.json"
+    },
+    "files": [
+      {
+        "path": "onnx/2a43ec07e67df9263c7c56c15da76cc7f74d7b32-LICENSE",
+        "source": "https://raw.githubusercontent.com/microsoft/onnxruntime/2a43ec07e67df9263c7c56c15da76cc7f74d7b32/LICENSE",
+        "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+      },
+      {
+        "path": "onnx/2a43ec07e67df9263c7c56c15da76cc7f74d7b32-ThirdPartyNotices.txt",
+        "source": "https://raw.githubusercontent.com/microsoft/onnxruntime/2a43ec07e67df9263c7c56c15da76cc7f74d7b32/ThirdPartyNotices.txt",
+        "sha256": "143764b952fdb1a7c69ce653bfba74a7744d6a8a573bfb73e235fba356c83de3"
+      }
+    ]
+  },
+  "onnxruntime-node@1.30.0": {
+    "provenance": {
+      "registry": "https://registry.npmjs.org/onnxruntime-node/1.30.0",
+      "gitHead": "f2c39fe2f838cf35ce7da92824f5a5e3ee6e88a7",
+      "release": "https://github.com/microsoft/onnxruntime/tree/v1.30.0",
+      "note": "Stable release tag resolved to commit; development package version contains its upstream commit prefix.",
+      "packageSource": "https://raw.githubusercontent.com/microsoft/onnxruntime/f2c39fe2f838cf35ce7da92824f5a5e3ee6e88a7/js/node/package.json"
+    },
+    "files": [
+      {
+        "path": "onnx/f2c39fe2f838cf35ce7da92824f5a5e3ee6e88a7-LICENSE",
+        "source": "https://raw.githubusercontent.com/microsoft/onnxruntime/f2c39fe2f838cf35ce7da92824f5a5e3ee6e88a7/LICENSE",
+        "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+      },
+      {
+        "path": "onnx/f2c39fe2f838cf35ce7da92824f5a5e3ee6e88a7-ThirdPartyNotices.txt",
+        "source": "https://raw.githubusercontent.com/microsoft/onnxruntime/f2c39fe2f838cf35ce7da92824f5a5e3ee6e88a7/ThirdPartyNotices.txt",
+        "sha256": "143764b952fdb1a7c69ce653bfba74a7744d6a8a573bfb73e235fba356c83de3"
+      }
+    ]
+  },
+  "onnxruntime-web@1.31.0-dev.20260914-8d85527a0": {
+    "provenance": {
+      "registry": "https://registry.npmjs.org/onnxruntime-web/1.31.0-dev.20260914-8d85527a0",
+      "gitHead": "8d85527a010e294a26b274749f74294b2a32cec5",
+      "release": "https://github.com/microsoft/onnxruntime/tree/8d85527a0",
+      "note": "Stable release tag resolved to commit; development package version contains its upstream commit prefix.",
+      "packageSource": "https://raw.githubusercontent.com/microsoft/onnxruntime/8d85527a010e294a26b274749f74294b2a32cec5/js/web/package.json"
+    },
+    "files": [
+      {
+        "path": "onnx/8d85527a010e294a26b274749f74294b2a32cec5-LICENSE",
+        "source": "https://raw.githubusercontent.com/microsoft/onnxruntime/8d85527a010e294a26b274749f74294b2a32cec5/LICENSE",
+        "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+      },
+      {
+        "path": "onnx/8d85527a010e294a26b274749f74294b2a32cec5-ThirdPartyNotices.txt",
+        "source": "https://raw.githubusercontent.com/microsoft/onnxruntime/8d85527a010e294a26b274749f74294b2a32cec5/ThirdPartyNotices.txt",
+        "sha256": "143764b952fdb1a7c69ce653bfba74a7744d6a8a573bfb73e235fba356c83de3"
+      }
+    ]
+  }
+}

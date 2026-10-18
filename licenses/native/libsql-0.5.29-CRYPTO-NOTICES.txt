@@ -1,0 +1,2130 @@
+ORIGINAL IN-FILE COPYRIGHT AND LICENSE NOTICES FROM SQLITE3MULTIPLECIPHERS
+A conservative superset of headers in the bundled native source; includes SHA2, Rijndael, and other cipher implementations.
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/aes_hardware.c
+
+/*
+** Name:        aes_hardware.c
+** Purpose:     AES algorithms based on AES NI
+** Author:      Ulrich Telle
+** Created:     2020-12-01
+** Copyright:   (c) 2020 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/ascon/aead.c
+
+/*
+** Name:        aead.c
+** Purpose:     Stream encryption/decryption with Ascon
+** Based on:    Public domain Ascon reference implementation
+**              and optimized variants for 32- and 64-bit
+**              (see https://github.com/ascon/ascon-c)
+** Remarks:     API functions adapted for use in SQLite3 Multiple Ciphers
+** Modified by: Ulrich Telle
+** Copyright:   (c) 2023-2023 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/ascon/api.h
+
+/*
+** Name:        api.h
+** Purpose:     Definition of preprocessor symbols
+** Based on:    Public domain Ascon reference implementation
+**              and optimized variants for 32- and 64-bit
+**              (see https://github.com/ascon/ascon-c)
+** Remarks:     API functions adapted for use in SQLite3 Multiple Ciphers
+**              Combined symbols from AEAD and HASH
+** Modified by: Ulrich Telle
+** Copyright:   (c) 2023-2023 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/ascon/crypto_aead.h
+
+/*
+** Name:        hash.c
+** Purpose:     API definition for Hash algorithm with Ascon
+** Based on:    Public domain Ascon reference implementation
+**              and optimized variants for 32- and 64-bit
+**              (see https://github.com/ascon/ascon-c)
+** Remarks:     API functions adapted for use in SQLite3 Multiple Ciphers
+** Modified by: Ulrich Telle
+** Copyright:   (c) 2023-2023 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/ascon/crypto_pbkdf2.h
+
+/*
+** Name:        pbkdf2.h
+** Purpose:     API definition of PBKDF2 algoritm with Ascon
+**              Password-based key derivation function based on ASCON.
+**              (see https://tools.ietf.org/html/rfc8018)
+** Based on:    Public domain Ascon reference implementation
+**              and optimized variants for 32- and 64-bit
+**              (see https://github.com/ascon/ascon-c)
+**              and the paper "Additional Modes for ASCON Version 1.1"
+**              by Rhys Weatherley, Southern Storm Software, Pty Ltd.
+** Remarks:     API functions adapted for use in SQLite3 Multiple Ciphers
+** Created by:  Ulrich Telle
+** Copyright:   (c) 2023-2023 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/ascon/hash.c
+
+/*
+** Name:        hash.c
+** Purpose:     Hash algorithm with Ascon
+** Based on:    Public domain Ascon reference implementation
+**              and optimized variants for 32- and 64-bit
+**              (see https://github.com/ascon/ascon-c)
+** Remarks:     API functions adapted for use in SQLite3 Multiple Ciphers
+** Modified by: Ulrich Telle
+** Copyright:   (c) 2023-2023 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/ascon/pbkdf2.c
+
+/*
+** Name:        pbkdf2.c
+** Purpose:     Implementation of PBKDF2 algoritm with Ascon
+** Based on:    Public domain Ascon reference implementation
+**              and optimized variants for 32- and 64-bit
+**              (see https://github.com/ascon/ascon-c)
+**              and the paper "Additional Modes for ASCON Version 1.1"
+**              by Rhys Weatherley, Southern Storm Software, Pty Ltd.
+** Remarks:     API functions adapted for use in SQLite3 Multiple Ciphers
+** Created by:  Ulrich Telle
+** Copyright:   (c) 2023-2023 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/ascon/prolog.h
+
+/*
+** Name:        prolog.h
+** Purpose:     Include important header files, before 
+** Based on:    Public domain Ascon reference implementation
+**              and optimized variants for 32- and 64-bit
+**              (see https://github.com/ascon/ascon-c)
+** Remarks:     API functions adapted for use in SQLite3 Multiple Ciphers
+** Modified by: Ulrich Telle
+** Copyright:   (c) 2023-2023 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/ascon/round.h
+
+/*
+** Name:        round.h
+** Purpose:     Selector for Ascon implementation variant for 32- resp 64-bit
+** Based on:    Public domain Ascon reference implementation
+**              and optimized variants for 32- and 64-bit
+**              (see https://github.com/ascon/ascon-c)
+** Remarks:     API functions adapted for use in SQLite3 Multiple Ciphers
+** Modified by: Ulrich Telle
+** Copyright:   (c) 2023-2023 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/carray.c
+
+/*
+** 2016-06-29
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+**
+** This file demonstrates how to create a table-valued-function that
+** returns the values in a C-language array.
+** Examples:
+**
+**      SELECT * FROM carray($ptr,5)
+**
+** The query above returns 5 integers contained in a C-language array
+** at the address $ptr.  $ptr is a pointer to the array of integers.
+** The pointer value must be assigned to $ptr using the
+** sqlite3_bind_pointer() interface with a pointer type of "carray".
+** For example:
+**
+**    static int aX[] = { 53, 9, 17, 2231, 4, 99 };
+**    int i = sqlite3_bind_parameter_index(pStmt, "$ptr");
+**    sqlite3_bind_pointer(pStmt, i, aX, "carray", 0);
+**
+** There is an optional third parameter to determine the datatype of
+** the C-language array.  Allowed values of the third parameter are
+** 'int32', 'int64', 'double', 'char*', 'struct iovec'.  Example:
+**
+**      SELECT * FROM carray($ptr,10,'char*');
+**
+** The default value of the third parameter is 'int32'.
+**
+** HOW IT WORKS
+**
+** The carray "function" is really a virtual table with the
+** following schema:
+**
+**     CREATE TABLE carray(
+**       value,
+**       pointer HIDDEN,
+**       count HIDDEN,
+**       ctype TEXT HIDDEN
+**     );
+**
+** If the hidden columns "pointer" and "count" are unconstrained, then 
+** the virtual table has no rows.  Otherwise, the virtual table interprets
+** the integer value of "pointer" as a pointer to the array and "count"
+** as the number of elements in the array.  The virtual table steps through
+** the array, element by element.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/carray.h
+
+/*
+** 2020-11-17
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+**
+** Interface definitions for the CARRAY table-valued function
+** extension.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/chacha20poly1305.c
+
+/*
+** This file contains the implementation for
+**   - the ChaCha20 cipher
+**   - the Poly1305 message digest
+**
+** The code was taken from the public domain implementation
+** of the sqleet project (https://github.com/resilar/sqleet)
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/cipher_ascon.c
+
+/*
+** Name:        cipher_ascon.c
+** Purpose:     Implementation of cipher Ascon
+** Author:      Ulrich Telle
+** Created:     2023-11-13
+** Copyright:   (c) 2023-2023 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/cipher_chacha20.c
+
+/*
+** Name:        cipher_chacha20.c
+** Purpose:     Implementation of cipher ChaCha20 - Poly1305
+** Author:      Ulrich Telle
+** Created:     2020-02-02
+** Copyright:   (c) 2006-2020 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/cipher_common.c
+
+/*
+** Name:        cipher_common.c
+** Purpose:     Implementation of SQLite codecs
+** Author:      Ulrich Telle
+** Created:     2020-02-02
+** Copyright:   (c) 2006-2022 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/cipher_common.h
+
+/*
+** Name:        cipher_common.h
+** Purpose:     Header for the ciphers of SQLite3 Multiple Ciphers
+** Author:      Ulrich Telle
+** Created:     2020-02-02
+** Copyright:   (c) 2006-2022 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/cipher_config.c
+
+/*
+** Name:        cipher_config.c
+** Purpose:     Configuration of SQLite codecs
+** Author:      Ulrich Telle
+** Created:     2020-03-02
+** Copyright:   (c) 2006-2023 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/cipher_config.h
+
+/*
+** Name:        cipher_config.h
+** Purpose:     Header for the cipher configuration of SQLite3 Multiple Ciphers
+** Author:      Ulrich Telle
+** Created:     2020-03-10
+** Copyright:   (c) 2006-2020 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/cipher_sds_rc4.c
+
+/*
+** Name:        cipher_sds_rc4.c
+** Purpose:     Implementation of cipher System.Data.SQLite3 RC4
+** Author:      Ulrich Telle
+** Created:     2020-02-02
+** Copyright:   (c) 2006-2020 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/cipher_sqlcipher.c
+
+/*
+** Name:        cipher_sqlcipher.c
+** Purpose:     Implementation of cipher SQLCipher (version 1 to 4)
+** Author:      Ulrich Telle
+** Created:     2020-02-02
+** Copyright:   (c) 2006-2020 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/cipher_wxaes128.c
+
+/*
+** Name:        cipher_wxaes128.c
+** Purpose:     Implementation of cipher wxSQLite3 AES 128-bit
+** Author:      Ulrich Telle
+** Created:     2020-02-02
+** Copyright:   (c) 2006-2020 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/cipher_wxaes256.c
+
+/*
+** Name:        cipher_wxaes256.c
+** Purpose:     Implementation of cipher wxSQLite3 AES 256-bit
+** Author:      Ulrich Telle
+** Created:     2020-02-02
+** Copyright:   (c) 2006-2020 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/codec_algos.c
+
+/*
+** Name:        codec_algos.c
+** Purpose:     Implementation of SQLite codec algorithms
+** Author:      Ulrich Telle
+** Created:     2020-02-02
+** Copyright:   (c) 2006-2020 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/codecext.c
+
+/*
+** Name:        codecext.c
+** Purpose:     Implementation of SQLite codec API
+** Author:      Ulrich Telle
+** Created:     2006-12-06
+** Copyright:   (c) 2006-2022 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/compress.c
+
+/*
+** 2014-06-13
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+******************************************************************************
+**
+** This SQLite extension implements SQL compression functions
+** compress() and uncompress() using ZLIB.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/csv.c
+
+/*
+** 2016-05-28
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+******************************************************************************
+**
+** This file contains the implementation of an SQLite virtual table for
+** reading CSV files.
+**
+** Usage:
+**
+**    .load ./csv
+**    CREATE VIRTUAL TABLE temp.csv USING csv(filename=FILENAME);
+**    SELECT * FROM csv;
+**
+** The columns are named "c1", "c2", "c3", ... by default.  Or the
+** application can define its own CREATE TABLE statement using the
+** schema= parameter, like this:
+**
+**    CREATE VIRTUAL TABLE temp.csv2 USING csv(
+**       filename = "../http.log",
+**       schema = "CREATE TABLE x(date,ipaddr,url,referrer,userAgent)"
+**    );
+**
+** Instead of specifying a file, the text of the CSV can be loaded using
+** the data= parameter.
+**
+** If the columns=N parameter is supplied, then the CSV file is assumed to have
+** N columns.  If both the columns= and schema= parameters are omitted, then
+** the number and names of the columns is determined by the first line of
+** the CSV input.
+**
+** Some extra debugging features (used for testing virtual tables) are available
+** if this module is compiled with -DSQLITE_TEST.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/fastpbkdf2.c
+
+/*
+ * fast-pbkdf2 - Optimal PBKDF2-HMAC calculation
+ * Written in 2015 by Joseph Birr-Pixton <jpixton@gmail.com>
+ *
+ * To the extent possible under law, the author(s) have dedicated all
+ * copyright and related and neighboring rights to this software to the
+ * public domain worldwide. This software is distributed without any
+ * warranty.
+ *
+ * You should have received a copy of the CC0 Public Domain Dedication
+ * along with this software. If not, see
+ * <http://creativecommons.org/publicdomain/zero/1.0/>.
+ */
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/fastpbkdf2.h
+
+/*
+ * fastpbkdf2 - Faster PBKDF2-HMAC calculation
+ * Written in 2015 by Joseph Birr-Pixton <jpixton@gmail.com>
+ *
+ * To the extent possible under law, the author(s) have dedicated all
+ * copyright and related and neighboring rights to this software to the
+ * public domain worldwide. This software is distributed without any
+ * warranty.
+ *
+ * You should have received a copy of the CC0 Public Domain Dedication
+ * along with this software. If not, see
+ * <http://creativecommons.org/publicdomain/zero/1.0/>.
+ */
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/fileio.c
+
+/*
+** 2014-06-13
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+******************************************************************************
+**
+** This SQLite extension implements SQL functions readfile() and
+** writefile(), and eponymous virtual type "fsdir".
+**
+** WRITEFILE(FILE, DATA [, MODE [, MTIME]]):
+**
+**   If neither of the optional arguments is present, then this UDF
+**   function writes blob DATA to file FILE. If successful, the number
+**   of bytes written is returned. If an error occurs, NULL is returned.
+**
+**   If the first option argument - MODE - is present, then it must
+**   be passed an integer value that corresponds to a POSIX mode
+**   value (file type + permissions, as returned in the stat.st_mode
+**   field by the stat() system call). Three types of files may
+**   be written/created:
+**
+**     regular files:  (mode & 0170000)==0100000
+**     symbolic links: (mode & 0170000)==0120000
+**     directories:    (mode & 0170000)==0040000
+**
+**   For a directory, the DATA is ignored. For a symbolic link, it is
+**   interpreted as text and used as the target of the link. For a
+**   regular file, it is interpreted as a blob and written into the
+**   named file. Regardless of the type of file, its permissions are
+**   set to (mode & 0777) before returning.
+**
+**   If the optional MTIME argument is present, then it is interpreted
+**   as an integer - the number of seconds since the unix epoch. The
+**   modification-time of the target file is set to this value before
+**   returning.
+**
+**   If three or more arguments are passed to this function and an
+**   error is encountered, an exception is raised.
+**
+** READFILE(FILE):
+**
+**   Read and return the contents of file FILE (type blob) from disk.
+**
+** FSDIR:
+**
+**   Used as follows:
+**
+**     SELECT * FROM fsdir($path [, $dir]);
+**
+**   Parameter $path is an absolute or relative pathname. If the file that it
+**   refers to does not exist, it is an error. If the path refers to a regular
+**   file or symbolic link, it returns a single row. Or, if the path refers
+**   to a directory, it returns one row for the directory, and one row for each
+**   file within the hierarchy rooted at $path.
+**
+**   Each row has the following columns:
+**
+**     name:  Path to file or directory (text value).
+**     mode:  Value of stat.st_mode for directory entry (an integer).
+**     mtime: Value of stat.st_mtime for directory entry (an integer).
+**     data:  For a regular file, a blob containing the file data. For a
+**            symlink, a text value containing the text of the link. For a
+**            directory, NULL.
+**
+**   If a non-NULL value is specified for the optional $dir parameter and
+**   $path is a relative path, then $path is interpreted relative to $dir. 
+**   And the paths returned in the "name" column of the table are also 
+**   relative to directory $dir.
+**
+** Notes on building this extension for Windows:
+**   Unless linked statically with the SQLite library, a preprocessor
+**   symbol, FILEIO_WIN32_DLL, must be #define'd to create a stand-alone
+**   DLL form of this extension for WIN32. See its use below for details.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/md5.c
+
+/*
+ * This is an OpenSSL-compatible implementation of the RSA Data Security, Inc.
+ * MD5 Message-Digest Algorithm (RFC 1321).
+ *
+ * Homepage:
+ * http://openwall.info/wiki/people/solar/software/public-domain-source-code/md5
+ *
+ * Author:
+ * Alexander Peslyak, better known as Solar Designer <solar at openwall.com>
+ *
+ * This software was written by Alexander Peslyak in 2001.  No copyright is
+ * claimed, and the software is hereby placed in the public domain.
+ * In case this attempt to disclaim copyright and place the software in the
+ * public domain is deemed null and void, then the software is
+ * Copyright (c) 2001 Alexander Peslyak and it is hereby released to the
+ * general public under the following terms:
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted.
+ *
+ * There's ABSOLUTELY NO WARRANTY, express or implied.
+ *
+ * (This is a heavily cut-down "BSD license".)
+ *
+ * This differs from Colin Plumb's older public domain implementation in that
+ * no exactly 32-bit integer data type is required (any 32-bit or wider
+ * unsigned integer data type will do), there's no compile-time endianness
+ * configuration, and the function prototypes match OpenSSL's.  No code from
+ * Colin Plumb's implementation has been reused; this comment merely compares
+ * the properties of the two independent implementations.
+ *
+ * The primary goals of this implementation are portability and ease of use.
+ * It is meant to be fast, but not as fast as possible.  Some known
+ * optimizations are not included to reduce source code size and avoid
+ * compile-time configuration.
+ */
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/memory_secure.c
+
+/*
+** Name:        mem_secure.c
+** Purpose:     Memory manager for SQLite3 Multiple Ciphers
+** Author:      Ulrich Telle
+** Created:     2023-09-17
+** Copyright:   (c) 2023 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/miniz.c
+
+/**************************************************************************
+ *
+ * Copyright 2013-2014 RAD Game Tools and Valve Software
+ * Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC
+ * All Rights Reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ *
+ **************************************************************************/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/miniz.c
+
+/*
+  This is free and unencumbered software released into the public domain.
+
+  Anyone is free to copy, modify, publish, use, compile, sell, or
+  distribute this software, either in source code form or as a compiled
+  binary, for any purpose, commercial or non-commercial, and by any
+  means.
+
+  In jurisdictions that recognize copyright laws, the author or authors
+  of this software dedicate any and all copyright interest in the
+  software to the public domain. We make this dedication for the benefit
+  of the public at large and to the detriment of our heirs and
+  successors. We intend this dedication to be an overt act of
+  relinquishment in perpetuity of all present and future rights to this
+  software under copyright law.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+  IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+  OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  OTHER DEALINGS IN THE SOFTWARE.
+
+  For more information, please refer to <http://unlicense.org/>
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/miniz.h
+
+/* miniz.c 2.2.0 - public domain deflate/inflate, zlib-subset, ZIP reading/writing/appending, PNG writing
+   See "unlicense" statement at the end of this file.
+   Rich Geldreich <richgel99@gmail.com>, last updated Oct. 13, 2013
+   Implements RFC 1950: http://www.ietf.org/rfc/rfc1950.txt and RFC 1951: http://www.ietf.org/rfc/rfc1951.txt
+
+   Most API's defined in miniz.c are optional. For example, to disable the archive related functions just define
+   MINIZ_NO_ARCHIVE_APIS, or to get rid of all stdio usage define MINIZ_NO_STDIO (see the list below for more macros).
+
+   * Low-level Deflate/Inflate implementation notes:
+
+     Compression: Use the "tdefl" API's. The compressor supports raw, static, and dynamic blocks, lazy or
+     greedy parsing, match length filtering, RLE-only, and Huffman-only streams. It performs and compresses
+     approximately as well as zlib.
+
+     Decompression: Use the "tinfl" API's. The entire decompressor is implemented as a single function
+     coroutine: see tinfl_decompress(). It supports decompression into a 32KB (or larger power of 2) wrapping buffer, or into a memory
+     block large enough to hold the entire file.
+
+     The low-level tdefl/tinfl API's do not make any use of dynamic memory allocation.
+
+   * zlib-style API notes:
+
+     miniz.c implements a fairly large subset of zlib. There's enough functionality present for it to be a drop-in
+     zlib replacement in many apps:
+        The z_stream struct, optional memory allocation callbacks
+        deflateInit/deflateInit2/deflate/deflateReset/deflateEnd/deflateBound
+        inflateInit/inflateInit2/inflate/inflateReset/inflateEnd
+        compress, compress2, compressBound, uncompress
+        CRC-32, Adler-32 - Using modern, minimal code size, CPU cache friendly routines.
+        Supports raw deflate streams or standard zlib streams with adler-32 checking.
+
+     Limitations:
+      The callback API's are not implemented yet. No support for gzip headers or zlib static dictionaries.
+      I've tried to closely emulate zlib's various flavors of stream flushing and return status codes, but
+      there are no guarantees that miniz.c pulls this off perfectly.
+
+   * PNG writing: See the tdefl_write_image_to_png_file_in_memory() function, originally written by
+     Alex Evans. Supports 1-4 bytes/pixel images.
+
+   * ZIP archive API notes:
+
+     The ZIP archive API's where designed with simplicity and efficiency in mind, with just enough abstraction to
+     get the job done with minimal fuss. There are simple API's to retrieve file information, read files from
+     existing archives, create new archives, append new files to existing archives, or clone archive data from
+     one archive to another. It supports archives located in memory or the heap, on disk (using stdio.h),
+     or you can specify custom file read/write callbacks.
+
+     - Archive reading: Just call this function to read a single file from a disk archive:
+
+      void *mz_zip_extract_archive_file_to_heap(const char *pZip_filename, const char *pArchive_name,
+        size_t *pSize, mz_uint zip_flags);
+
+     For more complex cases, use the "mz_zip_reader" functions. Upon opening an archive, the entire central
+     directory is located and read as-is into memory, and subsequent file access only occurs when reading individual files.
+
+     - Archives file scanning: The simple way is to use this function to scan a loaded archive for a specific file:
+
+     int mz_zip_reader_locate_file(mz_zip_archive *pZip, const char *pName, const char *pComment, mz_uint flags);
+
+     The locate operation can optionally check file comments too, which (as one example) can be used to identify
+     multiple versions of the same file in an archive. This function uses a simple linear search through the central
+     directory, so it's not very fast.
+
+     Alternately, you can iterate through all the files in an archive (using mz_zip_reader_get_num_files()) and
+     retrieve detailed info on each file by calling mz_zip_reader_file_stat().
+
+     - Archive creation: Use the "mz_zip_writer" functions. The ZIP writer immediately writes compressed file data
+     to disk and builds an exact image of the central directory in memory. The central directory image is written
+     all at once at the end of the archive file when the archive is finalized.
+
+     The archive writer can optionally align each file's local header and file data to any power of 2 alignment,
+     which can be useful when the archive will be read from optical media. Also, the writer supports placing
+     arbitrary data blobs at the very beginning of ZIP archives. Archives written using either feature are still
+     readable by any ZIP tool.
+
+     - Archive appending: The simple way to add a single file to an archive is to call this function:
+
+      mz_bool mz_zip_add_mem_to_archive_file_in_place(const char *pZip_filename, const char *pArchive_name,
+        const void *pBuf, size_t buf_size, const void *pComment, mz_uint16 comment_size, mz_uint level_and_flags);
+
+     The archive will be created if it doesn't already exist, otherwise it'll be appended to.
+     Note the appending is done in-place and is not an atomic operation, so if something goes wrong
+     during the operation it's possible the archive could be left without a central directory (although the local
+     file headers and file data will be fine, so the archive will be recoverable).
+
+     For more complex archive modification scenarios:
+     1. The safest way is to use a mz_zip_reader to read the existing archive, cloning only those bits you want to
+     preserve into a new archive using using the mz_zip_writer_add_from_zip_reader() function (which compiles the
+     compressed file data as-is). When you're done, delete the old archive and rename the newly written archive, and
+     you're done. This is safe but requires a bunch of temporary disk space or heap memory.
+
+     2. Or, you can convert an mz_zip_reader in-place to an mz_zip_writer using mz_zip_writer_init_from_reader(),
+     append new files as needed, then finalize the archive which will write an updated central directory to the
+     original archive. (This is basically what mz_zip_add_mem_to_archive_file_in_place() does.) There's a
+     possibility that the archive's central directory could be lost with this method if anything goes wrong, though.
+
+     - ZIP archive support limitations:
+     No spanning support. Extraction functions can only handle unencrypted, stored or deflated files.
+     Requires streams capable of seeking.
+
+   * This is a header file library, like stb_image.c. To get only a header file, either cut and paste the
+     below header, or create miniz.h, #define MINIZ_HEADER_FILE_ONLY, and then include miniz.c from it.
+
+   * Important: For best perf. be sure to customize the below macros for your target platform:
+     #define MINIZ_USE_UNALIGNED_LOADS_AND_STORES 1
+     #define MINIZ_LITTLE_ENDIAN 1
+     #define MINIZ_HAS_64BIT_REGISTERS 1
+
+   * On platforms using glibc, Be sure to "#define _LARGEFILE64_SOURCE 1" before including miniz.c to ensure miniz
+     uses the 64-bit variants: fopen64(), stat64(), etc. Otherwise you won't be able to process large files
+     (i.e. 32-bit stat() fails for me on files > 0x7FFFFFFF bytes).
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/regexp.c
+
+/*
+** 2012-11-13
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+******************************************************************************
+**
+** The code in this file implements a compact but reasonably
+** efficient regular-expression matcher for posix extended regular
+** expressions against UTF8 text.
+**
+** This file is an SQLite extension.  It registers a single function
+** named "regexp(A,B)" where A is the regular expression and B is the
+** string to be matched.  By registering this function, SQLite will also
+** then implement the "B regexp A" operator.  Note that with the function
+** the regular expression comes first, but with the operator it comes
+** second.
+**
+**  The following regular expression syntax is supported:
+**
+**     X*      zero or more occurrences of X
+**     X+      one or more occurrences of X
+**     X?      zero or one occurrences of X
+**     X{p,q}  between p and q occurrences of X
+**     (X)     match X
+**     X|Y     X or Y
+**     ^X      X occurring at the beginning of the string
+**     X$      X occurring at the end of the string
+**     .       Match any single character
+**     \c      Character c where c is one of \{}()[]|*+?.
+**     \c      C-language escapes for c in afnrtv.  ex: \t or \n
+**     \uXXXX  Where XXXX is exactly 4 hex digits, unicode value XXXX
+**     \xXX    Where XX is exactly 2 hex digits, unicode value XX
+**     [abc]   Any single character from the set abc
+**     [^abc]  Any single character not in the set abc
+**     [a-z]   Any single character in the range a-z
+**     [^a-z]  Any single character not in the range a-z
+**     \b      Word boundary
+**     \w      Word character.  [A-Za-z0-9_]
+**     \W      Non-word character
+**     \d      Digit
+**     \D      Non-digit
+**     \s      Whitespace character
+**     \S      Non-whitespace character
+**
+** A nondeterministic finite automaton (NFA) is used for matching, so the
+** performance is bounded by O(N*M) where N is the size of the regular
+** expression and M is the size of the input string.  The matcher never
+** exhibits exponential behavior.  Note that the X{p,q} operator expands
+** to p copies of X following by q-p copies of X? and that the size of the
+** regular expression in the O(N*M) performance bound is computed after
+** this expansion.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/rekeyvacuum.c
+
+/*
+** 2020-11-14
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+************************************************************************
+**
+** This file contains an adjusted version of function sqlite3RunVacuum
+** to allow reducing or removing reserved page space.
+** For this purpose the number of reserved bytes per page for the target
+** database is passed as an extra parameter to the adjusted function.
+**
+** NOTE: When upgrading to a new version of SQLite3 it is strongly
+** recommended to check the original function sqlite3RunVacuum of the
+** new version for relevant changes, and to incorporate them in the
+** adjusted function below.
+**
+** Change 0: Rename function to sqlite3mcRunVacuumForRekey()
+** Change 1: Add parameter 'int nRes'
+** Change 2: Remove local variable 'int nRes'
+** Change 3: Remove initialization 'nRes = sqlite3BtreeGetOptimalReserve(pMain)'
+** Change 4: Call sqlite3mcBtreeSetPageSize instead of sqlite3BtreeSetPageSize for main database
+**           (sqlite3mcBtreeSetPageSize allows to reduce the number of reserved bytes)
+**
+** This code is generated by the script rekeyvacuum.sh from SQLite version 3.44.2 amalgamation.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/rijndael.c
+
+/*
+** Name:        rijndael.c
+** Purpose:     Implementation of the Rijndael cipher
+** Author:      Ulrich Telle
+** Created:     2006-12-06
+** Copyright:   (c) 2006-2020 Ulrich Telle
+** License:     MIT
+**
+** Adjustments were made to make this code work with the wxSQLite3's
+** SQLite encryption extension.
+** The original code is public domain (see comments below).
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/rijndael.c
+
+/*
+/// \file rijndael.cpp Implementation of the Rijndael cipher
+//
+// File : rijndael.cpp
+// Creation date : Sun Nov 5 2000 03:22:10 CEST
+// Author : Szymon Stefanek (stefanek@tin.it)
+//
+// Another implementation of the Rijndael cipher.
+// This is intended to be an easily usable library file.
+// This code is public domain.
+// Based on the Vincent Rijmen and K.U.Leuven implementation 2.4.
+//
+// Original Copyright notice:
+//
+//    rijndael-alg-fst.c   v2.4   April '2000
+//    rijndael-alg-fst.h
+//    rijndael-api-fst.c
+//    rijndael-api-fst.h
+//
+//    Optimised ANSI C code
+//
+//    authors: v1.0: Antoon Bosselaers
+//             v2.0: Vincent Rijmen, K.U.Leuven
+//             v2.3: Paulo Barreto
+//             v2.4: Vincent Rijmen, K.U.Leuven
+//
+//    This code is placed in the public domain.
+//
+// This implementation works on 128 , 192 , 256 bit keys
+// and on 128 bit blocks
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/rijndael.h
+
+/*
+** Name:        rijndael.h
+** Purpose:     Header file for the Rijndael cipher
+** Author:      Ulrich Telle
+** Created:     2006-12-06
+** Copyright:   (c) 2006-2020 Ulrich Telle
+** License:     MIT
+**
+** Adjustments were made to make this code work with the wxSQLite3's
+** SQLite encryption extension.
+** The original code is public domain (see comments below).
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/rijndael.h
+
+/*
+// File : rijndael.h
+// Creation date : Sun Nov 5 2000 03:21:05 CEST
+// Author : Szymon Stefanek (stefanek@tin.it)
+//
+// Another implementation of the Rijndael cipher.
+// This is intended to be an easily usable library file.
+// This code is public domain.
+// Based on the Vincent Rijmen and K.U.Leuven implementation 2.4.
+//
+// Original Copyright notice:
+//
+//    rijndael-alg-fst.c   v2.4   April '2000
+//    rijndael-alg-fst.h
+//    rijndael-api-fst.c
+//    rijndael-api-fst.h
+//
+//    Optimised ANSI C code
+//
+//    authors: v1.0: Antoon Bosselaers
+//             v2.0: Vincent Rijmen, K.U.Leuven
+//             v2.3: Paulo Barreto
+//             v2.4: Vincent Rijmen, K.U.Leuven
+//
+//    This code is placed in the public domain.
+//
+
+//
+// This implementation works on 128 , 192 , 256 bit keys
+// and on 128 bit blocks
+//
+
+//
+// Example of usage:
+//
+//  // Input data
+//  unsigned char key[32];                       // The key
+//  initializeYour256BitKey();                   // Obviously initialized with sth
+//  const unsigned char * plainText = getYourPlainText(); // Your plain text
+//  int plainTextLen = strlen(plainText);        // Plain text length
+//
+//  // Encrypting
+//  Rijndael rin;
+//  unsigned char output[plainTextLen + 16];
+//
+//  rin.init(Rijndael::CBC,Rijndael::Encrypt,key,Rijndael::Key32Bytes);
+//  // It is a good idea to check the error code
+//  int len = rin.padEncrypt(plainText,len,output);
+//  if(len >= 0)useYourEncryptedText();
+//  else encryptError(len);
+//
+//  // Decrypting: we can reuse the same object
+//  unsigned char output2[len];
+//  rin.init(Rijndael::CBC,Rijndael::Decrypt,key,Rijndael::Key32Bytes));
+//  len = rin.padDecrypt(output,len,output2);
+//  if(len >= 0)useYourDecryptedText();
+//  else decryptError(len);
+//
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/series.c
+
+/*
+** 2015-08-18, 2023-04-28
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+**
+** This file demonstrates how to create a table-valued-function using
+** a virtual table.  This demo implements the generate_series() function
+** which gives the same results as the eponymous function in PostgreSQL,
+** within the limitation that its arguments are signed 64-bit integers.
+**
+** Considering its equivalents to generate_series(start,stop,step): A
+** value V[n] sequence is produced for integer n ascending from 0 where
+**  ( V[n] == start + n * step  &&  sgn(V[n] - stop) * sgn(step) >= 0 )
+** for each produced value (independent of production time ordering.)
+**
+** All parameters must be either integer or convertable to integer.
+** The start parameter is required.
+** The stop parameter defaults to (1<<32)-1 (aka 4294967295 or 0xffffffff)
+** The step parameter defaults to 1 and 0 is treated as 1.
+**
+** Examples:
+**
+**      SELECT * FROM generate_series(0,100,5);
+**
+** The query above returns integers from 0 through 100 counting by steps
+** of 5.
+**
+**      SELECT * FROM generate_series(0,100);
+**
+** Integers from 0 through 100 with a step size of 1.
+**
+**      SELECT * FROM generate_series(20) LIMIT 10;
+**
+** Integers 20 through 29.
+**
+**      SELECT * FROM generate_series(0,-100,-5);
+**
+** Integers 0 -5 -10 ... -100.
+**
+**      SELECT * FROM generate_series(0,-1);
+**
+** Empty sequence.
+**
+** HOW IT WORKS
+**
+** The generate_series "function" is really a virtual table with the
+** following schema:
+**
+**     CREATE TABLE generate_series(
+**       value,
+**       start HIDDEN,
+**       stop HIDDEN,
+**       step HIDDEN
+**     );
+**
+** The virtual table also has a rowid, logically equivalent to n+1 where
+** "n" is the ascending integer in the aforesaid production definition.
+**
+** Function arguments in queries against this virtual table are translated
+** into equality constraints against successive hidden columns.  In other
+** words, the following pairs of queries are equivalent to each other:
+**
+**    SELECT * FROM generate_series(0,100,5);
+**    SELECT * FROM generate_series WHERE start=0 AND stop=100 AND step=5;
+**
+**    SELECT * FROM generate_series(0,100);
+**    SELECT * FROM generate_series WHERE start=0 AND stop=100;
+**
+**    SELECT * FROM generate_series(20) LIMIT 10;
+**    SELECT * FROM generate_series WHERE start=20 LIMIT 10;
+**
+** The generate_series virtual table implementation leaves the xCreate method
+** set to NULL.  This means that it is not possible to do a CREATE VIRTUAL
+** TABLE command with "generate_series" as the USING argument.  Instead, there
+** is a single generate_series virtual table that is always available without
+** having to be created first.
+**
+** The xBestIndex method looks for equality constraints against the hidden
+** start, stop, and step columns, and if present, it uses those constraints
+** to bound the sequence of generated values.  If the equality constraints
+** are missing, it uses 0 for start, 4294967295 for stop, and 1 for step.
+** xBestIndex returns a small cost when both start and stop are available,
+** and a very large cost if either start or stop are unavailable.  This
+** encourages the query planner to order joins such that the bounds of the
+** series are well-defined.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/sha1.c
+
+/*
+By Steve Reid <sreid@sea-to-sky.net>
+100% Public Domain
+
+-----------------
+Modified 7/98
+By James H. Brown <jbrown@burgoyne.com>
+Still 100% Public Domain
+
+Corrected a problem which generated improper hash values on 16 bit machines
+Routine SHA1Update changed from
+	void SHA1Update(SHA1_CTX* context, unsigned char* data, unsigned int
+len)
+to
+	void SHA1Update(SHA1_CTX* context, unsigned char* data, unsigned
+long len)
+
+The 'len' parameter was declared an int which works fine on 32 bit machines.
+However, on 16 bit machines an int is too small for the shifts being done
+against
+it.  This caused the hash function to generate incorrect values if len was
+greater than 8191 (8K - 1) due to the 'len << 3' on line 3 of SHA1Update().
+
+Since the file IO in main() reads 16K at a time, any file 8K or larger would
+be guaranteed to generate the wrong hash (e.g. Test Vector #3, a million
+"a"s).
+
+I also changed the declaration of variables i & j in SHA1Update to
+unsigned long from unsigned int for the same reason.
+
+These changes should make no difference to any 32 bit implementations since
+an
+int and a long are the same size in those environments.
+
+--
+I also corrected a few compiler warnings generated by Borland C.
+1. Added #include <process.h> for exit() prototype
+2. Removed unused variable 'j' in SHA1Final
+3. Changed exit(0) to return(0) at end of main.
+
+ALL changes I made can be located by searching for comments containing 'JHB'
+-----------------
+Modified 8/98
+By Steve Reid <sreid@sea-to-sky.net>
+Still 100% public domain
+
+1- Removed #include <process.h> and used return() instead of exit()
+2- Fixed overwriting of finalcount in SHA1Final() (discovered by Chris Hall)
+3- Changed email address from steve@edmweb.com to sreid@sea-to-sky.net
+
+-----------------
+Modified 4/01
+By Saul Kravitz <Saul.Kravitz@celera.com>
+Still 100% PD
+Modified to run on Compaq Alpha hardware.
+
+-----------------
+Modified 07/2002
+By Ralph Giles <giles@artofcode.com>
+Still 100% public domain
+modified for use with stdint types, autoconf
+code cleanup, removed attribution comments
+switched SHA1Final() argument order for consistency
+use SHA1_ prefix for public api
+move public api to sha1.h
+
+-----------------
+Modified 02/2018
+By Ulrich Telle <github@telle-online.de>
+Still 100% public domain
+modified for use with fast-pbkdf2 (written by Joseph Birr-Pixton)
+detect endianess at run-time
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/sha1.h
+
+/* public api for steve reid's public domain SHA-1 implementation */
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/sha1.h
+
+/* this file is in the public domain */
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/sha2.c
+
+/*
+ * FIPS 180-2 SHA-224/256/384/512 implementation
+ * Last update: 02/02/2007
+ * Issue date:  04/30/2005
+ *
+ * Copyright (C) 2005, 2007 Olivier Gay <olivier.gay@a3.epfl.ch>
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/shathree.c
+
+/*
+** 2017-03-08
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+******************************************************************************
+**
+** This SQLite extension implements functions that compute SHA3 hashes
+** in the way described by the (U.S.) NIST FIPS 202 SHA-3 Standard.
+** Two SQL functions are implemented:
+**
+**     sha3(X,SIZE)
+**     sha3_query(Y,SIZE)
+**
+** The sha3(X) function computes the SHA3 hash of the input X, or NULL if
+** X is NULL.
+**
+** The sha3_query(Y) function evaluates all queries in the SQL statements of Y
+** and returns a hash of their results.
+**
+** The SIZE argument is optional.  If omitted, the SHA3-256 hash algorithm
+** is used.  If SIZE is included it must be one of the integers 224, 256,
+** 384, or 512, to determine SHA3 hash variant that is computed.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/shell.c
+
+/*
+** 2001 September 15
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+** This file contains code to implement the "sqlite" command line
+** utility for accessing SQLite databases.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/shell.c
+
+/*
+** 2023 November 1
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+********************************************************************************
+** This file exposes various interfaces used for console and other I/O
+** by the SQLite project command-line tools. These interfaces are used
+** at either source conglomeration time, compilation time, or run time.
+** This source provides for either inclusion into conglomerated,
+** "single-source" forms or separate compilation then linking.
+**
+** Platform dependencies are "hidden" here by various stratagems so
+** that, provided certain conditions are met, the programs using this
+** source or object code compiled from it need no explicit conditional
+** compilation in their source for their console and stream I/O.
+**
+** The symbols and functionality exposed here are not a public API.
+** This code may change in tandem with other project code as needed.
+**
+** When this .h file and its companion .c are directly incorporated into
+** a source conglomeration (such as shell.c), the preprocessor symbol
+** CIO_WIN_WC_XLATE is defined as 0 or 1, reflecting whether console I/O
+** translation for Windows is effected for the build.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/shell.c
+
+/*
+** 2023 November 4
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+********************************************************************************
+** This file implements various interfaces used for console and stream I/O
+** by the SQLite project command-line tools, as explained in console_io.h .
+** Functions prefixed by "SQLITE_INTERNAL_LINKAGE" behave as described there.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/sqlar.c
+
+/*
+** 2017-12-17
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+******************************************************************************
+**
+** Utility functions sqlar_compress() and sqlar_uncompress(). Useful
+** for working with sqlar archives and used by the shell tool's built-in
+** sqlar support.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/sqlite3.c
+
+/*
+** 2001 September 15
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+** Internal interface definitions for SQLite.
+**
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/sqlite3.c
+
+/*
+** 2015 January 12
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+******************************************************************************
+**
+** This file contains code that is specific to MSVC.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/sqlite3.c
+
+/*
+** 2015-03-02
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+******************************************************************************
+**
+** This file contains code that is specific to Wind River's VxWorks
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/sqlite3.c
+
+/*
+** 2001-09-15
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+** This header file defines the interface that the SQLite library
+** presents to client programs.  If a C-function, structure, datatype,
+** or constant definition does not appear in this file, then it is
+** not a published API of SQLite, is subject to change without
+** notice, and should not be referenced by programs that use SQLite.
+**
+** Some of the definitions that are in this file are marked as
+** "experimental".  Experimental interfaces are normally new
+** features recently added to SQLite.  We do not anticipate changes
+** to experimental interfaces but reserve the right to make minor changes
+** if experience from use "in the wild" suggest such changes are prudent.
+**
+** The official C-language API documentation for SQLite is derived
+** from comments in this file.  This file is the authoritative source
+** on how SQLite interfaces are supposed to operate.
+**
+** The name of this file under configuration management is "sqlite.h.in".
+** The makefile makes some minor changes to this file (such as inserting
+** the version number) and changes its name to "sqlite3.h" as
+** part of the build process.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/sqlite3ext.h
+
+/*
+** 2006 June 7
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+** This header file defines the SQLite interface for use by
+** shared libraries that want to be imported as extensions into
+** an SQLite instance.  Shared libraries that intend to be loaded
+** as extensions by SQLite should #include this file instead of 
+** sqlite3.h.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/sqlite3mc.c
+
+/*
+** Name:        sqlite3mc.c
+** Purpose:     Amalgamation of the SQLite3 Multiple Ciphers encryption extension for SQLite
+** Author:      Ulrich Telle
+** Created:     2020-02-28
+** Copyright:   (c) 2006-2022 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/sqlite3mc.h
+
+/*
+** Name:        sqlite3mc.h
+** Purpose:     Header file for SQLite3 Multiple Ciphers support
+** Author:      Ulrich Telle
+** Created:     2020-03-01
+** Copyright:   (c) 2019-2023 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/sqlite3mc_config.h
+
+/*
+** Name:        sqlite3mc_config.h
+** Purpose:     Header file for SQLite3 Multiple Ciphers compile-time configuration
+** Author:      Ulrich Telle
+** Created:     2021-09-27
+** Copyright:   (c) 2019-2023 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/sqlite3mc_version.h
+
+/*
+** Name:        sqlite3mc_version.h
+** Purpose:     SQLite3 Multiple Ciphers version numbers
+** Author:      Ulrich Telle
+** Created:     2020-08-05
+** Copyright:   (c) 2020-2023 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/sqlite3mc_vfs.c
+
+/*
+** Name:        sqlite3mc_vfs.c
+** Purpose:     Implementation of SQLite VFS for Multiple Ciphers
+** Author:      Ulrich Telle
+** Created:     2020-02-28
+** Copyright:   (c) 2020-2023 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/sqlite3mc_vfs.h
+
+/*
+** Name:        sqlite3mc_vfs.h
+** Purpose:     Header file for VFS of SQLite3 Multiple Ciphers support
+** Author:      Ulrich Telle
+** Created:     2020-03-01
+** Copyright:   (c) 2020-2023 Ulrich Telle
+** License:     MIT
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/sqlite3userauth.h
+
+/*
+** 2014-09-08
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+**
+** This file contains the application interface definitions for the
+** user-authentication extension feature.
+**
+** To compile with the user-authentication feature, append this file to
+** end of an SQLite amalgamation header file ("sqlite3.h"), then add
+** the SQLITE_USER_AUTHENTICATION compile-time option.  See the
+** user-auth.txt file in the same source directory as this file for
+** additional information.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/tclsqlite.c
+
+/*
+** 2001 September 15
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+** A TCL Interface to SQLite.  Append this file to sqlite3.c and
+** compile the whole thing to build a TCL-enabled version of SQLite.
+**
+** Compile-time options:
+**
+**  -DTCLSH         Add a "main()" routine that works as a tclsh.
+**
+**  -DTCLSH_INIT_PROC=name
+**
+**                  Invoke name(interp) to initialize the Tcl interpreter.
+**                  If name(interp) returns a non-NULL string, then run
+**                  that string as a Tcl script to launch the application.
+**                  If name(interp) returns NULL, then run the regular
+**                  tclsh-emulator code.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/test_windirent.c
+
+/*
+** 2015 November 30
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+** This file contains code to implement most of the opendir() family of
+** POSIX functions on Win32 using the MSVCRT.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/test_windirent.h
+
+/*
+** 2015 November 30
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+** This file contains declarations for most of the opendir() family of
+** POSIX functions on Win32 using the MSVCRT.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/userauth.c
+
+/*
+** 2014-09-08
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+*************************************************************************
+**
+** This file contains the bulk of the implementation of the
+** user-authentication extension feature.  Some parts of the user-
+** authentication code are contained within the SQLite core (in the
+** src/ subdirectory of the main source code tree) but those parts
+** that could reasonable be separated out are moved into this file.
+**
+** To compile with the user-authentication feature, append this file to
+** end of an SQLite amalgamation, then add the SQLITE_USER_AUTHENTICATION
+** compile-time option.  See the user-auth.txt file in the same source
+** directory as this file for additional information.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/uuid.c
+
+/*
+** 2019-10-23
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+******************************************************************************
+**
+** This SQLite extension implements functions that handling RFC-4122 UUIDs
+** Three SQL functions are implemented:
+**
+**     uuid()        - generate a version 4 UUID as a string
+**     uuid_str(X)   - convert a UUID X into a well-formed UUID string
+**     uuid_blob(X)  - convert a UUID X into a 16-byte blob
+**
+** The output from uuid() and uuid_str(X) are always well-formed RFC-4122
+** UUID strings in this format:
+**
+**        xxxxxxxx-xxxx-Mxxx-Nxxx-xxxxxxxxxxxx
+**
+** All of the 'x', 'M', and 'N' values are lower-case hexadecimal digits.
+** The M digit indicates the "version".  For uuid()-generated UUIDs, the
+** version is always "4" (a random UUID).  The upper three bits of N digit
+** are the "variant".  This library only supports variant 1 (indicated
+** by values of N between '8' and 'b') as those are overwhelming the most
+** common.  Other variants are for legacy compatibility only.
+**
+** The output of uuid_blob(X) is always a 16-byte blob.  The UUID input
+** string is converted in network byte order (big-endian) in accordance
+** with RFC-4122 specifications for variant-1 UUIDs.  Note that network
+** byte order is *always* used, even if the input self-identifies as a
+** variant-2 UUID.
+**
+** The input X to the uuid_str() and uuid_blob() functions can be either
+** a string or a BLOB.  If it is a BLOB it must be exactly 16 bytes in
+** length or else a NULL is returned.  If the input is a string it must
+** consist of 32 hexadecimal digits, upper or lower case, optionally
+** surrounded by {...} and with optional "-" characters interposed in the
+** middle.  The flexibility of input is inspired by the PostgreSQL
+** implementation of UUID functions that accept in all of the following
+** formats:
+**
+**     A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11
+**     {a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11}
+**     a0eebc999c0b4ef8bb6d6bb9bd380a11
+**     a0ee-bc99-9c0b-4ef8-bb6d-6bb9-bd38-0a11
+**     {a0eebc99-9c0b4ef8-bb6d6bb9-bd380a11}
+**
+** If any of the above inputs are passed into uuid_str(), the output will
+** always be in the canonical RFC-4122 format:
+**
+**     a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11
+**
+** If the X input string has too few or too many digits or contains
+** stray characters other than {, }, or -, then NULL is returned.
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/vsv.c
+
+/*
+** 2020-02-08 modified by Keith Medcalf who also disclaims all copyright
+** on the modifications and hereby places this code in the public domain
+**
+** This file contains the implementation of an SQLite virtual table for
+** reading VSV (Variably Separated Values), which are like CSV files,
+** but subtly different.  VSV supports a number of extensions to the
+** CSV format as well as more processing options.
+**
+** http:\\www.dessus.com\files\vsv.c
+**
+** Usage:
+**
+**  create virtual table temp.vsv using vsv(...);
+**  select * from vsv;
+**
+** The parameters to the vsv module (the vsv(...) part) are as follows:
+**
+**  filename=STRING     the filename, passed to the Operating System
+**  data=STRING         alternative data
+**  schema=STRING       Alternate Schema to use
+**  columns=N           columns parsed from the VSV file
+**  header=BOOL         whether or not a header row is present
+**  skip=N              number of leading data rows to skip
+**  rsep=STRING         record separator
+**  fsep=STRING         field separator
+**  validatetext=BOOL   validate UTF-8 encoding of text fields
+**  affinity=AFFINITY   affinity to apply to each returned value
+**  nulls=BOOL          empty fields are returned as NULL
+**
+**
+** Defaults:
+**
+**  filename / data     nothing.  You must provide one or the other
+**                      it is an error to provide both or neither
+**  schema              nothing.  If not provided then one will be
+**                      generated for you from the header, or if no
+**                      header is available then autogenerated using
+**                      field names manufactured as cX where X is the
+**                      column number
+**  columns             nothing.  If not specified then the number of
+**                      columns is determined by counting the fields
+**                      in the first record of the VSV file (which
+**                      will be the header row if header is specified),
+**                      the number of columns is not parsed from the
+**                      schema even if one is provided
+**  header=no           no header row in the VSV file
+**  skip=0              do not skip any data rows in the VSV file
+**  fsep=','            default field separator is a comma
+**  rsep='\n'           default record separator is a newline
+**  validatetext=no     do not validate text field encoding
+**  affinity=none       do not apply affinity to each returned value
+**  nulls=off           empty fields returned as zero-length
+**
+**
+** Parameter types:
+**
+**  STRING              means a quoted string
+**  N                   means a whole number not containing a sign
+**  BOOL                means something that evaluates as true or false
+**                          it is case insensitive
+**                          yes, no, true, false, 1, 0
+**  AFFINITY            means an SQLite3 type specification
+**                          it is case insensitive
+**                          none, blob, text, integer, real, numeric
+**
+** STRING means a quoted string.  The quote character may be either
+** a single quote or a double quote.  Two quote characters in a row
+** will be replaced with one quote character.  STRINGS do not
+** need to be quoted if it is obvious where they begin and end
+** (that is, they do not contain a comma or other character that the
+** parser treats especially, such as : or \).  Leading and trailing
+** spaces will be trimmed from unquoted strings.
+**
+**    filename =./this/filename.here, ...
+**    filename =./this/filename.here , ...
+**    filename = ./this/filename.here, ...
+**    filename = ./this/filename.here , ...
+**    filename = './this/filename.here', ...
+**    filename = "./this/filename.here", ...
+**
+**  are all equivalent.
+**
+** BOOL defaults to true so the following specifications are all the
+** same:
+**
+**  header = true
+**  header = yes
+**  header = 1
+**  header
+**
+**
+** Specific Parameters:
+**
+** The platform/compiler/OS fopen call is responsible for interpreting
+** the filename.  It may contain anything recognized by the OS.
+**
+** The separator string containing exactly one character, or a valid
+** escape sequence.  Recognized escape sequences are:
+**
+**  \t                  horizontal tab, ascii character 9 (0x09)
+**  \n                  linefeed, ascii character 10 (0x0a)
+**  \v                  vertical tab, ascii character 11 (0x0b)
+**  \f                  form feed, ascii character 12 (0x0c)
+**  \xhh                specific byte where hh is hexadecimal
+**
+** The validatetext setting will cause the validity of the field
+** encoding (not its contents) to be verified.  It effects how
+** fields that are supposed to contain text will be returned to
+** the SQLite3 library in order to prevent invalid utf8 data from
+** being stored or processed as if it were valid utf8 text.
+**
+** The nulls option will cause fields that do not contain anything
+** to return NULL rather than an empty result.  Two separators
+** side-by-each with no intervening characters at all will be
+** returned as NULL if nulls is true; if nulls is false or
+** the contents are explicity empty ("") then a 0 length blob
+** (if affinity=blob) or 0 length text string.
+**
+** For the affinity setting, the following processing is applied to
+** each value returned by the VSV virtual table:
+**
+**  none                no affinity is applied, all fields will be
+**                      returned as text just like in the original
+**                      csv module, embedded nulls will terminate
+**                      the text.  if validatetext is in effect then
+**                      an error will be thrown if the field does
+**                      not contain validly encoded text or contains
+**                      embedded nulls
+**
+**  blob                all fields will be returned as blobs
+**                      validatetext has no effect
+**
+**  text                all fields will be returned as text just
+**                      like in the original csv module, embedded
+**                      nulls will terminate the text.
+**                      if validatetext is in effect then a blob
+**                      will be returned if the field does not
+**                      contain validly encoded text or the field
+**                      contains embedded nulls
+**
+**  integer             if the field data looks like an integer,
+**                      (regex "^ *(\+|-)?\d+ *$"),
+**                      then an integer will be returned as
+**                      provided by the compiler and platform
+**                      runtime strtoll function
+**                      otherwise the field will be processed as
+**                      text as defined above
+**
+**  real                if the field data looks like a number,
+**                      (regex "^ *(\+|-)?(\d+\.?\d*|\d*\.?\d+)([eE](\+|-)?\d+)? *$")
+**                      then a double will be returned as
+**                      provided by the compiler and platform
+**                      runtime strtold function otherwise the
+**                      field will be processed as text as
+**                      defined above
+**
+**  numeric             if the field looks like an integer
+**                      (see integer above) that integer will be
+**                      returned
+**                      if the field looks like a number
+**                      (see real above) then the number will
+**                      returned as an integer if it has no
+**                      fractional part and
+**                      (a) your platform/compiler supports
+**                      long double and the number will fit in
+**                      a 64-bit integer; or,
+**                      (b) your platform/compiler does not
+**                      support long double (treats it as a double)
+**                      then a 64-bit integer will only be returned
+**                      for integers that can be represented in the
+**                      53 bit significand of a double
+**
+** The nulls option will cause fields that do not contain anything
+** to return NULL rather than an empty result.  Two separators
+** side-by-each with no intervening characters at all will be
+** returned as NULL if nulls is true; if nulls is false or
+** the contents are explicity empty ("") then a 0 length blob
+** (if affinity=blob) or 0 length text string will be returned.
+**
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/vsv.c
+
+/*
+** 2016-05-28
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+******************************************************************************
+**
+** This file contains the implementation of an SQLite virtual table for
+** reading CSV files.
+**
+** Usage:
+**
+**    .load ./csv
+**    CREATE VIRTUAL TABLE temp.csv USING csv(filename=FILENAME);
+**    SELECT * FROM csv;
+**
+** The columns are named "c1", "c2", "c3", ... by default.  Or the
+** application can define its own CREATE TABLE statement using the
+** schema= parameter, like this:
+**
+**    CREATE VIRTUAL TABLE temp.csv2 USING csv(
+**       filename = "../http.log",
+**       schema = "CREATE TABLE x(date,ipaddr,url,referrer,userAgent)"
+**    );
+**
+** Instead of specifying a file, the text of the CSV can be loaded using
+** the data= parameter.
+**
+** If the columns=N parameter is supplied, then the CSV file is assumed to have
+** N columns.  If both the columns= and schema= parameters are omitted, then
+** the number and names of the columns is determined by the first line of
+** the CSV input.
+**
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/zipfile.c
+
+/*
+** 2017-12-26
+**
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
+**
+******************************************************************************
+**
+** This file implements a virtual table for reading and writing ZIP archive
+** files.
+**
+** Usage example:
+**
+**     SELECT name, sz, datetime(mtime,'unixepoch') FROM zipfile($filename);
+**
+** Current limitations:
+**
+**    *  No support for encryption
+**    *  No support for ZIP archives spanning multiple files
+**    *  No support for zip64 extensions
+**    *  Only the "inflate/deflate" (zlib) compression method is supported
+*/
+
+
+================================================================================
+Source archive: libsql-rust/libsql-ffi-0.9.30.crate
+Original path: libsql-ffi-0.9.30/bundled/SQLite3MultipleCiphers/src/zlibwrap.h
+
+/*
+** Name:        zlibwrap.h
+** Purpose:     Include wrapper for miniz.h
+** Author:      Ulrich Telle
+** Created:     2022-05-09
+** Copyright:   (c) 2022 Ulrich Telle
+** License:     MIT
+*/

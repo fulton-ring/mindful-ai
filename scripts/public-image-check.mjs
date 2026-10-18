@@ -11,6 +11,9 @@ const required = [
   'models/minilm/LICENSE',
   'models/minilm/README.md',
   'models/minilm/model-manifest.json',
+  'notices/manifest.json',
+  'notices/debian-packages.tsv',
+  'notices/debian-sources.json',
 ];
 
 async function enterpriseFiles(directory, prefix = '') {
@@ -29,6 +32,33 @@ async function enterpriseFiles(directory, prefix = '') {
   return files;
 }
 
+async function packageDirectories(modules) {
+  const paths = [];
+  for (const pkg of await readdir(modules, { withFileTypes: true })) {
+    if (!pkg.isDirectory()) continue;
+    const path = join(modules, pkg.name);
+    if (!pkg.name.startsWith('@')) paths.push(path);
+    else {
+      for (const scoped of await readdir(path, { withFileTypes: true })) {
+        if (scoped.isDirectory()) paths.push(join(path, scoped.name));
+      }
+    }
+  }
+  return paths;
+}
+
+async function runtimePackages(directory) {
+  const packages = new Set();
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name === 'node_modules') continue;
+    for (const path of await packageDirectories(join(directory, entry.name, 'node_modules'))) {
+      const metadata = JSON.parse(await readFile(join(path, 'package.json'), 'utf8'));
+      if (metadata.name && metadata.version) packages.add(`${metadata.name}@${metadata.version}`);
+    }
+  }
+  return packages;
+}
+
 export async function inspectImageRoot(root) {
   const issues = [];
   const warnings = [];
@@ -45,6 +75,15 @@ export async function inspectImageRoot(root) {
     const content = await readFile(join(root, file), 'utf8').catch(() => '');
     const missing = content.match(/^MISSING_LICENSE_TEXT: .+$/gm) ?? [];
     issues.push(...missing.map((item) => `${file}: ${item}`));
+  }
+  try {
+    const notices = await readFile(join(root, 'THIRD_PARTY_LICENSES.txt'), 'utf8');
+    const retained = new Set([...notices.matchAll(/^Package: (.+)$/gm)].map((match) => match[1]));
+    for (const identity of await runtimePackages(join(root, 'node_modules/.pnpm'))) {
+      if (!retained.has(identity)) issues.push(`Runtime package absent from notices: ${identity}`);
+    }
+  } catch (error) {
+    issues.push(`Cannot verify runtime attribution coverage: ${error.code ?? error.message}`);
   }
   try {
     for (const file of await enterpriseFiles(join(root, 'node_modules'))) {
@@ -74,7 +113,7 @@ async function main() {
       process.exitCode = 1;
     } else {
       console.log(
-        'Package-content checks passed. Review native/browser/OS licensing before publication.',
+        'Package-content checks passed. Release publication also requires verified matching native/OS source companions.',
       );
     }
     return;

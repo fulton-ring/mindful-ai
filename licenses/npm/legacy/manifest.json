@@ -1,0 +1,599 @@
+{
+  "binary@0.3.0": {
+    "files": [
+      {
+        "path": "legacy/binary-0.3.0-published-package.json.txt",
+        "source": "https://registry.npmjs.org/binary/-/binary-0.3.0.tgz",
+        "sourceArchiveMember": "package/package.json",
+        "sourceArchiveIntegrity": "sha512-D4H1y5KYwpJgK8wk1Cue5LLPgmwHKYSChkbspQg5JtVuR5ulGckxfR62H3AE9UDkdMC8yyXlqYihuz3Aqg2XZg==",
+        "sourceArchiveShasum": "9f60553bc5ce8c3386f3b553cff47462adecaa79",
+        "sha256": "355ec61b56448e3d9ad74b286fa07e1b18bcbf153f45223b1a4f68d86bec891f"
+      },
+      {
+        "path": "legacy/MIT-license-terms.txt",
+        "source": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MIT.txt",
+        "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+        "canonicalTerms": true
+      }
+    ],
+    "notice": "The exact published binary@0.3.0 package.json declares MIT and contains the original published author metadata; those bytes are preserved verbatim from its integrity-pinned npm tarball. Canonical MIT terms are supplied separately to express this declaration. The canonical terms are a standard template, not a recovered original-author license file; template placeholders remain unchanged. Author metadata is not presented as a separately established copyright notice, and no copyright year or holder has been invented.",
+    "provenance": {
+      "registry": "https://registry.npmjs.org/binary/0.3.0",
+      "repository": "git://github.com/substack/node-binary.git",
+      "gitHead": null,
+      "npmTarball": "https://registry.npmjs.org/binary/-/binary-0.3.0.tgz",
+      "npmIntegrity": "sha512-D4H1y5KYwpJgK8wk1Cue5LLPgmwHKYSChkbspQg5JtVuR5ulGckxfR62H3AE9UDkdMC8yyXlqYihuz3Aqg2XZg==",
+      "npmShasum": "9f60553bc5ce8c3386f3b553cff47462adecaa79",
+      "publishedAuthor": {
+        "name": "James Halliday",
+        "email": "mail@substack.net",
+        "url": "http://substack.net"
+      },
+      "publishedLicenseDeclaration": "MIT",
+      "canonicalTermsCommit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "canonicalLicenseIdentifier": "MIT"
+    }
+  },
+  "boolbase@1.0.0": {
+    "files": [
+      {
+        "path": "legacy/boolbase-1.0.0-LICENSE",
+        "source": "https://raw.githubusercontent.com/fb55/boolbase/be0bcd8a4e917a0a5895e95b523fbbed05a64871/LICENSE",
+        "sha256": "cdf4d87ae0a6c160227263bf4e39a0a10e30e89ae7256e0f7ac7bde0836552c6"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/boolbase/1.0.0",
+      "repository": "https://github.com/fb55/boolbase",
+      "gitHead": null,
+      "resolvedCommit": "be0bcd8a4e917a0a5895e95b523fbbed05a64871",
+      "upstreamPath": "LICENSE",
+      "npmTarball": "https://registry.npmjs.org/boolbase/-/boolbase-1.0.0.tgz",
+      "npmIntegrity": "sha512-JZOSA7Mo9sNGB8+UjSgzdLtokWAky1zbztM3WRLCbZ70/3cTANmQmOdR7y2g+J0e2WXywy1yS468tY+IruqEww==",
+      "npmShasum": "68dff5fbe60c51eb37725ea9e3ed310dcc1e776e",
+      "resolution": "Original-project full license at a later commit; correspondence to installed release established by byte comparisons. No copyright holder or year has been invented.",
+      "comparison": {
+        "npmReleaseByteMatches": {
+          "README.md": "9cac5bfc290d30ccd13fa833923cb545584481e8ced66380bf758f1053f9d81d",
+          "index.js": "c62510fca8738c7444cdf5012bdd0ce214a1b6f7eaff7facb3a919e4656d7341"
+        },
+        "repositoryPackageVersionAtLicenseCommit": "1.0.0",
+        "packageJsonDifferences": [
+          "scripts.test: npm has echo Error: no test specified && exit 1; repository has node tests.js."
+        ]
+      }
+    }
+  },
+  "buffers@0.1.1": {
+    "files": [
+      {
+        "path": "legacy/buffers-0.1.1-published-package.json.txt",
+        "source": "https://registry.npmjs.org/buffers/-/buffers-0.1.1.tgz",
+        "sourceArchiveMember": "package/package.json",
+        "sourceArchiveIntegrity": "sha512-9q/rDEGSb/Qsvv2qvzIzdluL5k7AaJOTrw23z9reQthrbF7is4CtlT0DXyO1oei2DCp4uojjzQ7igaSHp1kAEQ==",
+        "sourceArchiveShasum": "b24579c3bed4d6d396aeee6d9a8ae7f5482ab7bb",
+        "sha256": "7091616d3b687b0de9dfbc6a1f8ab61e01742a3ec87f977bef64d1f299e231b9"
+      },
+      {
+        "path": "legacy/buffers-0.1.1-original-author-license-declaration-package.json.txt",
+        "source": "https://raw.githubusercontent.com/bitpay/node-buffers/1b745ee35d33eb166e15ef1866073a07c6d7de87/package.json",
+        "sha256": "eb42a43d5b685e6de2f2f4a5e18a70255be72349def7eedf504b912dd908913e"
+      },
+      {
+        "path": "legacy/MIT-license-terms.txt",
+        "source": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MIT.txt",
+        "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+        "canonicalTerms": true
+      }
+    ],
+    "notice": "The exact published buffers 0.1.1 package.json contains author metadata but no license field. The original author James Halliday added the explicit MIT/X11 declaration in original commit 1b745ee35d33eb166e15ef1866073a07c6d7de87, preserved in the bitpay repository; its index.js, tests, and both examples are byte-identical to the published release. Both package.json files are preserved verbatim. Canonical MIT terms are supplied separately to express that declaration; their copyright template is unchanged. No copyright year or copyright claim has been invented, and the fork is used to preserve the original author commit, not as a new licensing authority.",
+    "provenance": {
+      "registry": "https://registry.npmjs.org/buffers/0.1.1",
+      "repository": "git://github.com/substack/node-buffers.git",
+      "gitHead": null,
+      "npmTarball": "https://registry.npmjs.org/buffers/-/buffers-0.1.1.tgz",
+      "npmIntegrity": "sha512-9q/rDEGSb/Qsvv2qvzIzdluL5k7AaJOTrw23z9reQthrbF7is4CtlT0DXyO1oei2DCp4uojjzQ7igaSHp1kAEQ==",
+      "npmShasum": "b24579c3bed4d6d396aeee6d9a8ae7f5482ab7bb",
+      "publishedAuthor": "James Halliday <mail@substack.net> (http://substack.net)",
+      "publishedLicenseDeclaration": null,
+      "canonicalTermsCommit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "canonicalLicenseIdentifier": "MIT",
+      "resolvedCommit": "1b745ee35d33eb166e15ef1866073a07c6d7de87",
+      "originalLicenseCommitAuthor": "James Halliday <mail@substack.net>",
+      "originalLicenseCommitDate": "2012-04-03T02:08:58-07:00",
+      "originalLicenseCommitMessage": "license",
+      "preservedOriginalCommitRepository": "https://github.com/bitpay/node-buffers",
+      "originalAuthorLicenseDeclaration": "MIT/X11",
+      "comparison": {
+        "repositoryPackageVersionAtLicenseDeclaration": "0.1.1",
+        "npmReleaseByteMatches": {
+          "index.js": "97801e296ba5f3c32242f647e1daac5917e300367fed7935ab1e62f40adb1b8a",
+          "examples/slice.js": "8bff15364cb53bc2c6523dbec1dea1017696eb8b59fdf4c8d7cd31eea3a3750b",
+          "examples/splice.js": "edf9fc9a0cfab7ed73edfff9a1409e65918b8f2cd34eeef04b3c6a1838ffc1cb",
+          "test/buffers.js": "9d0d9671bde206620d50e08f9f855fe7898efd74727d4b6f0913650ea252997f"
+        }
+      }
+    }
+  },
+  "chainsaw@0.1.0": {
+    "files": [
+      {
+        "path": "legacy/evidence/chainsaw-0.1.0-LICENSE",
+        "source": "https://raw.githubusercontent.com/sreekanth370/node-chainsaw/4498627f264c0faef6420e049d97bac9efcf6e11/LICENSE",
+        "sha256": "55bf9819f3d339140d1b363058254c6c75a03159fc7d875b72600e76ebd3f038"
+      },
+      {
+        "path": "legacy/MIT-license-terms.txt",
+        "source": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MIT.txt",
+        "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+        "canonicalTerms": true
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/chainsaw/0.1.0",
+      "gitHead": null,
+      "repository": "git://github.com/substack/node-chainsaw.git",
+      "npmTarball": "https://registry.npmjs.org/chainsaw/-/chainsaw-0.1.0.tgz",
+      "npmIntegrity": "sha512-75kWfWt6MEKNC8xYXIdRpDehRYY/tNSgwKaJq+dbbDcxORuVrrQ+SEHoWsniVn9XPYfP4gmdWIeDk/4YNp1rNQ==",
+      "npmShasum": "5eab50b28afe58074d0d58291388828b5e5fbc98",
+      "resolvedCommit": "4498627f264c0faef6420e049d97bac9efcf6e11",
+      "originalLicenseCommitAuthor": "James Halliday <mail@substack.net>",
+      "originalLicenseCommitDate": "2012-04-15",
+      "originalLicenseCommitMessage": "added license",
+      "upstreamPath": "LICENSE",
+      "preservedOriginalCommitRepository": "https://github.com/sreekanth370/node-chainsaw",
+      "comparison": {
+        "repositoryPackageVersionAtLicenseCommit": "0.1.0",
+        "npmReleaseByteMatches": {
+          "index.js": "2fd46e18cf7cc2f90684023a951f0289c01316f4fb76cec197da14d0449106ba",
+          "package.json": "51910ad64abca4eb8c2c23abb2f713ba5220db89ed89c9fd198d27241a5a70ea",
+          "examples/add_do.js": "7900369d6a1d3b475aebb21b5dc638a2893dc61289ea36d40d37b69a8c93d583",
+          "examples/prompt.js": "3db7316b5bdcb6fa1814f8c48b81c874c43f2c55341cba2a8a731aab612579bf",
+          "test/chainsaw.js": "e26a167be33329bd96602d0b705f7b493e13c21ae92e0431f154d7ff86849830"
+        }
+      },
+      "resolution": "Original-author copyright and MIT permission by reference preserved verbatim from original-author commit, plus verbatim canonical MIT terms. SPDX template placeholders are unchanged and do not replace the copyright in the original author notice.",
+      "canonicalLicenseReference": {
+        "originalReference": "http://www.opensource.org/licenses/mit-license.php",
+        "licenseIdentifier": "MIT",
+        "canonicalTermsRepository": "https://github.com/spdx/license-list-data",
+        "canonicalTermsCommit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+        "canonicalTermsPath": "text/MIT.txt"
+      }
+    },
+    "notice": "The original author notice and explicit MIT license-by-reference are preserved verbatim from the original James Halliday commit. Full canonical MIT terms are supplied separately; their standard template placeholders remain unchanged and do not replace the copyright in the original notice."
+  },
+  "glob-to-regexp@0.4.1": {
+    "files": [
+      {
+        "path": "legacy/glob-to-regexp-0.4.1-README.md",
+        "source": "https://raw.githubusercontent.com/fitzgen/glob-to-regexp/2abf65a834259c6504ed3b80e85f893f8cd99127/README.md",
+        "sha256": "18a53184b61f21e9f39035c106e5e6bf885353ce4177d18e15fcb18980cb1ee2"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/glob-to-regexp/0.4.1",
+      "repository": "git+https://github.com/fitzgen/glob-to-regexp.git",
+      "gitHead": "2abf65a834259c6504ed3b80e85f893f8cd99127",
+      "resolvedCommit": "2abf65a834259c6504ed3b80e85f893f8cd99127",
+      "upstreamPath": "README.md",
+      "npmTarball": "https://registry.npmjs.org/glob-to-regexp/-/glob-to-regexp-0.4.1.tgz",
+      "npmIntegrity": "sha512-lkX1HJXwyMcprw/5YUZc2s7DrpAiHB21/V+E1rHUrVNokkvB6bqMzT0VfV6/86ZNabt1k14YOIaT7nDvOX3Iiw==",
+      "npmShasum": "c75297087c851b9a578bd217dd59a92f59fe546e"
+    }
+  },
+  "guid-typescript@1.0.9": {
+    "files": [
+      {
+        "path": "legacy/guid-typescript-1.0.9-published-package.json.txt",
+        "source": "https://registry.npmjs.org/guid-typescript/-/guid-typescript-1.0.9.tgz",
+        "sourceArchiveMember": "package/package.json",
+        "sourceArchiveIntegrity": "sha512-Y8T4vYhEfwJOTbouREvG+3XDsjr8E3kIr7uf+JZ0BYloFsttiHU0WfvANVsR7TxNUJa/WpCnw/Ino/p+DeBhBQ==",
+        "sourceArchiveShasum": "e35f77003535b0297ea08548f5ace6adb1480ddc",
+        "sha256": "ed86856ee95fe87eadd8552b6803a85b7fb4f6cce08603bf9c8385972b5badb6"
+      },
+      {
+        "path": "legacy/ISC-license-terms.txt",
+        "source": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/ISC.txt",
+        "sha256": "521c6f0ed8e64736684f89843d16a4df6b4b7449acbcfc6ca6630a3037ca8c53",
+        "canonicalTerms": true
+      }
+    ],
+    "notice": "The exact published guid-typescript@1.0.9 package.json declares ISC and contains the original published author metadata; those bytes are preserved verbatim from its integrity-pinned npm tarball. Canonical ISC terms are supplied separately to express this declaration. The canonical terms are a standard template, not a recovered original-author license file; template placeholders remain unchanged. Author metadata is not presented as a separately established copyright notice, and no copyright year or holder has been invented.",
+    "provenance": {
+      "registry": "https://registry.npmjs.org/guid-typescript/1.0.9",
+      "repository": "git+https://github.com/NicolasDeveloper/guid-typescript.git",
+      "gitHead": "1870de806c3db7ba46c5b8a1387c60fc9dda9284",
+      "npmTarball": "https://registry.npmjs.org/guid-typescript/-/guid-typescript-1.0.9.tgz",
+      "npmIntegrity": "sha512-Y8T4vYhEfwJOTbouREvG+3XDsjr8E3kIr7uf+JZ0BYloFsttiHU0WfvANVsR7TxNUJa/WpCnw/Ino/p+DeBhBQ==",
+      "npmShasum": "e35f77003535b0297ea08548f5ace6adb1480ddc",
+      "publishedAuthor": "nicolas",
+      "publishedLicenseDeclaration": "ISC",
+      "canonicalTermsCommit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "canonicalLicenseIdentifier": "ISC"
+    }
+  },
+  "isarray@1.0.0": {
+    "files": [
+      {
+        "path": "legacy/isarray-1.0.0-README.md",
+        "source": "https://raw.githubusercontent.com/juliangruber/isarray/2a23a281f369e9ae06394c0fb4d2381355a6ba33/README.md",
+        "sha256": "ff138e683771b187f3629c383db72ee7d632009010a36d08e18e8d2a34222ec7"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/isarray/1.0.0",
+      "repository": "git://github.com/juliangruber/isarray.git",
+      "gitHead": "2a23a281f369e9ae06394c0fb4d2381355a6ba33",
+      "resolvedCommit": "2a23a281f369e9ae06394c0fb4d2381355a6ba33",
+      "upstreamPath": "README.md",
+      "npmTarball": "https://registry.npmjs.org/isarray/-/isarray-1.0.0.tgz",
+      "npmIntegrity": "sha512-VLghIWNM6ELQzo7zwmcg0NmTVyWKYjvIeM83yjp0wRDTmUnrM678fQbcKBo6n2CJEF0szoG//ytg+TKla89ALQ==",
+      "npmShasum": "bb935d48582cba168c06834957a54a3e07124f11"
+    }
+  },
+  "pg-types@2.2.0": {
+    "files": [
+      {
+        "path": "legacy/pg-types-2.2.0-README.md",
+        "source": "https://raw.githubusercontent.com/brianc/node-pg-types/d9d9dfb87eb50914043cbc178c301b7dd3b0c50d/README.md",
+        "sha256": "ecda9bca71d3f0cee4e600d1dd2bef336213f39ef2e8fca6a1a1c1c8723f643a"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/pg-types/2.2.0",
+      "repository": "git://github.com/brianc/node-pg-types.git",
+      "gitHead": "d9d9dfb87eb50914043cbc178c301b7dd3b0c50d",
+      "resolvedCommit": "d9d9dfb87eb50914043cbc178c301b7dd3b0c50d",
+      "upstreamPath": "README.md",
+      "npmTarball": "https://registry.npmjs.org/pg-types/-/pg-types-2.2.0.tgz",
+      "npmIntegrity": "sha512-qTAAlrEsl8s4OiEQY69wDvcMIdQN6wdz5ojQiOy6YRMuynxenON0O5oCpJI6lshc6scgAY8qvJ2On/p+CXY0GA==",
+      "npmShasum": "2d0250d636454f7cfa3b6ae0382fdfa8063254a3"
+    }
+  },
+  "pgpass@1.0.5": {
+    "files": [
+      {
+        "path": "legacy/pgpass-1.0.5-README.md",
+        "source": "https://raw.githubusercontent.com/hoegaarden/pgpass/4230ed5e417ba6044ea7eb80b7c33db9ec301398/README.md",
+        "sha256": "62549909404b5a0dcb2b4b74c9a930baf8095dbcfa1543c4ffc79378acd22b57"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/pgpass/1.0.5",
+      "repository": "git+https://github.com/hoegaarden/pgpass.git",
+      "gitHead": "4230ed5e417ba6044ea7eb80b7c33db9ec301398",
+      "resolvedCommit": "4230ed5e417ba6044ea7eb80b7c33db9ec301398",
+      "upstreamPath": "README.md",
+      "npmTarball": "https://registry.npmjs.org/pgpass/-/pgpass-1.0.5.tgz",
+      "npmIntegrity": "sha512-FdW9r/jQZhSeohs1Z3sI1yxFQNFvMcnmfuj4WBMUTxOrAyLMaTcE1aAMBiTlbMNaXvBCQuVi0R7hd8udDSP7ug==",
+      "npmShasum": "9b873e4a564bb10fa7a7dbd55312728d422a223d"
+    }
+  },
+  "piccolore@0.1.3": {
+    "files": [
+      {
+        "path": "legacy/piccolore-0.1.3-published-package.json.txt",
+        "source": "https://registry.npmjs.org/piccolore/-/piccolore-0.1.3.tgz",
+        "sourceArchiveMember": "package/package.json",
+        "sourceArchiveIntegrity": "sha512-o8bTeDWjE086iwKrROaDf31K0qC/BENdm15/uH9usSC/uZjJOKb2YGiVHfLY4GhwsERiPI1jmwI2XrA7ACOxVw==",
+        "sourceArchiveShasum": "ef33f6180e6a37b35fe12a45765a900171cfaedc",
+        "sha256": "17e4425992180694581938d67397c0f50c0fd2f013e4b891f21534feeae2c7ec"
+      },
+      {
+        "path": "legacy/piccolore-0.1.3-published-README.md",
+        "source": "https://registry.npmjs.org/piccolore/-/piccolore-0.1.3.tgz",
+        "sourceArchiveMember": "package/README.md",
+        "sourceArchiveIntegrity": "sha512-o8bTeDWjE086iwKrROaDf31K0qC/BENdm15/uH9usSC/uZjJOKb2YGiVHfLY4GhwsERiPI1jmwI2XrA7ACOxVw==",
+        "sourceArchiveShasum": "ef33f6180e6a37b35fe12a45765a900171cfaedc",
+        "sha256": "28eb643e014301c3e10a1ef277d73f0f32095e4cdcbcccec9d75916bb652667d"
+      },
+      {
+        "path": "legacy/ISC-license-terms.txt",
+        "source": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/ISC.txt",
+        "sha256": "521c6f0ed8e64736684f89843d16a4df6b4b7449acbcfc6ca6630a3037ca8c53",
+        "canonicalTerms": true
+      },
+      {
+        "path": "legacy/piccolore-inherited-picocolors-1.1.1-LICENSE",
+        "source": "https://raw.githubusercontent.com/alexeyraspopov/picocolors/6f0a4638348ed20633d623ee973f9c9a96f65104/LICENSE",
+        "sha256": "6582629e2979466878f6014313dcc2f3756c9616148682227ce3063dde310750",
+        "inheritedUpstreamNotice": true
+      }
+    ],
+    "notice": "The exact published piccolore 0.1.3 package.json explicitly declares ISC and has no author field. Its README, preserved verbatim, identifies piccolore as a temporary fork of picocolors. Canonical ISC terms are supplied separately to express that declaration; template placeholders are unchanged. The original picocolors ISC copyright/license notice is also preserved from the original upstream project for the inherited implementation. The precise picocolors fork-base commit is not identified by piccolore. No author copyright or contribution year has been inferred for piccolore.",
+    "provenance": {
+      "registry": "https://registry.npmjs.org/piccolore/0.1.3",
+      "repository": "git+https://github.com/delucis/piccolore.git",
+      "gitHead": null,
+      "resolvedCommit": "5af9fa6834292e3cb3a2bc778e4057517c1505e0",
+      "tag": "v0.1.3",
+      "npmTarball": "https://registry.npmjs.org/piccolore/-/piccolore-0.1.3.tgz",
+      "npmIntegrity": "sha512-o8bTeDWjE086iwKrROaDf31K0qC/BENdm15/uH9usSC/uZjJOKb2YGiVHfLY4GhwsERiPI1jmwI2XrA7ACOxVw==",
+      "npmShasum": "ef33f6180e6a37b35fe12a45765a900171cfaedc",
+      "publishedLicenseDeclaration": "ISC",
+      "publishedAuthor": null,
+      "canonicalTermsCommit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "canonicalLicenseIdentifier": "ISC",
+      "inheritedUpstream": {
+        "registry": "https://registry.npmjs.org/picocolors/1.1.1",
+        "repository": "https://github.com/alexeyraspopov/picocolors",
+        "gitHead": "6f0a4638348ed20633d623ee973f9c9a96f65104",
+        "basis": "Exact published piccolore README explicitly identifies this project as its upstream fork; formatter, replaceClose, and createColors derive from that implementation with TypeScript annotations and ESM changes.",
+        "caveat": "The exact picocolors fork-base release is not stated by piccolore."
+      }
+    }
+  },
+  "promise-limit@2.7.0": {
+    "files": [
+      {
+        "path": "legacy/promise-limit-2.7.0-published-package.json.txt",
+        "source": "https://registry.npmjs.org/promise-limit/-/promise-limit-2.7.0.tgz",
+        "sourceArchiveMember": "package/package.json",
+        "sourceArchiveIntegrity": "sha512-7nJ6v5lnJsXwGprnGXga4wx6d1POjvi5Qmf1ivTRxTjH4Z/9Czja/UCMLVmB9N93GeWOU93XaFaEt6jbuoagNw==",
+        "sourceArchiveShasum": "eb5737c33342a030eaeaecea9b3d3a93cb592b26",
+        "sha256": "dc438c2d05deb0ba521b02cdfe4c7b840c94d11134353357d772dbaad53ff0a9"
+      },
+      {
+        "path": "legacy/ISC-license-terms.txt",
+        "source": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/ISC.txt",
+        "sha256": "521c6f0ed8e64736684f89843d16a4df6b4b7449acbcfc6ca6630a3037ca8c53",
+        "canonicalTerms": true
+      }
+    ],
+    "notice": "The exact published promise-limit@2.7.0 package.json declares ISC and contains the original published author metadata; those bytes are preserved verbatim from its integrity-pinned npm tarball. Canonical ISC terms are supplied separately to express this declaration. The canonical terms are a standard template, not a recovered original-author license file; template placeholders remain unchanged. Author metadata is not presented as a separately established copyright notice, and no copyright year or holder has been invented.",
+    "provenance": {
+      "registry": "https://registry.npmjs.org/promise-limit/2.7.0",
+      "repository": "git+https://github.com/featurist/promise-limit.git",
+      "gitHead": "5b911ce33253ec0a7ea9cf079d8c0434efbe3244",
+      "npmTarball": "https://registry.npmjs.org/promise-limit/-/promise-limit-2.7.0.tgz",
+      "npmIntegrity": "sha512-7nJ6v5lnJsXwGprnGXga4wx6d1POjvi5Qmf1ivTRxTjH4Z/9Czja/UCMLVmB9N93GeWOU93XaFaEt6jbuoagNw==",
+      "npmShasum": "eb5737c33342a030eaeaecea9b3d3a93cb592b26",
+      "publishedAuthor": "Tim Macfarlane <timmacfarlane@gmail.com>",
+      "publishedLicenseDeclaration": "ISC",
+      "canonicalTermsCommit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "canonicalLicenseIdentifier": "ISC"
+    }
+  },
+  "react-remove-scroll-bar@2.3.8": {
+    "files": [
+      {
+        "path": "legacy/react-remove-scroll-bar-2.3.8-LICENSE",
+        "source": "https://raw.githubusercontent.com/theKashey/react-remove-scroll-bar/7301c160fda44cb8cf2b9fdfde61efad35736196/LICENSE",
+        "sha256": "a79aae0c0f21990d9d963bb3c5a79cdcea9a46f8523ba55c58d7fe776b6ebc84"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/react-remove-scroll-bar/2.3.8",
+      "repository": "git+https://github.com/theKashey/react-remove-scroll-bar.git",
+      "gitHead": "b3b1287aad81def2e2ae707274b74531b61ddbaf",
+      "resolvedCommit": "7301c160fda44cb8cf2b9fdfde61efad35736196",
+      "upstreamPath": "LICENSE",
+      "npmTarball": "https://registry.npmjs.org/react-remove-scroll-bar/-/react-remove-scroll-bar-2.3.8.tgz",
+      "npmIntegrity": "sha512-9r+yi9+mgU33AKcj6IbT9oRCO78WriSj6t/cF8DWBZJ9aOGPOTEDvdUDz1FwKim7QXWwmHqtdHnRJfhAxEG46Q==",
+      "npmShasum": "99c20f908ee467b385b68a3469b4a3e750012223",
+      "resolution": "Original-project full license at a later commit; correspondence to installed release established by byte comparisons. No copyright holder or year has been invented.",
+      "comparison": {
+        "earlierRegistry": "https://registry.npmjs.org/react-remove-scroll-bar/2.3.7",
+        "earlierGitHead": "29e9fcd1eecf7d3b77a767941c4a57fe461fc1e4",
+        "earlierNpmTarball": "https://registry.npmjs.org/react-remove-scroll-bar/-/react-remove-scroll-bar-2.3.7.tgz",
+        "earlierNpmIntegrity": "sha512-UzA0npskGFA2bUqwWsSRJscuQEt7zyfVtMpCtBl/lk+k/ky6lzYImEks9jwgxTDe/B0tb5hyrYgbQv/JQaHjDw==",
+        "npmReleaseByteMatches": {
+          "dist/es2015/component.js": "3baec61523006aedf14321423427b0c50aa17bfe48faf344bebff9d883149f29",
+          "dist/es2019/component.js": "ac214bb2783fdf743a0c949fef47784741db109dcc6f4426f46e77386dee1c8f",
+          "dist/es5/component.js": "d95ae68cda75b262f01b7c3eba3d530c6a24579778cbb3e320b2449348dabb13",
+          "dist/es2015/constants.js": "1c73582ef730bbca1d536a6995c7eea438dcd0632fee2856337627e44b5872e2",
+          "dist/es2019/constants.js": "f597b4036280caca4cc58d3476ffc02dc5c16564090229e6685e98b80a8e2a33",
+          "dist/es5/constants.js": "20bf238e562be0830b10b1813d36fa321e81cd07fd99b27724833132304b73bc",
+          "dist/es2015/index.js": "130bc4c810a84aeae180ba8fe1e7fd96f706d5d3a0cf6728419ff2c74708185f",
+          "dist/es2019/index.js": "130bc4c810a84aeae180ba8fe1e7fd96f706d5d3a0cf6728419ff2c74708185f",
+          "dist/es5/index.js": "0e1ab245d6b12ef80409b988b0f29b498c562b6cff6e7365714cb0c351914a12",
+          "dist/es2015/utils.js": "2c4105ab772a5cbf4b3d1e54f49e94d03fde867d20767b46bb3e5c27f4d82f00",
+          "dist/es2019/utils.js": "dafd773a756cca848d359153df92315235becb2ed8e10b1146458be4bfd38826",
+          "dist/es5/utils.js": "ee6c64e8690475db96ec1a1b2ede342ffdc45ccf739bd28dd6f86c8c9a5917c3",
+          "constants/package.json": "9b557c166960d4a096abc83259b8787a4072516f666856f8cf51656e38ed904b",
+          "README.md": "486442209236ffa3893312e508694699a6b8834d30a2f9c083c1f3379983e4f9",
+          "dist/es2015/component.d.ts": "8b9441c9166045f81e5000001f95521319692124baea142b228efdc370883736",
+          "dist/es2019/component.d.ts": "8b9441c9166045f81e5000001f95521319692124baea142b228efdc370883736",
+          "dist/es5/component.d.ts": "8b9441c9166045f81e5000001f95521319692124baea142b228efdc370883736",
+          "dist/es2015/constants.d.ts": "cd9dd3a7b0b95c3068f3b43b82da6dc6bee018f56d975b248d4bb6c484e61ed1",
+          "dist/es2019/constants.d.ts": "cd9dd3a7b0b95c3068f3b43b82da6dc6bee018f56d975b248d4bb6c484e61ed1",
+          "dist/es5/constants.d.ts": "cd9dd3a7b0b95c3068f3b43b82da6dc6bee018f56d975b248d4bb6c484e61ed1",
+          "dist/es2015/index.d.ts": "130bc4c810a84aeae180ba8fe1e7fd96f706d5d3a0cf6728419ff2c74708185f",
+          "dist/es2019/index.d.ts": "130bc4c810a84aeae180ba8fe1e7fd96f706d5d3a0cf6728419ff2c74708185f",
+          "dist/es5/index.d.ts": "130bc4c810a84aeae180ba8fe1e7fd96f706d5d3a0cf6728419ff2c74708185f",
+          "dist/es2015/utils.d.ts": "c4304c2114b48bb2778de565b4a0274ebbbbd71f6d7f5c57e116bd1656ea2c32",
+          "dist/es2019/utils.d.ts": "c4304c2114b48bb2778de565b4a0274ebbbbd71f6d7f5c57e116bd1656ea2c32",
+          "dist/es5/utils.d.ts": "c4304c2114b48bb2778de565b4a0274ebbbbd71f6d7f5c57e116bd1656ea2c32"
+        },
+        "packageJsonDifferences": [
+          "version: 2.3.7 -> 2.3.8",
+          "dependencies.react-style-singleton: ^2.2.1 -> ^2.2.2"
+        ],
+        "repositoryPathsUnchangedFromEarlierGitHeadToLicenseCommit": [
+          "src/",
+          "README.md",
+          "package.json"
+        ],
+        "repositoryPackageVersionAtLicenseCommit": "2.3.7"
+      }
+    }
+  },
+  "rehype-katex@7.0.1": {
+    "files": [
+      {
+        "path": "legacy/rehype-katex-7.0.1-license",
+        "source": "https://raw.githubusercontent.com/remarkjs/remark-math/88a9497e1ede93b958237c85edbf5651faeca7af/license",
+        "sha256": "cb992262f361a5359e6771c28740d33c7041e15332ae8537fae40538992591a9"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/rehype-katex/7.0.1",
+      "repository": "git+https://github.com/remarkjs/remark-math.git#main",
+      "gitHead": "88a9497e1ede93b958237c85edbf5651faeca7af",
+      "resolvedCommit": "88a9497e1ede93b958237c85edbf5651faeca7af",
+      "upstreamPath": "license",
+      "npmTarball": "https://registry.npmjs.org/rehype-katex/-/rehype-katex-7.0.1.tgz",
+      "npmIntegrity": "sha512-OiM2wrZ/wuhKkigASodFoo8wimG3H12LWQaH8qSPVJn9apWKFSH3YOCtbKpBorTVw/eI7cuT21XBbvwEswbIOA==",
+      "npmShasum": "832e6d7af2744a228981d1b0fe89483a9e7c93a1"
+    }
+  },
+  "remark-math@6.0.0": {
+    "files": [
+      {
+        "path": "legacy/remark-math-6.0.0-license",
+        "source": "https://raw.githubusercontent.com/remarkjs/remark-math/d5d0660b150810a535bbb07eac6cc96a4510aa24/license",
+        "sha256": "cb992262f361a5359e6771c28740d33c7041e15332ae8537fae40538992591a9"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/remark-math/6.0.0",
+      "repository": "git+https://github.com/remarkjs/remark-math.git#main",
+      "gitHead": "d5d0660b150810a535bbb07eac6cc96a4510aa24",
+      "resolvedCommit": "d5d0660b150810a535bbb07eac6cc96a4510aa24",
+      "upstreamPath": "license",
+      "npmTarball": "https://registry.npmjs.org/remark-math/-/remark-math-6.0.0.tgz",
+      "npmIntegrity": "sha512-MMqgnP74Igy+S3WwnhQ7kqGlEerTETXMvJhrUzDikVZ2/uogJCb+WHUg97hK9/jcfc0dkD73s3LN8zU49cTEtA==",
+      "npmShasum": "0acdf74675f1c195fea6efffa78582f7ed7fc0d7"
+    }
+  },
+  "saxes@5.0.1": {
+    "files": [
+      {
+        "path": "legacy/saxes-5.0.1-LICENSE",
+        "source": "https://raw.githubusercontent.com/lddubeau/saxes/6ef6a275b20f19cb67808daf0d8f64e06aaf5b0e/LICENSE",
+        "sha256": "0fac2374380621b22e6b50451057721a9c52935b02d16d106a9f04897f061d0e"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/saxes/5.0.1",
+      "repository": "git+https://github.com/lddubeau/saxes.git",
+      "gitHead": null,
+      "resolvedCommit": "6ef6a275b20f19cb67808daf0d8f64e06aaf5b0e",
+      "upstreamPath": "LICENSE",
+      "npmTarball": "https://registry.npmjs.org/saxes/-/saxes-5.0.1.tgz",
+      "npmIntegrity": "sha512-5LBh1Tls8c9xgGjw3QrMwETmTMVk0oFgvrFSvWx62llR2hcEInrKNZ2GZCCuuy2lvWrdl5jhbpeqc5hRYKFOcw==",
+      "npmShasum": "eebab953fa3b7608dbe94e5dadb15c888fa6696d",
+      "tag": "v5.0.1",
+      "tagResolution": "git ls-remote --tags https://github.com/lddubeau/saxes.git refs/tags/v5.0.1 refs/tags/v5.0.1^{}"
+    }
+  },
+  "saxes@6.0.0": {
+    "files": [
+      {
+        "path": "legacy/saxes-6.0.0-LICENSE",
+        "source": "https://raw.githubusercontent.com/lddubeau/saxes/211fa0ebec9b628affc09219199639887174bfc3/LICENSE",
+        "sha256": "0fac2374380621b22e6b50451057721a9c52935b02d16d106a9f04897f061d0e"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/saxes/6.0.0",
+      "repository": "git+https://github.com/lddubeau/saxes.git",
+      "gitHead": "211fa0ebec9b628affc09219199639887174bfc3",
+      "resolvedCommit": "211fa0ebec9b628affc09219199639887174bfc3",
+      "upstreamPath": "LICENSE",
+      "npmTarball": "https://registry.npmjs.org/saxes/-/saxes-6.0.0.tgz",
+      "npmIntegrity": "sha512-xAg7SOnEhrm5zI3puOOKyy1OMcMlIJZYNJY7xLBwSze0UjhPLnWfj2GF2EpT0jmzaJKIWKHLsaSSajf35bcYnA==",
+      "npmShasum": "fe5b4a4768df4f14a201b1ba6a65c1f3d9988cc5"
+    }
+  },
+  "stackback@0.0.2": {
+    "files": [
+      {
+        "path": "legacy/stackback-0.0.2-published-package.json.txt",
+        "source": "https://registry.npmjs.org/stackback/-/stackback-0.0.2.tgz",
+        "sourceArchiveMember": "package/package.json",
+        "sourceArchiveIntegrity": "sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw==",
+        "sourceArchiveShasum": "1ac8a0d9483848d1695e418b6d031a3c3ce68e3b",
+        "sha256": "4d984909b27d37d2f1a379b9cda7292a6e3a133c076df166d740a17514ac6e60"
+      },
+      {
+        "path": "legacy/MIT-license-terms.txt",
+        "source": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MIT.txt",
+        "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+        "canonicalTerms": true
+      }
+    ],
+    "notice": "The exact published stackback@0.0.2 package.json declares MIT and contains the original published author metadata; those bytes are preserved verbatim from its integrity-pinned npm tarball. Canonical MIT terms are supplied separately to express this declaration. The canonical terms are a standard template, not a recovered original-author license file; template placeholders remain unchanged. Author metadata is not presented as a separately established copyright notice, and no copyright year or holder has been invented.",
+    "provenance": {
+      "registry": "https://registry.npmjs.org/stackback/0.0.2",
+      "repository": "git://github.com/shtylman/node-stackback.git",
+      "gitHead": null,
+      "npmTarball": "https://registry.npmjs.org/stackback/-/stackback-0.0.2.tgz",
+      "npmIntegrity": "sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw==",
+      "npmShasum": "1ac8a0d9483848d1695e418b6d031a3c3ce68e3b",
+      "publishedAuthor": "Roman Shtylman <shtylman@gmail.com>",
+      "publishedLicenseDeclaration": "MIT",
+      "canonicalTermsCommit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "canonicalLicenseIdentifier": "MIT"
+    }
+  },
+  "standardwebhooks@1.1.1": {
+    "files": [
+      {
+        "path": "legacy/standardwebhooks-1.1.1-LICENSE",
+        "source": "https://raw.githubusercontent.com/standard-webhooks/standard-webhooks/b4d2c14fc5b4ccff3ff271e3b087dff812254c59/libraries/LICENSE",
+        "sha256": "5ec8c7b26b64d881a6706617bed25c049f97f2f35de034c756de8546fd6dbe27"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/standardwebhooks/1.1.1",
+      "repository": "git+https://github.com/standard-webhooks/standard-webhooks.git",
+      "gitHead": "b4d2c14fc5b4ccff3ff271e3b087dff812254c59",
+      "resolvedCommit": "b4d2c14fc5b4ccff3ff271e3b087dff812254c59",
+      "upstreamPath": "libraries/LICENSE",
+      "npmTarball": "https://registry.npmjs.org/standardwebhooks/-/standardwebhooks-1.1.1.tgz",
+      "npmIntegrity": "sha512-bCbX9ZEyFkWPsRz7Bl3NuQUJohmwGSev/yhr7vhaGPlc4AfIrspIRa6cPTBuI1ItmrTDJ4d/S2hCsfe4+vQGnQ==",
+      "npmShasum": "25b98fa2bbe4edad7b42778135c923563e3d5e2f"
+    }
+  },
+  "tr46@0.0.3": {
+    "files": [
+      {
+        "path": "legacy/tr46-0.0.3-LICENSE.md",
+        "source": "https://raw.githubusercontent.com/Sebmaster/tr46.js/3a6f29721e7063b9ffd421e461a54beae6170001/LICENSE.md",
+        "sha256": "eeed1ca176eebad5c73870e233cfff03981fecd319c969475dfa3633036c336b"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/tr46/0.0.3",
+      "repository": "git+https://github.com/Sebmaster/tr46.js.git",
+      "gitHead": "a8009f9ce80ff5dbe71dd71e203afe4e4c878d28",
+      "resolvedCommit": "3a6f29721e7063b9ffd421e461a54beae6170001",
+      "upstreamPath": "LICENSE.md",
+      "npmTarball": "https://registry.npmjs.org/tr46/-/tr46-0.0.3.tgz",
+      "npmIntegrity": "sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==",
+      "npmShasum": "8184fd347dac9cdc185992f3a6622e14b9d9ab6a",
+      "resolution": "Original-project full license at a later commit; correspondence to installed release established by byte comparisons. No copyright holder or year has been invented.",
+      "comparison": {
+        "npmReleaseByteMatches": {
+          "package.json": "615087f58ee138fd35c2b414c355b72e36e5919725b8aecc1c34f6a5585b9779",
+          ".npmignore": "220244e94c71eccaccee66cac3ccd592f503f4a21caabbde6b92d16ce4434ba1",
+          "index.js": "8194f9425ce9ab06ea9aebcd64a85ec064d95d61bb349f8f1c98762ad256638e",
+          "lib/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "repositoryPackageVersionAtLicenseCommit": "0.0.3",
+        "npmGeneratedFilesNotTrackedInRepository": ["lib/mappingTable.json"]
+      }
+    }
+  },
+  "undici-types@5.26.5": {
+    "files": [
+      {
+        "path": "legacy/undici-types-5.26.5-LICENSE",
+        "source": "https://raw.githubusercontent.com/nodejs/undici/9197790ae0d015b40b75fd0c5cdb7420704b5272/LICENSE",
+        "sha256": "a6db8096b2707bc0102d256917d4d33f298ba36d8c3f25de067a2b5bb379db27"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/undici-types/5.26.5",
+      "repository": "git+https://github.com/nodejs/undici.git",
+      "gitHead": "9197790ae0d015b40b75fd0c5cdb7420704b5272",
+      "resolvedCommit": "9197790ae0d015b40b75fd0c5cdb7420704b5272",
+      "upstreamPath": "LICENSE",
+      "npmTarball": "https://registry.npmjs.org/undici-types/-/undici-types-5.26.5.tgz",
+      "npmIntegrity": "sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA==",
+      "npmShasum": "bcd539893d00b56e964fd2657a4866b221a65617"
+    }
+  }
+}

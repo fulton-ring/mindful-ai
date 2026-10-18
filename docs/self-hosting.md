@@ -2,7 +2,7 @@
 
 The same OCI image serves the UI and API, runs durable chat execution, extracts PDF/DOCX/XLSX attachments, reads public web pages with Chromium and searches saved sources using a bundled local embedding model. A standalone instance stores its database and private objects in one persistent volume. PostgreSQL, Valkey and S3 support separate HTTP, worker and scheduler processes. Neither setup requires a Cloudflare account.
 
-Use Node.js 24.15 or newer and pnpm 10.30.0 when building outside Docker. The image pins the Node 24.15 Debian baseline and installs the Chromium version matching Playwright 1.64.1 for its target architecture. The build downloads the pinned embedding model; runtime startup does not download model weights. Model assets and the UI are included in the image. Provider credentials are runtime configuration, never build arguments.
+Use Node.js 24.15 or newer and pnpm 10.30.0 when building outside Docker. The image pins the Node 24.15 Debian baseline and uses Debian's Chromium distribution, tested with the installed Playwright adapter on both supported architectures. The build downloads the pinned embedding model; runtime startup does not download model weights. Model assets and the UI are included in the image. Provider credentials are runtime configuration, never build arguments.
 
 ## One container with SQLite
 
@@ -31,6 +31,22 @@ docker run -d --name walden \
 
 Chromium's sandbox remains enabled. The host must permit unprivileged user namespaces; follow the [Playwright container guidance](https://playwright.dev/docs/docker) when choosing a host security profile. The supplied profile derives from the upstream Playwright v1.64.1 Docker profile, with `chroot` permitted for Chromium’s private user namespace while host capabilities remain dropped. Do not add `--no-sandbox` to make an incompatible host appear healthy.
 
+## Published images
+
+Versioned releases publish native amd64 and arm64 images at `ghcr.io/fulton-ring/mindful-ai`. Use a version tag from the [GitHub releases page](https://github.com/fulton-ring/mindful-ai/releases), or pin its reported image digest for repeatable deployments. `latest` follows successful stable releases. The `sha-<full-commit>` tag identifies the source revision.
+
+Download the matching release's `chromium-seccomp.json`, then run the published image with the same options shown above, replacing `walden:local` with `ghcr.io/fulton-ring/mindful-ai:<version>` and the seccomp path with the downloaded file. Set the provider in a private environment file, for example:
+
+```dotenv
+AUTH_MODE=none
+APP_URL=http://localhost:3000
+AI_PROVIDER=openrouter
+OPENROUTER_API_KEY=your-own-key
+AI_MODEL=your-provider-model-id
+```
+
+Each release includes checksummed corresponding-source archives for the native libraries and Debian packages in each architecture's image. These archives are companion downloads; they are not loaded at startup or stored in the runtime image. [The source instructions](../licenses/native/README.md) explain verification and reassembly. Runtime notices are retained under `/app/notices`, including the installed package versions and Chromium credits. Redistribute the notices and matching source companions with the image.
+
 ## Configuration
 
 | Variable | Meaning |
@@ -57,6 +73,7 @@ Chromium's sandbox remains enabled. The host must permit unprivileged user names
 | `OPENROUTER_API_KEY` | Credential when `AI_PROVIDER=openrouter` |
 | `EMBEDDING_MODEL_DIR` | Bundled local model path, `/app/models/minilm` in the image |
 | `EMBEDDING_MODEL_REVISION` | Pinned model identity; must match the installed assets |
+| `CHROMIUM_EXECUTABLE_PATH` | Optional system Chromium path; the image sets `/usr/bin/chromium`. Local development defaults to Playwright's downloaded browser. |
 | `APP_POLICY_JSON` | Optional partial JSON policy for message/upload limits, retention and features |
 | `MESSAGE_LIMIT`, `MESSAGE_WINDOW_HOURS` | Legacy defaults: 20 weighted points per 4 hours; `MESSAGE_LIMIT=unlimited` removes the quota |
 
@@ -211,4 +228,6 @@ Run these commands beside the root `package.json`. The root launcher loads `.env
 
 `pnpm test:providers` runs the same browser and API scenarios against actual Node/SQLite/local-file and workerd/D1/R2/Durable Object hosts, with controlled inference responses. Set `WALDEN_TEST_S3_ENDPOINT` to include the mixed SQLite/S3 case. [The provider matrix guide](../tests/provider-matrix/README.md) covers disposable SeaweedFS configuration and the separate opt-in browser checks against live Cloudflare and OpenRouter inference. CI runs all three deterministic provider combinations and the standalone development smoke; live credentials are not needed for those gates.
 
-The manual/release `Self-hosted image` CI workflow builds and smokes native amd64 and arm64 images, checks non-root sandboxed Chromium, and exercises first-start readiness, UI assets and runtime configuration. It does not push images or deploy infrastructure. A complete operator smoke test additionally signs in when enabled, starts a note/chat, reconnects to its event stream, restarts a worker during an active turn, exercises Stop and retry, uploads/extracts a document, reads a public page, searches saved sources, and validates backup/restore against a disposable instance.
+The manual/release `Self-hosted image` CI workflow runs the full application/provider checks, builds native amd64 and arm64 images, and exercises non-root sandboxed Chromium rendering, Markdown, links, screenshots and redirect restrictions. It also checks first-start readiness, UI assets, API behavior and retained attribution. Publication requires an explicit version and publish selection, or a published GitHub release. Matching source companions are uploaded before an architecture image is pushed; version and stable `latest` manifests wait for both architectures. A dispatch without publication builds and verifies the same artifacts without pushing images. It does not deploy infrastructure.
+
+A complete operator smoke test additionally signs in when enabled, starts a note/chat, reconnects to its event stream, restarts a worker during an active turn, exercises Stop and retry, uploads/extracts a document, reads a public page, searches saved sources, and validates backup/restore against a disposable instance.

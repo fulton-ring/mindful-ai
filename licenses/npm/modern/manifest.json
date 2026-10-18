@@ -1,0 +1,673 @@
+{
+  "@aws-sdk/credential-provider-http@3.972.74": {
+    "files": [
+      {
+        "path": "modern/_aws-sdk_credential-provider-http_3.972.74__LICENSE",
+        "source": "https://raw.githubusercontent.com/aws/aws-sdk-js-v3/c68e50e4a6e0469a20c2894fe8a29c140553ebb8/LICENSE",
+        "sha256": "edea91454b811f127fbdea3d86f378f6719bd372ed440abf82b232f6fca06c3d"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/%40aws-sdk%2Fcredential-provider-http/3.972.74",
+      "repository": "https://github.com/aws/aws-sdk-js-v3",
+      "gitHead": null,
+      "commit": "c68e50e4a6e0469a20c2894fe8a29c140553ebb8",
+      "commitSource": "git ls-remote annotated release tag peeled commit, package.json version verified",
+      "releaseTag": "v3.1138.0",
+      "releaseTagObject": "ffe67d42ef308262ccf6a6b6de25bfb4b3845d9c",
+      "versionEvidence": {
+        "source": "https://raw.githubusercontent.com/aws/aws-sdk-js-v3/c68e50e4a6e0469a20c2894fe8a29c140553ebb8/packages-internal/credential-provider-http/package.json",
+        "name": "@aws-sdk/credential-provider-http",
+        "version": "3.972.74"
+      },
+      "distIntegrity": "sha512-u91E/hT8f4d1xy0Jl7VG4nVKJ3lxbrZkoBTeSVoJdWBiSEUMwMS/9+e0H/aJVQV//Lt5wuzP+E69v4aRSsNTmw==",
+      "resolvedCommit": "c68e50e4a6e0469a20c2894fe8a29c140553ebb8",
+      "declaredLicense": "Apache-2.0"
+    }
+  },
+  "@aws-sdk/credential-provider-login@3.972.79": {
+    "files": [
+      {
+        "path": "modern/_aws-sdk_credential-provider-login_3.972.79__LICENSE",
+        "source": "https://raw.githubusercontent.com/aws/aws-sdk-js-v3/c68e50e4a6e0469a20c2894fe8a29c140553ebb8/LICENSE",
+        "sha256": "edea91454b811f127fbdea3d86f378f6719bd372ed440abf82b232f6fca06c3d"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/%40aws-sdk%2Fcredential-provider-login/3.972.79",
+      "repository": "https://github.com/aws/aws-sdk-js-v3",
+      "gitHead": null,
+      "commit": "c68e50e4a6e0469a20c2894fe8a29c140553ebb8",
+      "commitSource": "git ls-remote annotated release tag peeled commit, package.json version verified",
+      "releaseTag": "v3.1138.0",
+      "releaseTagObject": "ffe67d42ef308262ccf6a6b6de25bfb4b3845d9c",
+      "versionEvidence": {
+        "source": "https://raw.githubusercontent.com/aws/aws-sdk-js-v3/c68e50e4a6e0469a20c2894fe8a29c140553ebb8/packages-internal/credential-provider-login/package.json",
+        "name": "@aws-sdk/credential-provider-login",
+        "version": "3.972.79"
+      },
+      "distIntegrity": "sha512-L+Z85anONJd8MaiuraO4wRxATCdEejBZ3K3eymzWI5JPXa9sOS9CkIm72PBKqXKX+Z9p9NGMX5AIMXm0LEflgw==",
+      "resolvedCommit": "c68e50e4a6e0469a20c2894fe8a29c140553ebb8",
+      "declaredLicense": "Apache-2.0"
+    }
+  },
+  "@aws-sdk/nested-clients@3.997.46": {
+    "files": [
+      {
+        "path": "modern/_aws-sdk_nested-clients_3.997.46__LICENSE",
+        "source": "https://raw.githubusercontent.com/aws/aws-sdk-js-v3/c68e50e4a6e0469a20c2894fe8a29c140553ebb8/LICENSE",
+        "sha256": "edea91454b811f127fbdea3d86f378f6719bd372ed440abf82b232f6fca06c3d"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/%40aws-sdk%2Fnested-clients/3.997.46",
+      "repository": "https://github.com/aws/aws-sdk-js-v3",
+      "gitHead": null,
+      "commit": "c68e50e4a6e0469a20c2894fe8a29c140553ebb8",
+      "commitSource": "git ls-remote annotated release tag peeled commit, package.json version verified",
+      "releaseTag": "v3.1138.0",
+      "releaseTagObject": "ffe67d42ef308262ccf6a6b6de25bfb4b3845d9c",
+      "versionEvidence": {
+        "source": "https://raw.githubusercontent.com/aws/aws-sdk-js-v3/c68e50e4a6e0469a20c2894fe8a29c140553ebb8/packages-internal/nested-clients/package.json",
+        "name": "@aws-sdk/nested-clients",
+        "version": "3.997.46"
+      },
+      "distIntegrity": "sha512-oRxtBcka/JGHGs9l9p9IVajGoTP8vTPmoAzdHGy4Qcy9P5vPnDf6nhIeM/COQNY9k/OahImTRaLkHftoXvfcmQ==",
+      "resolvedCommit": "c68e50e4a6e0469a20c2894fe8a29c140553ebb8",
+      "declaredLicense": "Apache-2.0"
+    }
+  },
+  "@drizzle-team/brocli@0.10.2": {
+    "files": [
+      {
+        "path": "modern/_drizzle-team_brocli_0.10.2__LICENSE",
+        "source": "https://raw.githubusercontent.com/drizzle-team/brocli/65d1432f4ce1f048d99604acd60d0eab8612c91b/LICENSE",
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/%40drizzle-team%2Fbrocli/0.10.2",
+      "repository": "https://github.com/drizzle-team/brocli",
+      "gitHead": null,
+      "distIntegrity": "sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w==",
+      "commit": "65d1432f4ce1f048d99604acd60d0eab8612c91b",
+      "commitSource": "npm SLSA provenance resolvedDependencies.gitCommit",
+      "attestation": "https://registry.npmjs.org/-/npm/v1/attestations/@drizzle-team%2fbrocli@0.10.2",
+      "workflow": {
+        "ref": "refs/heads/main",
+        "repository": "https://github.com/drizzle-team/brocli",
+        "path": ".github/workflows/release.yaml"
+      },
+      "resolvedCommit": "65d1432f4ce1f048d99604acd60d0eab8612c91b",
+      "declaredLicense": "Apache-2.0",
+      "attestationSubjectIntegrityMatchesRegistry": true
+    }
+  },
+  "drizzle-orm@0.45.2": {
+    "files": [
+      {
+        "path": "modern/drizzle-orm_0.45.2__LICENSE",
+        "source": "https://raw.githubusercontent.com/drizzle-team/drizzle-orm/273c78071d4841b497f5144734b38294df7ec64b/LICENSE",
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/drizzle-orm/0.45.2",
+      "repository": "https://github.com/drizzle-team/drizzle-orm",
+      "gitHead": null,
+      "distIntegrity": "sha512-kY0BSaTNYWnoDMVoyY8uxmyHjpJW1geOmBMdSSicKo9CIIWkSxMIj2rkeSR51b8KAPB7m+qysjuHme5nKP+E5Q==",
+      "commit": "273c78071d4841b497f5144734b38294df7ec64b",
+      "commitSource": "npm SLSA provenance resolvedDependencies.gitCommit",
+      "attestation": "https://registry.npmjs.org/-/npm/v1/attestations/drizzle-orm@0.45.2",
+      "workflow": {
+        "ref": "refs/heads/main",
+        "repository": "https://github.com/drizzle-team/drizzle-orm",
+        "path": ".github/workflows/router.yaml"
+      },
+      "resolvedCommit": "273c78071d4841b497f5144734b38294df7ec64b",
+      "declaredLicense": "Apache-2.0",
+      "attestationSubjectIntegrityMatchesRegistry": true
+    }
+  },
+  "@better-auth/utils@0.5.0": {
+    "files": [
+      {
+        "path": "modern/_better-auth_utils_0.5.0__LICENSE",
+        "source": "https://raw.githubusercontent.com/better-auth/utils/ef522888b7b2ff77ca13f0afb476dfae8f297862/LICENSE",
+        "sha256": "b5052b5db9a8720634e5243aaf019269ddd93c2e43f46a09f72b99e0004c8680"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/%40better-auth%2Futils/0.5.0",
+      "repository": "https://github.com/better-auth/utils",
+      "gitHead": null,
+      "resolvedCommit": "f03c1c76aff7bfa3f4de4af47b112315c770a0d1",
+      "declaredLicense": "MIT",
+      "distIntegrity": "sha512-BL8W4EfIZFwlu0r54m3v1ztjDhu6dDe/amLTm0xybmbZaNgYUqhD3SjpAsnq0q8YD6/ki4iwIgxJNLP/N3TxiA==",
+      "attestation": "https://registry.npmjs.org/-/npm/v1/attestations/@better-auth%2futils@0.5.0",
+      "commitSource": "npm SLSA provenance resolvedDependencies.gitCommit",
+      "attestationSubjectIntegrityMatchesRegistry": true,
+      "licenseCommit": "ef522888b7b2ff77ca13f0afb476dfae8f297862",
+      "licenseCommitRelationship": "later maintainer license addition; same package version and identical source subtree",
+      "comparison": {
+        "source": "https://api.github.com/repos/better-auth/utils/compare/f03c1c76aff7bfa3f4de4af47b112315c770a0d1...ef522888b7b2ff77ca13f0afb476dfae8f297862",
+        "releaseCommit": "f03c1c76aff7bfa3f4de4af47b112315c770a0d1",
+        "licenseCommit": "ef522888b7b2ff77ca13f0afb476dfae8f297862",
+        "unchangedSourceDirectory": "src",
+        "releaseSourceTree": "6bb5752d9a41f163b7698559c7b5fd2c1a5950db",
+        "licenseSourceTree": "6bb5752d9a41f163b7698559c7b5fd2c1a5950db",
+        "packageVersion": "0.5.0",
+        "packageLicense": "MIT"
+      }
+    }
+  },
+  "@hono/standard-validator@0.4.0": {
+    "files": [
+      {
+        "path": "modern/_hono_standard-validator_0.4.0__LICENSE",
+        "source": "https://raw.githubusercontent.com/honojs/middleware/a8e2af4d857aa7fabf290cdf6f67307678e50409/LICENSE",
+        "sha256": "6895190430d809c4c57a7582ecc2f99acbc2ea39a5dfad20262a41d5b3e91733"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/%40hono%2Fstandard-validator/0.4.0",
+      "repository": "https://github.com/honojs/middleware",
+      "gitHead": null,
+      "resolvedCommit": "45c94d6b58240c0316453220869444d622330205",
+      "declaredLicense": "MIT",
+      "distIntegrity": "sha512-MxOm1asDh9j7c1D0KiWwppSbFgAQxTRO4YEhjMrJn3lF1BIcXenPdgjSGKDRfQmZdaTaMA8slQLETgVOKyJxFw==",
+      "attestation": "https://registry.npmjs.org/-/npm/v1/attestations/@hono%2fstandard-validator@0.4.0",
+      "commitSource": "npm SLSA provenance resolvedDependencies.gitCommit",
+      "attestationSubjectIntegrityMatchesRegistry": true,
+      "licenseCommit": "a8e2af4d857aa7fabf290cdf6f67307678e50409",
+      "licenseCommitRelationship": "later maintainer license addition; same package version and identical source subtree",
+      "comparison": {
+        "source": "https://api.github.com/repos/honojs/middleware/compare/45c94d6b58240c0316453220869444d622330205...a8e2af4d857aa7fabf290cdf6f67307678e50409",
+        "releaseCommit": "45c94d6b58240c0316453220869444d622330205",
+        "licenseCommit": "a8e2af4d857aa7fabf290cdf6f67307678e50409",
+        "unchangedSourceDirectory": "packages/standard-validator/src",
+        "releaseSourceTree": "b313f3b92e8d0b62383e042bf522f7490bb4e2d6",
+        "licenseSourceTree": "b313f3b92e8d0b62383e042bf522f7490bb4e2d6",
+        "packageVersion": "0.4.0",
+        "packageLicense": "MIT"
+      }
+    }
+  },
+  "@libsql/client@0.18.0": {
+    "files": [
+      {
+        "path": "modern/_libsql_client_0.18.0__LICENSE",
+        "source": "https://raw.githubusercontent.com/tursodatabase/libsql-client-ts/9496c782af413f6380235c7f5d0c97b5371f49b7/LICENSE",
+        "sha256": "f7984723ac416cb45f9eb462c4da22ad4a7d7996bd3f9c7a92288e047cce003f"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/%40libsql%2Fclient/0.18.0",
+      "repository": "https://github.com/tursodatabase/libsql-client-ts",
+      "gitHead": "9496c782af413f6380235c7f5d0c97b5371f49b7",
+      "distIntegrity": "sha512-zMCCo58vv7w27j7+cnt/GW+X6/Rih6cHZ86PKi0AxCMOqMfrVgG9OZ5lW2bDMJhSeOjsv2szH2nJF3A9l36UmA==",
+      "commitSource": "npm registry gitHead",
+      "resolvedCommit": "9496c782af413f6380235c7f5d0c97b5371f49b7",
+      "declaredLicense": "MIT"
+    }
+  },
+  "@libsql/core@0.18.0": {
+    "files": [
+      {
+        "path": "modern/_libsql_core_0.18.0__LICENSE",
+        "source": "https://raw.githubusercontent.com/tursodatabase/libsql-client-ts/9496c782af413f6380235c7f5d0c97b5371f49b7/LICENSE",
+        "sha256": "f7984723ac416cb45f9eb462c4da22ad4a7d7996bd3f9c7a92288e047cce003f"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/%40libsql%2Fcore/0.18.0",
+      "repository": "https://github.com/tursodatabase/libsql-client-ts",
+      "gitHead": "9496c782af413f6380235c7f5d0c97b5371f49b7",
+      "distIntegrity": "sha512-N8RR2CIpcgtbKZnXs2KVpw2lJQfinUj3I56e7qRDRpK18Hty0Rr8nr00VmFb4R/DsqOanPB/TaP3+QAQLZeXMg==",
+      "commitSource": "npm registry gitHead",
+      "resolvedCommit": "9496c782af413f6380235c7f5d0c97b5371f49b7",
+      "declaredLicense": "MIT"
+    }
+  },
+  "@libsql/isomorphic-ws@0.1.5": {
+    "files": [
+      {
+        "path": "modern/_libsql_isomorphic-ws_0.1.5__LICENSE",
+        "source": "https://raw.githubusercontent.com/libsql/isomorphic-ts/87331abc53d4e77deb2f3d6384438d4804a07e0a/LICENSE",
+        "sha256": "cecf589818a56c2da8a0a6cc82c8a215c9770988c033b6016c2b74bf79f38152"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/%40libsql%2Fisomorphic-ws/0.1.5",
+      "repository": "https://github.com/libsql/isomorphic-ts",
+      "gitHead": "87331abc53d4e77deb2f3d6384438d4804a07e0a",
+      "distIntegrity": "sha512-DtLWIH29onUYR00i0GlQ3UdcTRC6EP4u9w/h9LxpUZJWRMARk6dQwZ6Jkd+QdwVpuAOrdxt18v0K2uIYR3fwFg==",
+      "commitSource": "npm registry gitHead",
+      "resolvedCommit": "87331abc53d4e77deb2f3d6384438d4804a07e0a",
+      "declaredLicense": "MIT"
+    }
+  },
+  "@posthog/browser-common@0.9.0": {
+    "files": [
+      {
+        "path": "modern/_posthog_browser-common_0.9.0__LICENSE",
+        "source": "https://raw.githubusercontent.com/PostHog/posthog-js/437164dd22b6ecf5334bed9992288e6335124104/LICENSE",
+        "sha256": "d3fb92ac01f0bef4078f89aac9f20f76da3383ad45becf6204abdf5495f43f8f"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/%40posthog%2Fbrowser-common/0.9.0",
+      "repository": "https://github.com/PostHog/posthog-js",
+      "gitHead": null,
+      "distIntegrity": "sha512-EWoVzs1vVY7ihpn8yOjj3jyjriHUEEMVSBNL/TW3hk09fTriWRe76vJXrRg0G0yjTYxHmtlSkNn4mOV24ZEzzA==",
+      "commit": "437164dd22b6ecf5334bed9992288e6335124104",
+      "commitSource": "npm SLSA provenance resolvedDependencies.gitCommit",
+      "attestation": "https://registry.npmjs.org/-/npm/v1/attestations/@posthog%2fbrowser-common@0.9.0",
+      "workflow": {
+        "ref": "refs/heads/main",
+        "repository": "https://github.com/PostHog/posthog-js",
+        "path": ".github/workflows/release.yml"
+      },
+      "resolvedCommit": "437164dd22b6ecf5334bed9992288e6335124104",
+      "declaredLicense": "MIT",
+      "attestationSubjectIntegrityMatchesRegistry": true
+    }
+  },
+  "@redis/bloom@5.12.1": {
+    "files": [
+      {
+        "path": "modern/_redis_bloom_5.12.1__LICENSE",
+        "source": "https://raw.githubusercontent.com/redis/node-redis/838c28d9f55d13a7933e650b9f7782fdb5af4f71/LICENSE",
+        "sha256": "a57b250a5bf03d7afe55b74063313f2adb7b00d546c0ab149a89398333fe3cc8"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/%40redis%2Fbloom/5.12.1",
+      "repository": "https://github.com/redis/node-redis",
+      "gitHead": "838c28d9f55d13a7933e650b9f7782fdb5af4f71",
+      "distIntegrity": "sha512-PUUfv+ms7jgPSBVoo/DN4AkPHj4D5TZSd6SbJX7egzBplkYUcKmHRE8RKia7UtZ8bSQbLguLvxVO+asKtQfZWA==",
+      "commitSource": "npm registry gitHead",
+      "resolvedCommit": "838c28d9f55d13a7933e650b9f7782fdb5af4f71",
+      "declaredLicense": "MIT"
+    }
+  },
+  "@redis/client@5.12.1": {
+    "files": [
+      {
+        "path": "modern/_redis_client_5.12.1__LICENSE",
+        "source": "https://raw.githubusercontent.com/redis/node-redis/789d6d5c5c774fda24257ce1fc7f4f66b80ae689/LICENSE",
+        "sha256": "a57b250a5bf03d7afe55b74063313f2adb7b00d546c0ab149a89398333fe3cc8"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/%40redis%2Fclient/5.12.1",
+      "repository": "https://github.com/redis/node-redis",
+      "gitHead": "789d6d5c5c774fda24257ce1fc7f4f66b80ae689",
+      "distIntegrity": "sha512-7aPGWeqA3uFm43o19umzdl16CEjK/JQGtSXVPevplTaOU3VJA/rseBC1QvYUz9lLDIMBimc4SW/zrW4S89BaCA==",
+      "commitSource": "npm registry gitHead",
+      "resolvedCommit": "789d6d5c5c774fda24257ce1fc7f4f66b80ae689",
+      "declaredLicense": "MIT"
+    }
+  },
+  "@redis/json@5.12.1": {
+    "files": [
+      {
+        "path": "modern/_redis_json_5.12.1__LICENSE",
+        "source": "https://raw.githubusercontent.com/redis/node-redis/02cfd5ad4c07ef6c1d703e25d3c2076eacfb4b45/LICENSE",
+        "sha256": "a57b250a5bf03d7afe55b74063313f2adb7b00d546c0ab149a89398333fe3cc8"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/%40redis%2Fjson/5.12.1",
+      "repository": "https://github.com/redis/node-redis",
+      "gitHead": "02cfd5ad4c07ef6c1d703e25d3c2076eacfb4b45",
+      "distIntegrity": "sha512-eOze75esLve4vfqDel7aMX08CNaiLLQS2fV8mpRN9NxPe1rVR4vQyYiW/OgtGUysF6QOr9ANhfxABKNOJfXdKg==",
+      "commitSource": "npm registry gitHead",
+      "resolvedCommit": "02cfd5ad4c07ef6c1d703e25d3c2076eacfb4b45",
+      "declaredLicense": "MIT"
+    }
+  },
+  "@redis/search@5.12.1": {
+    "files": [
+      {
+        "path": "modern/_redis_search_5.12.1__LICENSE",
+        "source": "https://raw.githubusercontent.com/redis/node-redis/9e7767c5bf2cb06bcce872fe99e5dbb349e3a074/LICENSE",
+        "sha256": "a57b250a5bf03d7afe55b74063313f2adb7b00d546c0ab149a89398333fe3cc8"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/%40redis%2Fsearch/5.12.1",
+      "repository": "https://github.com/redis/node-redis",
+      "gitHead": "9e7767c5bf2cb06bcce872fe99e5dbb349e3a074",
+      "distIntegrity": "sha512-ItlxbxC9cKI6IU1TLWoczwJCRb6TdmkEpWv05UrPawqaAnWGRu3rcIqsc5vN483T2fSociuyV1UkWIL5I4//2w==",
+      "commitSource": "npm registry gitHead",
+      "resolvedCommit": "9e7767c5bf2cb06bcce872fe99e5dbb349e3a074",
+      "declaredLicense": "MIT"
+    }
+  },
+  "@redis/time-series@5.12.1": {
+    "files": [
+      {
+        "path": "modern/_redis_time-series_5.12.1__LICENSE",
+        "source": "https://raw.githubusercontent.com/redis/node-redis/de70920ecb4caf2a9c871a24cf08f1fcb41b1d2d/LICENSE",
+        "sha256": "a57b250a5bf03d7afe55b74063313f2adb7b00d546c0ab149a89398333fe3cc8"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/%40redis%2Ftime-series/5.12.1",
+      "repository": "https://github.com/redis/node-redis",
+      "gitHead": "de70920ecb4caf2a9c871a24cf08f1fcb41b1d2d",
+      "distIntegrity": "sha512-c6JL6E3EcZJuNqKFz+KM+l9l5mpcQiKvTwgA3blt5glWJ8hjDk0yeHN3beE/MpqYIQ8UEX44ItQzgkE/gCBELQ==",
+      "commitSource": "npm registry gitHead",
+      "resolvedCommit": "de70920ecb4caf2a9c871a24cf08f1fcb41b1d2d",
+      "declaredLicense": "MIT"
+    }
+  },
+  "redis@5.12.1": {
+    "files": [
+      {
+        "path": "modern/redis_5.12.1__LICENSE",
+        "source": "https://raw.githubusercontent.com/redis/node-redis/6a447261fc77c4577aa5127fb269f8b69cfe6732/LICENSE",
+        "sha256": "a57b250a5bf03d7afe55b74063313f2adb7b00d546c0ab149a89398333fe3cc8"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/redis/5.12.1",
+      "repository": "https://github.com/redis/node-redis",
+      "gitHead": "6a447261fc77c4577aa5127fb269f8b69cfe6732",
+      "distIntegrity": "sha512-LDsoVvb/CpoV9EN3FXvgvSHNJWuCIzl9MiO3ppOevuGLpSGJhwfQjpEwfFJcQvNSddHADDdZaWx0HnmMxRXG7g==",
+      "commitSource": "npm registry gitHead",
+      "resolvedCommit": "6a447261fc77c4577aa5127fb269f8b69cfe6732",
+      "declaredLicense": "MIT"
+    }
+  },
+  "@cloudflare/workers-types@5.20260918.1": {
+    "files": [
+      {
+        "path": "modern/_cloudflare_workers-types_5.20260918.1__LICENSE",
+        "source": "https://raw.githubusercontent.com/cloudflare/workerd/679c09e5eea0af8a04062e1875e99c75af532e3b/LICENSE",
+        "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/%40cloudflare%2Fworkers-types/5.20260918.1",
+      "repository": "https://github.com/cloudflare/workerd",
+      "gitHead": "679c09e5eea0af8a04062e1875e99c75af532e3b",
+      "distIntegrity": "sha512-bUGc9gIdooYPi6lAUoB/eBXmy/ev9ok0XvDLzfJZQVCT8WCEQwv9f6smz6XeE83JzpX6ZSVi9CG1aDORnErYRQ==",
+      "commitSource": "npm registry gitHead",
+      "resolvedCommit": "679c09e5eea0af8a04062e1875e99c75af532e3b",
+      "declaredLicense": "MIT OR Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "note": "Package declares MIT OR Apache-2.0; vendored upstream repository Apache-2.0 license."
+    }
+  },
+  "@standard-community/standard-json@0.3.6": {
+    "files": [
+      {
+        "path": "modern/_standard-community_standard-json_0.3.6__published-package.json.txt",
+        "source": "https://registry.npmjs.org/@standard-community/standard-json/-/standard-json-0.3.6.tgz",
+        "sourceArchiveMember": "package/package.json",
+        "sourceArchiveIntegrity": "sha512-tuXKz1Ps4al0W4xhfwii7v4lskKtOv3QE7mcouRVThrBdOR6JzY4Vea3nsxcEnte84bOJvMvXGmOMWE3IBbHyA==",
+        "sha256": "0c9c3b65f6822b2324dda3ea34a52d65f25a7d7dfaa514055c9f5ebdf65934f0",
+        "licenseDeclaration": true
+      },
+      {
+        "path": "modern/MIT-canonical-terms.txt",
+        "source": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MIT.txt",
+        "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+        "canonicalTerms": true,
+        "licenseIdentifier": "MIT",
+        "note": "Canonical SPDX license terms, not an original package license file. Template placeholders preserved unchanged."
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/%40standard-community%2Fstandard-json/0.3.6",
+      "repository": "https://github.com/standard-community/standard-json",
+      "gitHead": null,
+      "resolvedCommit": "ee5ce969fb8cb0f1912653854f34b2ed95cf8467",
+      "declaredLicense": "MIT",
+      "distIntegrity": "sha512-tuXKz1Ps4al0W4xhfwii7v4lskKtOv3QE7mcouRVThrBdOR6JzY4Vea3nsxcEnte84bOJvMvXGmOMWE3IBbHyA==",
+      "attestation": "https://registry.npmjs.org/-/npm/v1/attestations/@standard-community%2fstandard-json@0.3.6",
+      "commitSource": "npm SLSA provenance resolvedDependencies.gitCommit",
+      "attestationSubjectIntegrityMatchesRegistry": true,
+      "npmTarball": "https://registry.npmjs.org/@standard-community/standard-json/-/standard-json-0.3.6.tgz",
+      "npmIntegrity": "sha512-tuXKz1Ps4al0W4xhfwii7v4lskKtOv3QE7mcouRVThrBdOR6JzY4Vea3nsxcEnte84bOJvMvXGmOMWE3IBbHyA==",
+      "npmShasum": "d16d7684dfa939b755dceb26d779c8caf60aa268",
+      "publishedLicenseDeclaration": "MIT",
+      "publishedLicenseDeclarationSource": {
+        "source": "https://registry.npmjs.org/@standard-community/standard-json/-/standard-json-0.3.6.tgz",
+        "sourceArchiveMember": "package/package.json"
+      },
+      "canonicalLicenseReference": {
+        "licenseIdentifier": "MIT",
+        "canonicalTermsRepository": "https://github.com/spdx/license-list-data",
+        "canonicalTermsCommit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+        "canonicalTermsPath": "text/MIT.txt"
+      },
+      "resolution": "The exact published package declares MIT. Its package.json is preserved verbatim with canonical MIT terms supplied as a separately labeled reference; these terms are not represented as an original package license file. No copyright holder or year has been synthesized."
+    },
+    "notice": "This package declares MIT in its exact published package.json, preserved below. The separately labeled canonical SPDX MIT terms are a reference for that declaration, not an original package license file. Template placeholders are preserved unchanged; no copyright holder or year has been invented."
+  },
+  "@standard-community/standard-openapi@0.2.10": {
+    "files": [
+      {
+        "path": "modern/_standard-community_standard-openapi_0.2.10__published-package.json.txt",
+        "source": "https://registry.npmjs.org/@standard-community/standard-openapi/-/standard-openapi-0.2.10.tgz",
+        "sourceArchiveMember": "package/package.json",
+        "sourceArchiveIntegrity": "sha512-whaCN9eu5zv5gu6Kyeh5am/S3AyS1nqo57/wAxs/KPS7+94UhBUZmkIetmXzm22qIV0zMrHt3y+2VfjkbkYYTA==",
+        "sha256": "4ac74a2634e457e7fe864854226a608a45822f0cb18a9d9836fd4f61fc7448a6",
+        "licenseDeclaration": true
+      },
+      {
+        "path": "modern/MIT-canonical-terms.txt",
+        "source": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MIT.txt",
+        "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+        "canonicalTerms": true,
+        "licenseIdentifier": "MIT",
+        "note": "Canonical SPDX license terms, not an original package license file. Template placeholders preserved unchanged."
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/%40standard-community%2Fstandard-openapi/0.2.10",
+      "repository": "https://github.com/standard-community/standard-openapi",
+      "gitHead": null,
+      "resolvedCommit": "f6e302a5631c1f5b5c05e5f1c6f794b2418e21e0",
+      "declaredLicense": "MIT",
+      "distIntegrity": "sha512-whaCN9eu5zv5gu6Kyeh5am/S3AyS1nqo57/wAxs/KPS7+94UhBUZmkIetmXzm22qIV0zMrHt3y+2VfjkbkYYTA==",
+      "attestation": "https://registry.npmjs.org/-/npm/v1/attestations/@standard-community%2fstandard-openapi@0.2.10",
+      "commitSource": "npm SLSA provenance resolvedDependencies.gitCommit",
+      "attestationSubjectIntegrityMatchesRegistry": true,
+      "npmTarball": "https://registry.npmjs.org/@standard-community/standard-openapi/-/standard-openapi-0.2.10.tgz",
+      "npmIntegrity": "sha512-whaCN9eu5zv5gu6Kyeh5am/S3AyS1nqo57/wAxs/KPS7+94UhBUZmkIetmXzm22qIV0zMrHt3y+2VfjkbkYYTA==",
+      "npmShasum": "5efc8c1856e8dbec6b31125d0292cd72a16b52a3",
+      "publishedLicenseDeclaration": "MIT",
+      "publishedLicenseDeclarationSource": {
+        "source": "https://registry.npmjs.org/@standard-community/standard-openapi/-/standard-openapi-0.2.10.tgz",
+        "sourceArchiveMember": "package/package.json"
+      },
+      "canonicalLicenseReference": {
+        "licenseIdentifier": "MIT",
+        "canonicalTermsRepository": "https://github.com/spdx/license-list-data",
+        "canonicalTermsCommit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+        "canonicalTermsPath": "text/MIT.txt"
+      },
+      "resolution": "The exact published package declares MIT. Its package.json is preserved verbatim with canonical MIT terms supplied as a separately labeled reference; these terms are not represented as an original package license file. No copyright holder or year has been synthesized."
+    },
+    "notice": "This package declares MIT in its exact published package.json, preserved below. The separately labeled canonical SPDX MIT terms are a reference for that declaration, not an original package license file. Template placeholders are preserved unchanged; no copyright holder or year has been invented."
+  },
+  "am-i-vibing@0.5.0": {
+    "files": [
+      {
+        "path": "modern/am-i-vibing_0.5.0__published-package.json.txt",
+        "source": "https://registry.npmjs.org/am-i-vibing/-/am-i-vibing-0.5.0.tgz",
+        "sourceArchiveMember": "package/package.json",
+        "sourceArchiveIntegrity": "sha512-KLcsDhqf1XRrJmJr+9I/C0EX2K+sGrAGZFgkmd84c8TJO9zJBu+/kFInjazu1KfJWFhWDKdRWkpBzEs7s35DVA==",
+        "sha256": "eea5f282495e540410aebc20b31fec39adc173b573c0596accf1b26eed26a6f6",
+        "licenseDeclaration": true
+      },
+      {
+        "path": "modern/am-i-vibing_0.5.0__published-README.md",
+        "source": "https://registry.npmjs.org/am-i-vibing/-/am-i-vibing-0.5.0.tgz",
+        "sourceArchiveMember": "package/README.md",
+        "sourceArchiveIntegrity": "sha512-KLcsDhqf1XRrJmJr+9I/C0EX2K+sGrAGZFgkmd84c8TJO9zJBu+/kFInjazu1KfJWFhWDKdRWkpBzEs7s35DVA==",
+        "sha256": "f2dbe95905be94f2f536639145d6bcc5676f4b77d58d4be8713759bbd24bc76f",
+        "originalCopyrightNotice": true
+      },
+      {
+        "path": "modern/MIT-canonical-terms.txt",
+        "source": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MIT.txt",
+        "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+        "canonicalTerms": true,
+        "licenseIdentifier": "MIT",
+        "note": "Canonical SPDX license terms, not an original package license file. Template placeholders preserved unchanged."
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/am-i-vibing/0.5.0",
+      "repository": "https://github.com/ascorbic/am-i-vibing",
+      "gitHead": null,
+      "resolvedCommit": "a858d9865e3f5a278504aad0a775a8b7a8d70bbc",
+      "declaredLicense": "MIT",
+      "distIntegrity": "sha512-KLcsDhqf1XRrJmJr+9I/C0EX2K+sGrAGZFgkmd84c8TJO9zJBu+/kFInjazu1KfJWFhWDKdRWkpBzEs7s35DVA==",
+      "attestation": "https://registry.npmjs.org/-/npm/v1/attestations/am-i-vibing@0.5.0",
+      "commitSource": "npm SLSA provenance resolvedDependencies.gitCommit",
+      "attestationSubjectIntegrityMatchesRegistry": true,
+      "npmTarball": "https://registry.npmjs.org/am-i-vibing/-/am-i-vibing-0.5.0.tgz",
+      "npmIntegrity": "sha512-KLcsDhqf1XRrJmJr+9I/C0EX2K+sGrAGZFgkmd84c8TJO9zJBu+/kFInjazu1KfJWFhWDKdRWkpBzEs7s35DVA==",
+      "npmShasum": "8f1e024c6c0966ed3f7a3fc6a8afd4e2a9182abe",
+      "publishedLicenseDeclaration": "MIT",
+      "publishedLicenseDeclarationSource": {
+        "source": "https://registry.npmjs.org/am-i-vibing/-/am-i-vibing-0.5.0.tgz",
+        "sourceArchiveMember": "package/package.json"
+      },
+      "canonicalLicenseReference": {
+        "licenseIdentifier": "MIT",
+        "canonicalTermsRepository": "https://github.com/spdx/license-list-data",
+        "canonicalTermsCommit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+        "canonicalTermsPath": "text/MIT.txt"
+      },
+      "resolution": "The exact published package declares MIT. Its package.json is preserved verbatim with canonical MIT terms supplied as a separately labeled reference; these terms are not represented as an original package license file. No copyright holder or year has been synthesized.",
+      "publishedAuthorMetadata": "Matt Kane"
+    },
+    "notice": "This package declares MIT in its exact published package.json, preserved below. The separately labeled canonical SPDX MIT terms are a reference for that declaration, not an original package license file. Template placeholders are preserved unchanged; no copyright holder or year has been invented. The original published README, including its Copyright \u00a9 2025 Matt Kane notice, is preserved below."
+  },
+  "drizzle-kit@0.31.10": {
+    "files": [
+      {
+        "path": "modern/drizzle-kit_0.31.10__published-package.json.txt",
+        "source": "https://registry.npmjs.org/drizzle-kit/-/drizzle-kit-0.31.10.tgz",
+        "sourceArchiveMember": "package/package.json",
+        "sourceArchiveIntegrity": "sha512-7OZcmQUrdGI+DUNNsKBn1aW8qSoKuTH7d0mYgSP8bAzdFzKoovxEFnoGQp2dVs82EOJeYycqRtciopszwUf8bw==",
+        "sha256": "c258e6134d938d6d718448274fd3e89ed9c05aeca7bb6bc7df22c89d943615c8",
+        "licenseDeclaration": true
+      },
+      {
+        "path": "modern/MIT-canonical-terms.txt",
+        "source": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MIT.txt",
+        "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+        "canonicalTerms": true,
+        "licenseIdentifier": "MIT",
+        "note": "Canonical SPDX license terms, not an original package license file. Template placeholders preserved unchanged."
+      },
+      {
+        "path": "modern/drizzle-kit_0.31.10__LICENSE",
+        "source": "https://raw.githubusercontent.com/drizzle-team/drizzle-orm/4aa6ecfee4b4728dadf6f77f071a149878a3c6c0/LICENSE",
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        "conflictingUpstreamLicense": true
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/drizzle-kit/0.31.10",
+      "repository": "https://github.com/drizzle-team/drizzle-orm",
+      "gitHead": null,
+      "distIntegrity": "sha512-7OZcmQUrdGI+DUNNsKBn1aW8qSoKuTH7d0mYgSP8bAzdFzKoovxEFnoGQp2dVs82EOJeYycqRtciopszwUf8bw==",
+      "commit": "4aa6ecfee4b4728dadf6f77f071a149878a3c6c0",
+      "commitSource": "npm SLSA provenance resolvedDependencies.gitCommit",
+      "attestation": "https://registry.npmjs.org/-/npm/v1/attestations/drizzle-kit@0.31.10",
+      "workflow": {
+        "ref": "refs/heads/main",
+        "repository": "https://github.com/drizzle-team/drizzle-orm",
+        "path": ".github/workflows/router.yaml"
+      },
+      "resolvedCommit": "4aa6ecfee4b4728dadf6f77f071a149878a3c6c0",
+      "declaredLicense": "MIT",
+      "attestationSubjectIntegrityMatchesRegistry": true,
+      "npmTarball": "https://registry.npmjs.org/drizzle-kit/-/drizzle-kit-0.31.10.tgz",
+      "npmIntegrity": "sha512-7OZcmQUrdGI+DUNNsKBn1aW8qSoKuTH7d0mYgSP8bAzdFzKoovxEFnoGQp2dVs82EOJeYycqRtciopszwUf8bw==",
+      "npmShasum": "556b4ba9ecfe089423dc5338634efa9ecd9afc1a",
+      "publishedLicenseDeclaration": "MIT",
+      "publishedLicenseDeclarationSource": {
+        "source": "https://registry.npmjs.org/drizzle-kit/-/drizzle-kit-0.31.10.tgz",
+        "sourceArchiveMember": "package/package.json"
+      },
+      "canonicalLicenseReference": {
+        "licenseIdentifier": "MIT",
+        "canonicalTermsRepository": "https://github.com/spdx/license-list-data",
+        "canonicalTermsCommit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+        "canonicalTermsPath": "text/MIT.txt"
+      },
+      "resolution": "The exact published package declares MIT. Its package.json is preserved verbatim with canonical MIT terms supplied as a separately labeled reference; these terms are not represented as an original package license file. No copyright holder or year has been synthesized.",
+      "publishedAuthorMetadata": "Drizzle Team",
+      "licenseConflict": {
+        "publishedPackageDeclaration": "MIT",
+        "repositoryRootLicense": "Apache-2.0",
+        "rootLicenseSource": "https://raw.githubusercontent.com/drizzle-team/drizzle-orm/4aa6ecfee4b4728dadf6f77f071a149878a3c6c0/LICENSE",
+        "resolution": "Both are preserved as evidence; this notice does not select one or resolve the upstream inconsistency."
+      }
+    },
+    "notice": "This package declares MIT in its exact published package.json, preserved below. The separately labeled canonical SPDX MIT terms are a reference for that declaration, not an original package license file. Template placeholders are preserved unchanged; no copyright holder or year has been invented. Upstream license conflict: the published package declares MIT, while the repository-root LICENSE at the release source commit contains Apache-2.0. Both the canonical MIT reference and the original Apache-2.0 file are preserved; this notice does not choose between them or resolve the inconsistency."
+  },
+  "process-ancestry@0.1.0": {
+    "files": [
+      {
+        "path": "modern/process-ancestry_0.1.0__published-package.json.txt",
+        "source": "https://registry.npmjs.org/process-ancestry/-/process-ancestry-0.1.0.tgz",
+        "sourceArchiveMember": "package/package.json",
+        "sourceArchiveIntegrity": "sha512-tGqJW/UnclpYASFcM6Xh8D8l/BMtaQ9+CSG0vlJSJTcdMM4lDRv4c6H0Pdcsfted+bVczdYSfk2fdukg2gQkZg==",
+        "sha256": "ec3e2a3bdadeb4278cec00eaeeeb5567c5996fa3fb1026ba459da4ea343211e4",
+        "licenseDeclaration": true
+      },
+      {
+        "path": "modern/MIT-canonical-terms.txt",
+        "source": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MIT.txt",
+        "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+        "canonicalTerms": true,
+        "licenseIdentifier": "MIT",
+        "note": "Canonical SPDX license terms, not an original package license file. Template placeholders preserved unchanged."
+      }
+    ],
+    "provenance": {
+      "registry": "https://registry.npmjs.org/process-ancestry/0.1.0",
+      "repository": "https://github.com/ascorbic/process-ancestry",
+      "gitHead": null,
+      "resolvedCommit": "45004fd6155437eef40a632877a567db1b9addc5",
+      "declaredLicense": "MIT",
+      "distIntegrity": "sha512-tGqJW/UnclpYASFcM6Xh8D8l/BMtaQ9+CSG0vlJSJTcdMM4lDRv4c6H0Pdcsfted+bVczdYSfk2fdukg2gQkZg==",
+      "releaseTag": "process-ancestry@0.1.0",
+      "releaseTagObject": "b04de9f81c990abaa7d98972f1fafa03641edaf6",
+      "commitSource": "git ls-remote annotated package release tag peeled commit",
+      "versionEvidence": {
+        "source": "https://raw.githubusercontent.com/ascorbic/process-ancestry/45004fd6155437eef40a632877a567db1b9addc5/packages/process-ancestry/package.json",
+        "name": "process-ancestry",
+        "version": "0.1.0"
+      },
+      "npmTarball": "https://registry.npmjs.org/process-ancestry/-/process-ancestry-0.1.0.tgz",
+      "npmIntegrity": "sha512-tGqJW/UnclpYASFcM6Xh8D8l/BMtaQ9+CSG0vlJSJTcdMM4lDRv4c6H0Pdcsfted+bVczdYSfk2fdukg2gQkZg==",
+      "npmShasum": "06a18bb06c413d827502190458fc7604ee6b3ded",
+      "publishedLicenseDeclaration": "MIT",
+      "publishedLicenseDeclarationSource": {
+        "source": "https://registry.npmjs.org/process-ancestry/-/process-ancestry-0.1.0.tgz",
+        "sourceArchiveMember": "package/package.json"
+      },
+      "canonicalLicenseReference": {
+        "licenseIdentifier": "MIT",
+        "canonicalTermsRepository": "https://github.com/spdx/license-list-data",
+        "canonicalTermsCommit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+        "canonicalTermsPath": "text/MIT.txt"
+      },
+      "resolution": "The exact published package declares MIT. Its package.json is preserved verbatim with canonical MIT terms supplied as a separately labeled reference; these terms are not represented as an original package license file. No copyright holder or year has been synthesized.",
+      "publishedAuthorMetadata": "Matt Kane"
+    },
+    "notice": "This package declares MIT in its exact published package.json, preserved below. The separately labeled canonical SPDX MIT terms are a reference for that declaration, not an original package license file. Template placeholders are preserved unchanged; no copyright holder or year has been invented."
+  }
+}
