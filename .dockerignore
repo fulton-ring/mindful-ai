@@ -33,4 +33,5 @@ apps/api/data
 backups
 **/backups
 **/*.private.json
+**/*.private.jsonc
 **/.npmrc

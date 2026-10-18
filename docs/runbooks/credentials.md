@@ -1,118 +1,75 @@
 # Credentials and deployment
 
-Local development and deployed environments require Clerk authentication. Keep Clerk development and production instances separate.
+Use your own service accounts and resources. Keep secrets in the root `.env` for standalone development, `apps/api/.dev.vars` for Wrangler development, or the deployment platform's secret store. Never commit credentials or print private deployment profiles in CI logs.
 
-## Clerk
+## Standalone development and self-hosting
 
-Create separate development and production Clerk applications. Enable email verification-code login and Google; leave passwords disabled. Configure allowed redirect URLs for the frontend origin. Set `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, and `CLERK_AUTHORIZED_PARTIES` (a comma-separated list of frontend origins) in the API environment. Public frontend configuration is returned by `/api/config`; never send the secret key to the browser.
+`pnpm dev` starts the app at `http://localhost:3000`, backed by SQLite and local files. No Cloudflare or authentication provider is required. Without auth configuration, one shared default account owns the workspace; `AUTH_MODE=none` explicitly selects that behavior. See [self-hosting](../self-hosting.md) for container, PostgreSQL, Valkey and S3 settings.
 
-Test email login followed by Google linking, sign-out, expired tokens, and deletion against the same notes account before launch. Do not merge accounts based on an unverified email string. D1 stores an external identity reference and application records, not login credentials.
+Choose optional authentication before exposing a private workspace:
 
-## Model provider
+- `AUTH_MODE=better-auth`: configure `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` for your public app origin, plus any desired OAuth providers. The standalone runtime can default the auth URL from `APP_URL`.
+- `AUTH_MODE=clerk`: configure your own `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, and comma-separated `CLERK_AUTHORIZED_PARTIES` frontend origins. Keep development and production Clerk instances separate. The API returns public browser configuration from `/api/config`; the secret key stays server-side.
 
-The default inference provider is **Cloudflare Workers AI**, using `@cf/google/gemma-4-26b-a4b-it`, as requested by Jeremy. Use the Worker AI binding for deployed inference. Local inference requires Cloudflare authentication and consumes Workers AI usage.
+Changing an existing database's auth mode requires explicit operator acceptance; see the self-hosting guide. Verify sign-in, sign-out, account isolation and deletion with disposable accounts.
 
-The model supports tool calling, but that does not replace application validation of edits and permissions. Run real conversations covering production, learning consent, incorrect answers, capture, and requests to stop checks before opening access. No OpenAI, Anthropic, or Google API key is required for the Cloudflare-hosted path.
+## Inference and research providers
 
-## Cloudflare
+Notes work without inference credentials. To enable chat, explicitly choose `AI_PROVIDER` and configure its connection:
 
-The `walden` D1 database is configured in `apps/api/wrangler.jsonc`. Its fresh schema comes from `src/db/schema.ts` and the generated `0000_baseline.sql`. See [database workflow](../database.md). Configure secret values with `wrangler secret put`; do not place them in vars, source files, migrations, or CI logs.
+- `cloudflare`: use the native Worker `AI` binding, or your own `CLOUDFLARE_ACCOUNT_ID` and application `CLOUDFLARE_API_TOKEN` for REST access.
+- `openrouter`: set `OPENROUTER_API_KEY` and optionally `AI_MODEL`.
+- `openai-compatible`: set `AI_BASE_URL`, `AI_MODEL`, and `AI_API_KEY` if the endpoint requires it.
 
-Build the web app and API. Verify SPA routing, `/api/*` routing, streaming, auth origins, and scheduled expiration on a staging deployment before releasing it. No remote resources are created by the local setup steps.
+`AI_MODEL` selects the default model; `AI_BACKGROUND_MODEL` and `AI_MODELS_JSON` can constrain background work and the available catalog. Select models that support the application's text and tool use. Provider usage and retention depend on your account and endpoint.
 
-### R2 chat attachments
+`OPENROUTER_API_KEY` separately enables public web search. Standalone page reading and saved-source indexing use the local browser and index. Cloudflare page reading and saved sources require your own browser/search bindings or REST credentials and `AI_SEARCH_INSTANCE`. See [research setup](research.md).
 
-Create a private `walden-attachments` bucket and bind it as `FILES` in the Worker. Create R2 S3 API credentials restricted to this bucket, with object read/write access. The Worker uses them only to sign two-minute browser PUT URLs for staging objects; after upload, the `FILES` binding validates and moves files into the owner's thread prefix. Set the credentials as Worker secrets:
+## Cloudflare development and deployment
 
-```dotenv
-R2_ACCOUNT_ID=<Cloudflare account ID>
-R2_BUCKET=<private bucket name>
-R2_ACCESS_KEY_ID=<R2 API token access key ID>
-R2_SECRET_ACCESS_KEY=<R2 API token secret access key>
+The tracked `apps/api/wrangler.jsonc` and `apps/landing/wrangler.jsonc` are portable examples. They select no account or production domains. Authenticate Wrangler to your own account, create D1 and R2 resources, and replace the all-zero `database_id`. Retain the binding names (`DB`, `FILES`, `CHAT_TURN`, `AI`, `BROWSER`, `AI_SEARCH`, `ASSETS`), SQL text rule and existing Durable Object migration tag when adapting the app profile. Remote AI, browser and search bindings need your own account access even during local Wrangler development. The configured 30-second CPU limit requires Workers Paid.
+
+For local Cloudflare development, copy `apps/api/.dev.vars.example` to `.dev.vars`, configure your chosen auth/inference settings, then run `pnpm db:migrate` and `pnpm dev:cloudflare`. The frontend runs on 5173 and Wrangler on 8787. See [database workflow](../database.md) for schema changes.
+
+For each deployment, copy the portable examples to ignored `wrangler.production.private.jsonc` files beside the originals and configure your own account ID, resource IDs, bindings, vars and optional custom-domain routes. Keep each profile private with file mode `0600`. Production auth belongs in the private profile and its Worker secrets; the tracked example intentionally uses `AUTH_MODE=none`.
+
+Set Worker secrets using the appropriate profile, for example:
+
+```sh
+pnpm --filter @walden/api exec wrangler secret put CLERK_SECRET_KEY --config wrangler.production.private.jsonc
 ```
 
-`R2_ACCOUNT_ID` and `R2_BUCKET` are in `apps/api/wrangler.jsonc`. Apply `apps/api/r2-cors.json` to the bucket so the production origin can PUT with `Content-Type`. Add an R2 lifecycle rule to remove objects under `staging/` after one day; abandoned uploads otherwise remain until their thread is removed. Keep the bucket private. Local development sets `UPLOAD_LOCAL_FALLBACK=true` and uses the same authenticated Worker endpoint for multipart upload because local R2 does not support a browser-accessible presigned URL.
+Use a deployment token with only the Cloudflare permissions needed for your resources and routes. Keep it separate from application REST credentials. Do not load the application's root `.env` into deployment commands. Native Workers AI inference does not need a deployment token injected into the Worker.
 
-Mastra's native list, stat, read, and grep tools see a read-only, owner/thread-scoped view of the `FILES` binding. PDF, DOCX, and XLSX files require `extractDocument`, which uses Workers AI `toMarkdown` and stores a Markdown sidecar in that view. Image files remain available to the model as image content. Both file and sidecar objects are deleted with the thread or account.
+Build and inspect before deploying:
 
-## Retention
-
-Conversations expire seven days after the last user message. Live reads must enforce expiration even if the scheduled purge has not run. Saved notes remain until deletion. Do not enable raw prompt/response logging in the model gateway or observability tooling. Model-provider retention and D1 Time Travel have separate lifetimes from live-record deletion; document these accurately. After restoring a database, expire stale conversation data before serving requests.
-
-## PostHog observability
-
-Set the Worker secret `POSTHOG_API_KEY` to enable API traces. `POSTHOG_HOST` is optional and defaults to the US ingestion host, `https://us.i.posthog.com`. When the key is absent, API telemetry is disabled. The API exporter always removes message, note, reasoning, tool input/output, request context, and raw error text before export; telemetry includes opaque user, conversation, turn, model, token, timing, and operation metadata only.
-
-For local development, configure these variables in the root environment file, then restart both services:
-
-```dotenv
-POSTHOG_API_KEY=<PostHog project key>
-POSTHOG_HOST=https://us.i.posthog.com
-VITE_POSTHOG_KEY=<same PostHog project key>
-VITE_POSTHOG_HOST=https://us.i.posthog.com
+```sh
+pnpm build
+PUBLIC_APP_URL=https://chat.example.com PUBLIC_SITE_URL=https://example.com pnpm --filter @walden/landing build
+pnpm --filter @walden/api exec wrangler deploy --dry-run --config wrangler.production.private.jsonc
+pnpm --filter @walden/landing exec wrangler deploy --dry-run --config wrangler.production.private.jsonc
 ```
 
-The frontend key is the public project ingestion key, never a PostHog personal API key. Vite reads the project root environment but only exposes variables prefixed `VITE_`. The active project and runtime configuration are documented below.
+When explicitly releasing, omit `--dry-run` for the selected private profile. Verify auth origins, `/api/*`, SPA routing, streaming and scheduled cleanup on your own staging deployment first. Builds and dry runs do not upload or provision resources.
 
-Browser analytics use explicit events for navigation, chat lifecycle, note capture and proposal decisions, note-panel controls, persona selection, conversation deletion, and theme changes. Automatic DOM capture and session recordings are disabled. Authentication uses only the opaque Clerk user ID for analytics identity and resets it on logout. Neither interaction events nor Mastra traces include message, note, or reasoning content.
+### GitHub production deployment
 
-Mastra registers both the main chat agent and the semantic annotator with PostHog observability. Export cleanup runs with Worker `waitUntil`, bounded to 1.5 seconds, and disposes per-turn exporters. Analytics errors must not affect conversation output. Unit tests use mocked exporters; live ingestion verification is documented below.
+The manual CI deployment jobs require successful verification and standalone integration checks on `main`. Configure the GitHub `production` environment with:
 
-## Separate application and provisioning credentials
+- Secret `CLOUDFLARE_API_TOKEN`: the deployment token.
+- Secret `WALDEN_APP_WRANGLER_CONFIG`: the exact raw JSONC contents of your private API profile.
+- Secret `WALDEN_LANDING_WRANGLER_CONFIG`: the exact raw JSONC contents of your private landing profile.
+- Variable `WALDEN_PUBLIC_APP_URL`: your app origin.
+- Variable `WALDEN_PUBLIC_SITE_URL`: your landing-page origin.
 
-The token in the root `.env` (`CLOUDFLARE_API_TOKEN`) is reserved for application access. Do not use it for provisioning, migrations, or deployment, and do not broaden its permissions for those operations. The deployed Mastra integration uses the native `AI` binding and does not need this token injected into the Worker.
+The jobs fail when required configuration is missing. Each job writes its profile with mode `0600` and passes it directly to Wrangler. Landing builds receive both public URLs; local landing defaults are `http://localhost:3000` for app links and `http://localhost:4321` for the canonical site URL. Worker secrets remain managed separately from the JSONC profiles.
 
-Use the connected Cloudflare MCP for provisioning where supported, or a separate deployment token supplied explicitly to the deployment process. Never load the application's root `.env` into a deployment command. Clerk secrets remain separate.
+### R2 attachments
 
-## Wrangler deployment token
+Bind your private bucket as `FILES`. Browser uploads through R2 require `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY`; store the access keys as Worker secrets. Adapt `apps/api/r2-cors.json` to your actual browser origins before applying it. Add a lifecycle rule removing abandoned `staging/` objects after one day. Local Wrangler development can use `UPLOAD_LOCAL_FALLBACK=true` instead of browser presigned URLs. See the self-hosting guide for standalone local-file/S3 configuration.
 
-Use a custom token restricted to the deployment account:
+## Optional PostHog
 
-- Account / Workers Scripts / Edit
-- Account / D1 / Edit
-- Account / Account Settings / Read
-- Account / Workers AI / Read and Edit (local or REST inference checks)
-- Account / Workers Tail / Read (diagnostics)
+Telemetry is disabled without `POSTHOG_API_KEY`. Configure your own project ingestion key and optional `POSTHOG_HOST` (default `https://us.i.posthog.com`). `/api/config` exposes only a public `phc_` ingestion key for browser analytics; never use a personal management key there. Browser autocapture and session recording are disabled.
 
-For a separately issued provisioning token, set `CLOUDFLARE_API_TOKEN` only in the deployment process or its CI secret store. Do not commit it. Native deployed inference uses the AI binding and does not require this token as an application secret. The initial workers.dev deployment needs neither Pages nor DNS permissions. A later custom domain additionally needs Zone / Workers Routes / Edit on that zone.
-
-References: https://developers.cloudflare.com/fundamentals/api/reference/permissions/ and https://developers.cloudflare.com/workers-ai/get-started/rest-api/.
-
-
-## Current deployment
-
-Deployed through the Cloudflare MCP on September 17, 2026:
-
-- URL: https://walden.jeremy-herzog.workers.dev
-- Worker: `walden`, serving the React frontend with Workers Static Assets.
-- Bindings: `DB` (D1), `AI` (Workers AI), and `ASSETS`.
-- Model: `@cf/google/gemma-4-26b-a4b-it` through Mastra and the native binding.
-- Scheduled transcript cleanup: `17 * * * *` (UTC).
-- Preview URLs are disabled.
-- Clerk development authentication is configured and required.
-
-Verification: public config returned 200; protected notes returned 401; Chromium loaded the setup screen without page errors. Cloudflare rejected the default Python urllib user agent with error 1010, while Chromium and a browser user agent succeeded.
-
-MCP deployment used a Cloudflare-issued, short-lived assets upload session for local asset transfer and the MCP credential for Worker upload and configuration. The application token was not used. Temporary upload-token files were removed after deployment.
-
-
-## Clerk testing — September 18, 2026
-
-- Clerk CLI 3.3.0 links to application `app_3JU6USCGeA1w4xSM8iiUuMvu96C` (Walden), development instance `ins_3JU6ULlzUU1s7RXDlOQOdTDMs7l`.
-- Frontend uses `@clerk/react`; the Hono API validates Clerk Bearer tokens using `@clerk/backend` and checks authorized frontend origins.
-- Email verification-code and Google sign-in are enabled; passwords are disabled. The Clerk secret is a Cloudflare Worker secret, never a frontend variable. Fresh credentials were retrieved through Clerk's authenticated Platform API without reading existing environment files.
-- Clerk doctor passed. Local and deployed browser checks covered sign-up controls, Google availability, and password absence. Application data requires a valid signed-in session.
-- This is Clerk's development instance; production domain/OAuth setup is a separate launch task.
-
-## Search and PostHog configuration — September 20, 2026
-
-The dedicated US PostHog project is **Walden**, project `619294`:
-https://us.posthog.com/project/619294
-
-Set `POSTHOG_API_KEY` to the public `phc_` project ingestion token and `POSTHOG_HOST=https://us.i.posthog.com` in the Worker and local `.dev.vars`. The public `/api/config` endpoint exposes only a `phc_` project token for the browser; personal API tokens are never exposed there. Browser configuration is runtime configuration, so a separate Vite analytics key is no longer required.
-
-The browser emits standard `$pageview` events, including signed-out visits, with thread paths normalized and query strings removed. Existing explicit chat/note events require an authenticated identity. Autocapture, session recordings, and surveys remain disabled. Server traces preserve model, token, duration, tool, and opaque correlation metadata, with prompt/answer/tool contents removed.
-
-Live local verification confirmed pageviews, chat submission/completion, and `$ai_generation`, `$ai_span`, and `$ai_trace` ingestion. An aggregate check of 389 trace events found no populated input, output, output-choice, state, or tool-content fields. Search subrequests incur separate OpenRouter usage; main generation token counts do not include those subrequests.
-
-`OPENROUTER_API_KEY` is also required in the deployed Worker for public web search. This does not change `AI_PROVIDER=cloudflare` for the main model. Keep the secret out of source and logs.
+Content-free operational traces and explicitly consented visible-conversation capture have different boundaries. Detailed capture fails closed without `POSTHOG_PROJECT_ID` and `POSTHOG_PERSONAL_API_KEY` for deletion management. Keep the personal key server-side and verify opt-out and provider deletion before enabling collection. See [customer data policy](../customer-data-policy.md) for disclosure, retention and deletion requirements.
