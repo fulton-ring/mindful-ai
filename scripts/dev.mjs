@@ -83,7 +83,7 @@ async function main() {
       return;
   }
   if (!(await runPnpm(['exec', 'turbo', 'run', 'build', '--filter=@walden/web'], env))) return;
-  await runPnpm(['exec', 'turbo', 'run', 'dev', '--env-mode=loose'], env);
+  await runPnpm(['exec', 'turbo', 'run', 'dev', '--env-mode=loose', '--log-order=stream'], env);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

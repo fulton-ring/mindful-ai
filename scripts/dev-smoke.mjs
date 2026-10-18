@@ -34,6 +34,8 @@ async function waitFor(check, label, milliseconds = 180_000) {
 function smokeEnvironment(directory, port, apiPort) {
   const env = {
     ...process.env,
+    // Exercise Turbo's CI logging behavior even when this check runs locally.
+    GITHUB_ACTIONS: 'true',
     PORT: String(port),
     WALDEN_API_PORT: String(apiPort),
     APP_URL: `http://localhost:${port}`,
