@@ -279,6 +279,28 @@ test('supplements reject paths outside their directory and missing provenance', 
   );
 });
 
+test('AMD64 LZMA 1.5.1 retains its exact published MIT declaration and reference terms', async (t) => {
+  const root = await fixture(t);
+  const pkg = { name: '@napi-rs/lzma-linux-x64-gnu', version: '1.5.1', license: 'MIT' };
+  await writeFile(join(root, 'package.json'), JSON.stringify(pkg));
+  const inventory = { MIT: [{ paths: [root] }] };
+  const result = await generateNotices(inventory);
+  assert.doesNotMatch(result, /MISSING_LICENSE_TEXT: @napi-rs\/lzma-linux-x64-gnu@1\.5\.1/);
+  assert.match(result, /Package: @napi-rs\/lzma-linux-x64-gnu@1\.5\.1/);
+  assert.match(result, /Source archive member: package\/package.json/);
+  assert.match(
+    result,
+    /Canonical license terms \(reference text; not a package-authored license file\)/,
+  );
+  assert.match(result, /no copyright holder or year has been invented/);
+  assert.match(result, /578e2a50ae69cd627c2953f8fa677efbf89f3087efeafff2db65aa31b81dc136/);
+  await writeFile(join(root, 'package.json'), JSON.stringify({ ...pkg, version: '1.5.2' }));
+  assert.match(
+    await generateNotices(inventory),
+    /MISSING_LICENSE_TEXT: @napi-rs\/lzma-linux-x64-gnu@1\.5\.2/,
+  );
+});
+
 test('all checked-in supplements generate offline with valid provenance and checksums', async (t) => {
   const root = await fixture(t);
   const manifest = JSON.parse(

@@ -5919,6 +5919,11 @@
       "source": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MPL-2.0.txt",
       "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172",
       "canonicalTerms": true
+    },
+    {
+      "path": "lzma-1.5.1/lzma-f164df92d83e095f195d628b1a68a141ae2eb638.tar.gz",
+      "source": "https://codeload.github.com/Brooooooklyn/lzma/tar.gz/f164df92d83e095f195d628b1a68a141ae2eb638",
+      "sha256": "47259ecff2db4931dd43ff75409ee94b732aedcf7756e1a69191646e51794fd7"
     }
   ],
   "components": {
@@ -6870,5 +6875,146 @@
         "path_in_vcs": "crates/swc_visit"
       }
     }
-  ]
+  ],
+  "platformNativeAddons": {
+    "@napi-rs/lzma-linux-x64-gnu@1.5.1": {
+      "platform": "linux",
+      "arch": "x64",
+      "libc": "glibc",
+      "registry": "https://registry.npmjs.org/@napi-rs%2flzma-linux-x64-gnu/1.5.1",
+      "gitHead": "f164df92d83e095f195d628b1a68a141ae2eb638",
+      "npmArchive": {
+        "source": "https://registry.npmjs.org/@napi-rs/lzma-linux-x64-gnu/-/lzma-linux-x64-gnu-1.5.1.tgz",
+        "integrity": "sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ==",
+        "sha256": "e69ca2a96510be330953f5b04b1d74617e7ce5d4487db4876c4b02b8364ef7e7"
+      },
+      "binary": {
+        "path": "package/lzma.linux-x64-gnu.node",
+        "sha256": "1f62f0ff272b69f09dff7c867d840d407f2b43c5b6170fd6af0928ed0f542ed4"
+      },
+      "sourceArchive": "lzma-1.5.1/lzma-f164df92d83e095f195d628b1a68a141ae2eb638.tar.gz",
+      "observedDependencyVersionMethod": "Crate versions in registry source paths embedded in the exact npm native binary; not reconstructed from a fresh Cargo resolution.",
+      "observedDependencies": [
+        {
+          "name": "lzma-rust2",
+          "version": "0.16.5",
+          "license": "Apache-2.0",
+          "source": "https://static.crates.io/crates/lzma-rust2/lzma-rust2-0.16.5.crate",
+          "sha256": "ca93e534d1142d1d0dcca6d25fe302508a5dfb40b302802904577725ea0b695b",
+          "originalLicenseTexts": [
+            {
+              "source": "https://static.crates.io/crates/lzma-rust2/lzma-rust2-0.16.5.crate",
+              "path": "lzma-rust2-0.16.5/LICENSE",
+              "sha256": "43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1",
+              "retainedIn": "libsql-0.5.29-RUST-LICENSES.txt"
+            }
+          ]
+        },
+        {
+          "name": "napi",
+          "version": "3.10.5",
+          "license": "MIT",
+          "source": "https://static.crates.io/crates/napi/napi-3.10.5.crate",
+          "sha256": "6826e5ddc15589b2d68c8ad5321c18e85d40488e93e32962f362e572669bccf6",
+          "originalLicenseTexts": [
+            {
+              "source": "https://raw.githubusercontent.com/napi-rs/napi-rs/970988341eb7f859d2df6da1fb7b12f404a2123e/LICENSE",
+              "path": "LICENSE",
+              "sha256": "3f1ce66533302df3a32edbfdfc0b78f0dd34659e4c1f5817162e5ea3c2297215",
+              "retainedIn": "TOOLING-RUST-SUPPLEMENTAL-LICENSES.txt"
+            }
+          ]
+        },
+        {
+          "name": "napi-sys",
+          "version": "3.2.3",
+          "license": "MIT",
+          "source": "https://static.crates.io/crates/napi-sys/napi-sys-3.2.3.crate",
+          "sha256": "73e43cf2eb0bd1bf95a43c07c076ebd2da5d1e015a71c3d201faeffffcc0ecac",
+          "originalLicenseTexts": [
+            {
+              "source": "https://raw.githubusercontent.com/napi-rs/napi-rs/3812aa748caeb1fdb72d773564827a23307b81d8/LICENSE",
+              "path": "LICENSE",
+              "sha256": "3f1ce66533302df3a32edbfdfc0b78f0dd34659e4c1f5817162e5ea3c2297215",
+              "retainedIn": "TOOLING-RUST-SUPPLEMENTAL-LICENSES.txt"
+            }
+          ]
+        },
+        {
+          "name": "tokio",
+          "version": "1.52.3",
+          "license": "MIT",
+          "source": "https://static.crates.io/crates/tokio/tokio-1.52.3.crate",
+          "sha256": "8fc7f01b389ac15039e4dc9531aa973a135d7a4135281b12d7c1bc79fd57fffe",
+          "originalLicenseTexts": [
+            {
+              "source": "https://static.crates.io/crates/tokio/tokio-1.52.3.crate",
+              "path": "tokio-1.52.3/LICENSE",
+              "sha256": "253cd04c6714889df2d32f3f64d669179a1c95c76ac43c40882c52eb06bc3552",
+              "retainedIn": "libsql-0.5.29-RUST-LICENSES.txt"
+            }
+          ]
+        },
+        {
+          "name": "libloading",
+          "version": "0.9.0",
+          "license": "ISC",
+          "source": "https://static.crates.io/crates/libloading/libloading-0.9.0.crate",
+          "sha256": "754ca22de805bb5744484a5b151a9e1a8e837d5dc232c2d7d8c2e3492edc8b60",
+          "originalLicenseTexts": [
+            {
+              "source": "https://static.crates.io/crates/libloading/libloading-0.9.0.crate",
+              "path": "libloading-0.9.0/LICENSE",
+              "sha256": "b29f8b01452350c20dd1af16ef83b598fea3053578ccc1c7a0ef40e57be2620f",
+              "retainedIn": "libsql-0.5.29-RUST-LICENSES.txt"
+            }
+          ]
+        }
+      ],
+      "rustStandardLibrary": {
+        "version": "1.97.0",
+        "commit": "2d8144b7880597b6e6d3dfd63a9a9efae3f533d3",
+        "method": "ELF .comment rustc version and /rustc/COMMIT/library source paths embedded in the exact binary.",
+        "originalLicenseTexts": [
+          {
+            "source": "https://raw.githubusercontent.com/rust-lang/rust/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/LICENSE-MIT",
+            "sha256": "b71bd43a069ca0641a9ecfe585ca7b3c53b5cc1608f8b68321168698e28b5ea1",
+            "retainedIn": "RUST-STANDARD-LIBRARY-LICENSES.txt"
+          },
+          {
+            "source": "https://raw.githubusercontent.com/rust-lang/rust/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/LICENSE-APACHE",
+            "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+            "retainedIn": "libsql-0.5.29-RUST-SUPPLEMENTAL-LICENSES.txt"
+          },
+          {
+            "source": "https://raw.githubusercontent.com/rust-lang/rust/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/COPYRIGHT",
+            "sha256": "172020dbfd5b53a226dfde77616190a48dcff519b0bc0e6deb91a8450782c4af",
+            "retainedIn": "RUST-STANDARD-LIBRARY-LICENSES.txt"
+          }
+        ]
+      },
+      "allocator": {
+        "declaredDependency": "mimalloc-safe = 0.1 with skip_collect_on_exit and local_dynamic_tls",
+        "resolvedVersion": null,
+        "limitation": "The upstream release explicitly gitignores Cargo.lock; exact resolved mimalloc-safe/libmimalloc-sys2 versions are not claimed.",
+        "noticeCoverage": "All 40 feature-compatible wrapper/sys releases available before npm publication 2026-07-14T01:57:30.232Z were downloaded and their crate-index SHA256 values verified. Their two distinct original MIT notices are already retained byte for byte; this is an attribution superset, not proof of the selected versions.",
+        "originalLicenseTexts": [
+          {
+            "source": "https://static.crates.io/crates/mimalloc-safe/mimalloc-safe-0.1.45.crate",
+            "path": "mimalloc-safe-0.1.45/LICENSE.txt",
+            "sha256": "a08554fab028af3af047e8588d32d019662c1b1bf07959a195a2f75fe340726b",
+            "retainedIn": "rollup-4.63.3-RUST-LICENSES.txt"
+          },
+          {
+            "source": "https://static.crates.io/crates/libmimalloc-sys2/libmimalloc-sys2-0.1.40.crate",
+            "path": "libmimalloc-sys2-0.1.40/c_src/mimalloc/LICENSE",
+            "sha256": "82ade5d7d9b029044b5fbbc326207fc47c2d44ee4dd71e8a559c36d728217de9",
+            "retainedIn": "rollup-4.63.3-RUST-LICENSES.txt"
+          }
+        ]
+      },
+      "nativeImplementation": "lzma-rust2 is pure Rust. Cargo.toml has no liblzma/xz C dependency. The ELF DT_NEEDED list contains only Debian system libraries; liblzma/liblzma-sys in lzma-rust2's own Cargo.lock are benchmark/dev dependencies, not the addon release dependency.",
+      "requiredOnAllArchitectures": false
+    }
+  }
 }

@@ -113,3 +113,24 @@ GNU C++ runtime build provenance also has an upstream limitation: its build
 uses a mutable LLVM-major-version package and builder image, so the exact
 patch-level build cannot be established from its source recipe alone. Original
 LLVM runtime license text is retained with npm attribution.
+
+The Linux x64 GNU store additionally contains `@napi-rs/lzma-linux-x64-gnu@1.5.1`
+through Rollup's optional dependencies in the API production closure. Its exact
+upstream source archive is pinned in `sources.json`. This addon uses pure-Rust
+`lzma-rust2` 0.16.5 (Apache-2.0), rather than the liblzma/xz C library. Binary
+source paths also identify N-API 3.10.5, N-API sys 3.2.3, Tokio 1.52.3, and
+libloading 0.9.0; the compiler records Rust 1.97.0 commit
+`2d8144b7880597b6e6d3dfd63a9a9efae3f533d3`. The original Apache, MIT, ISC,
+and Rust standard-library license texts for these observations are already
+retained byte for byte in the native notices. `platformNativeAddons` records
+original source URLs, archive/binary hashes, and the retained notice paths.
+
+The LZMA release does not publish Cargo.lock. The exact resolved Mimalloc
+wrapper/native-library versions therefore remain unproven. A conservative check
+of all 40 compatible releases published before this npm version found only two
+distinct original MIT notices; both are already retained in the Rollup native
+notices. This check establishes notice coverage without claiming an original
+build lock or substituting the addon's MIT declaration for embedded licenses.
+The observed native dependencies are permissively licensed; no new liblzma/xz
+corresponding-source requirement was identified. This platform-specific record
+is informational and does not require the x64 package on arm64.
