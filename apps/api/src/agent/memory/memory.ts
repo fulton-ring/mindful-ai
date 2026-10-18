@@ -1,9 +1,11 @@
 import type { LanguageModelV3 } from '@ai-sdk/provider';
 import { D1Store } from '@mastra/cloudflare-d1';
 import type { MastraDBMessage } from '@mastra/core/agent';
+import type { MastraCompositeStore } from '@mastra/core/storage';
 import { Memory } from '@mastra/memory';
 import { type Conversation, uiMessageText } from '@walden/contracts';
 import { isInterrupted } from '../../chat/messages';
+import type { AppDatabase } from '../../db/database';
 
 import { D1ObservationalMemory } from './d1-observational-memory';
 import { abortableObservationModel } from './observation-model';
@@ -16,7 +18,7 @@ export type MemoryLifecycleEvent = {
   error?: Error;
 };
 
-const stores = new WeakMap<D1Database, Promise<D1Store>>();
+const stores = new WeakMap<object, Promise<MastraCompositeStore>>();
 /**
  * Older messages are summarized once they pass this many tokens. The models'
  * windows are 256k+, so the threshold is set by cost and latency, not capacity;
@@ -32,27 +34,36 @@ const identity = (ownerId: string, conversationId: string, branchId: string) => 
   resourceId: `user:${ownerId}`,
 });
 
-function storeFor(db: D1Database): Promise<D1Store> {
-  const existing = stores.get(db);
+/** Host startup binds native libSQL/Postgres memory to the application database. */
+export function registerAgentMemoryStore(db: AppDatabase, storage: MastraCompositeStore) {
+  stores.set(db.identity ?? db, Promise.resolve(storage));
+}
+
+function storeFor(db: AppDatabase): Promise<MastraCompositeStore> {
+  const existing = stores.get(db.identity ?? db);
   if (existing) return existing;
+  if (db.dialect) throw new Error('Native agent memory storage is not configured');
   const initialized = (async () => {
     const storage = new D1Store({
       id: 'walden-agent-memory',
-      binding: db,
+      binding: db as D1Database,
       tablePrefix: 'agent_',
     });
-    storage.stores.memory = new D1ObservationalMemory({ binding: db, tablePrefix: 'agent_' });
+    storage.stores.memory = new D1ObservationalMemory({
+      binding: db as D1Database,
+      tablePrefix: 'agent_',
+    });
     await storage.init();
     return storage;
   })();
-  stores.set(db, initialized);
+  stores.set(db.identity ?? db, initialized);
   // A transient initialization failure must not poison every subsequent turn.
-  void initialized.catch(() => stores.delete(db));
+  void initialized.catch(() => stores.delete(db.identity ?? db));
   return initialized;
 }
 
 function createObservationalMemory(
-  storage: D1Store,
+  storage: MastraCompositeStore,
   model: LanguageModelV3,
   signal: AbortSignal,
   observeAt = OBSERVATION_TOKEN_THRESHOLD,
@@ -131,6 +142,7 @@ const toMemoryMessage = (
 });
 
 export type PreparedMemory = {
+  activate?: () => Promise<void>;
   memory: Memory;
   threadId: string;
   resourceId: string;
@@ -139,6 +151,7 @@ export type PreparedMemory = {
 };
 
 type PrepareMemoryOptions = {
+  deferWrites?: boolean;
   model: LanguageModelV3;
   signal: AbortSignal;
   isActive?: () => Promise<boolean>;
@@ -146,7 +159,7 @@ type PrepareMemoryOptions = {
 };
 
 async function syncConversationMessages(
-  storage: D1Store,
+  storage: MastraCompositeStore,
   memory: Memory,
   conversation: Conversation,
   threadId: string,
@@ -184,7 +197,7 @@ async function syncConversationMessages(
   const staleIds = stored.messages.map(({ id }) => id).filter((id) => !authoritativeIds.has(id));
   if (staleIds.length || changed.length) {
     // Regeneration/recovery must not retain observations of the replaced answer.
-    await storage.stores.memory!.clearObservationalMemory(threadId, resourceId);
+    await (await storage.getStore('memory'))!.clearObservationalMemory(threadId, resourceId);
   }
   if (staleIds.length) await memory.deleteMessages(staleIds);
   const changedIds = new Set(changed.map(({ id }) => id));
@@ -229,7 +242,7 @@ async function observeConversation(
 }
 
 export async function prepareAgentMemory(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   conversation: Conversation,
   options: PrepareMemoryOptions,
@@ -238,6 +251,15 @@ export async function prepareAgentMemory(
   const storage = await storeFor(db);
   const memory = createObservationalMemory(storage, options.model, options.signal);
   const { threadId, resourceId } = identity(ownerId, conversation.id, conversation.branchId);
+  if (options.deferWrites)
+    return {
+      memory,
+      threadId,
+      resourceId,
+      activate: async () => {
+        await prepareAgentMemory(db, ownerId, conversation, { ...options, deferWrites: false });
+      },
+    };
   const messages = await syncConversationMessages(
     storage,
     memory,
@@ -297,7 +319,7 @@ async function contextTokens(
  * next turn, whose context is loaded from memory.
  */
 export async function compactAgentMemory(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   conversation: Conversation,
   options: { model: LanguageModelV3; signal: AbortSignal; focus?: string },
@@ -325,7 +347,7 @@ export async function compactAgentMemory(
 }
 
 export async function deleteAgentMemoryThread(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   conversationId: string,
   branchId?: string,
@@ -340,7 +362,10 @@ export async function deleteAgentMemoryThread(
           .bind(conversationId, ownerId)
           .all<{ id: string }>()
       ).results.map(({ id }) => id);
-  for (const id of branchIds)
-    await memory.deleteThread(identity(ownerId, conversationId, id).threadId);
-  await memory.settled();
+  for (const id of branchIds) {
+    const { threadId, resourceId } = identity(ownerId, conversationId, id);
+    await memory.deleteThread(threadId);
+    await memory.settled();
+    await (await storage.getStore('memory'))!.clearObservationalMemory(threadId, resourceId);
+  }
 }

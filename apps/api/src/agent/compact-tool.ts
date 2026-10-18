@@ -2,10 +2,11 @@ import type { LanguageModelV3 } from '@ai-sdk/provider';
 import { createTool } from '@mastra/core/tools';
 import type { Conversation } from '@walden/contracts';
 import { z } from 'zod';
+import type { AppDatabase } from '../db/database';
 import { compactAgentMemory } from './memory/memory';
 
 type CompactToolOptions = {
-  db: D1Database;
+  db: AppDatabase;
   ownerId: string;
   conversation: Conversation;
   /** The default fast model; summaries never use the persona's model. */

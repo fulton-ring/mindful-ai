@@ -229,6 +229,7 @@ export function isExpiredNoteConversation(
   now: Date = new Date(),
 ) {
   if (!conversation?.noteId) return false;
+  if (conversation.expiresAt === null) return false;
   const expiresAt = Date.parse(conversation.expiresAt);
   return Number.isFinite(expiresAt) && expiresAt <= now.getTime();
 }

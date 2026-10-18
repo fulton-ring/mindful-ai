@@ -23,7 +23,11 @@ async function createRetentionFixture() {
       .join('\n'),
   });
   const db = sqliteD1Binding(file);
-  await db.prepare("INSERT INTO users VALUES ('owner','subject','now','now',0)").run();
+  await db
+    .prepare(
+      "INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('owner','subject','now','now',0)",
+    )
+    .run();
   await db
     .prepare(
       "INSERT INTO notes (id,owner_id,markdown,created_at,updated_at) VALUES ('note','owner','Permanent note','now','now')",
@@ -131,7 +135,7 @@ async function resumeArchivedNote(db: D1Database) {
   });
   expect(resumed.messages).toEqual([]);
   expect(resumed.noteId).toBe('note');
-  expect(Date.parse(resumed.expiresAt)).toBeGreaterThan(Date.now());
+  expect(Date.parse(resumed.expiresAt!)).toBeGreaterThan(Date.now());
   await db
     .prepare(
       "INSERT INTO turns (id,request_id,conversation_id,owner_id,status,created_at,branch_id,source_branch_id) VALUES ('resumed','resumed','expired-note','owner','completed','now',?,?)",
@@ -166,7 +170,7 @@ it.each(['scheduled', 'renew'] as const)(
       if (mode === 'renew') {
         const renewed = await loadConversation(db, 'owner', 'expired-note', { renewExpired: true });
         expect(renewed.messages).toEqual([]);
-        expect(Date.parse(renewed.expiresAt)).toBeGreaterThan(Date.now());
+        expect(Date.parse(renewed.expiresAt!)).toBeGreaterThan(Date.now());
       }
       await purgeExpiredConversations(db);
       await assertExpiredCleanup(db, mode);

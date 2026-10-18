@@ -1,4 +1,5 @@
 import { first } from '../db/client';
+import type { AppDatabase, AppStatement } from '../db/database';
 import { HttpError } from '../http';
 
 /** A suggestion status change recorded on a note edit so undo/redo can reverse it. */
@@ -15,7 +16,7 @@ type OperationRequest = { action: string; base_revision: number };
 type ExpectedOperation = { action: string; baseRevision: number };
 
 /** Whether a note edit was already recorded under this client operation ID. */
-export const hasNoteEdit = async (db: D1Database, key: OperationKey) =>
+export const hasNoteEdit = async (db: AppDatabase, key: OperationKey) =>
   Boolean(
     await first<{ id: string }>(
       db
@@ -25,7 +26,7 @@ export const hasNoteEdit = async (db: D1Database, key: OperationKey) =>
   );
 
 /** The recorded undo/redo/decision request for this operation ID, if it already ran. */
-export const loadOperationRequest = (db: D1Database, key: OperationKey) =>
+export const loadOperationRequest = (db: AppDatabase, key: OperationKey) =>
   first<OperationRequest>(
     db
       .prepare(
@@ -48,8 +49,8 @@ export function assertReplayMatches(request: OperationRequest, expected: Expecte
  * operation already recorded it; everything else is reported as `conflict`.
  */
 export async function runIdempotentBatch(
-  db: D1Database,
-  statements: D1PreparedStatement[],
+  db: AppDatabase,
+  statements: AppStatement[],
   options: {
     key: OperationKey;
     expected: ExpectedOperation;

@@ -1,0 +1,20 @@
+{
+  "name": "walden-mastra-portability-spike",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-concurrency=1 portability.test.mjs",
+    "test:candidate": "node candidate.mjs",
+    "prepare:candidate": "node candidate.mjs --prepare"
+  },
+  "dependencies": {
+    "@mastra/core": "1.67.0",
+    "@mastra/libsql": "1.23.0",
+    "@mastra/pg": "1.23.0",
+    "@mastra/redis": "1.4.0",
+    "@mastra/redis-streams": "0.6.3",
+    "ioredis": "5.8.2",
+    "zod": "3.25.76"
+  }
+}

@@ -2,6 +2,7 @@ import { type NoteState, noteDecisionSchema } from '@walden/contracts';
 import { applyAgentProvenance, soleInsertion } from '@walden/domain';
 import type { z } from 'zod';
 import { first } from '../../db/client';
+import type { AppDatabase } from '../../db/database';
 import { HttpError, newId, nowIso } from '../../http';
 import { applySuggestionPatch, loadNoteState } from '../history/history';
 import {
@@ -24,7 +25,7 @@ const decisionAction = (input: DecisionInput, suggestionId: string) =>
   `${input.decision}:${suggestionId}`;
 
 async function loadPendingSuggestion(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   noteId: string,
   suggestionId: string,
@@ -40,7 +41,7 @@ async function loadPendingSuggestion(
 }
 
 async function decideNoteContent(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   noteId: string,
   input: DecisionInput,
@@ -77,7 +78,7 @@ async function decideNoteContent(
 }
 
 const buildDecisionCreates = (
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   noteId: string,
   context: DecisionContext,
@@ -134,7 +135,7 @@ const buildDecisionCreates = (
 };
 
 const buildDecisionUpdates = (
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   noteId: string,
   context: DecisionContext,
@@ -172,7 +173,7 @@ const buildDecisionUpdates = (
 };
 
 const buildDecisionStatements = (
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   noteId: string,
   context: DecisionContext,
@@ -184,7 +185,7 @@ const buildDecisionStatements = (
 ];
 
 async function runDecisionBatch(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   noteId: string,
   context: DecisionContext,
@@ -205,8 +206,8 @@ async function runDecisionBatch(
   );
 }
 
-export async function decideSuggestion(
-  db: D1Database,
+async function decideSuggestionInTransaction(
+  db: AppDatabase,
   ownerId: string,
   noteId: string,
   suggestionId: string,
@@ -231,4 +232,20 @@ export async function decideSuggestion(
   const after = await decideNoteContent(db, ownerId, noteId, input, state, suggestion);
   await runDecisionBatch(db, ownerId, noteId, { input, state, suggestion, after });
   return loadNoteState(db, ownerId, noteId);
+}
+
+export async function decideSuggestion(
+  db: AppDatabase,
+  ownerId: string,
+  noteId: string,
+  suggestionId: string,
+  input: DecisionInput,
+) {
+  return db.transaction
+    ? db.transaction(
+        (connection) =>
+          decideSuggestionInTransaction(connection, ownerId, noteId, suggestionId, input),
+        [`owner:${ownerId}`],
+      )
+    : decideSuggestionInTransaction(db, ownerId, noteId, suggestionId, input);
 }

@@ -1,18 +1,22 @@
 import type { Usage } from '@walden/contracts';
 import { Hono } from 'hono';
-import { loadMessageBudget, messageLimitFrom } from '../chat/turns/message-limit';
+import { loadMessageBudget } from '../chat/turns/message-limit';
 import { first } from '../db/client';
+import { prepareQuery } from '../db/database';
+import { getRequestAccountPolicy } from '../policy/request';
 import type { Bindings, Variables } from '../types';
 
 export const metricsRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 /** The message budget alone, which the composer checks after every reply. */
-metricsRoutes.get('/budget', async (c) =>
-  c.json(await loadMessageBudget(c.env.DB, c.get('userId'), messageLimitFrom(c.env))),
-);
+metricsRoutes.get('/budget', async (c) => {
+  const { policy } = await getRequestAccountPolicy(c);
+  return c.json(await loadMessageBudget(c.env.DB, c.get('userId'), policy.messages));
+});
 metricsRoutes.get('/usage', async (c) => {
   const ownerId = c.get('userId');
+  const { policy } = await getRequestAccountPolicy(c);
   const [budget, sent, favorite] = await Promise.all([
-    loadMessageBudget(c.env.DB, ownerId, messageLimitFrom(c.env)),
+    loadMessageBudget(c.env.DB, ownerId, policy.messages),
     first<{ total: number }>(
       c.env.DB.prepare(
         "SELECT COUNT(*) AS total FROM messages WHERE owner_id=? AND role='user'",
@@ -22,11 +26,14 @@ metricsRoutes.get('/usage', async (c) => {
     // reply records the persona name it was written with, so a renamed or
     // deleted persona still reports something meaningful.
     first<{ persona_name: string }>(
-      c.env.DB.prepare(
-        `SELECT json_extract(ui_message,'$.metadata.personaName') AS persona_name FROM messages
+      prepareQuery(c.env.DB, {
+        sqlite: `SELECT json_extract(ui_message,'$.metadata.personaName') AS persona_name FROM messages
          WHERE owner_id=? AND role='assistant' AND persona_name IS NOT NULL
          GROUP BY persona_name ORDER BY COUNT(DISTINCT conversation_id) DESC, MAX(created_at) DESC LIMIT 1`,
-      ).bind(ownerId),
+        postgres: `SELECT ui_message::jsonb #>> '{metadata,personaName}' AS persona_name FROM messages
+         WHERE owner_id=? AND role='assistant' AND ui_message::jsonb #>> '{metadata,personaName}' IS NOT NULL
+         GROUP BY persona_name ORDER BY COUNT(DISTINCT conversation_id) DESC, MAX(created_at) DESC LIMIT 1`,
+      }).bind(ownerId),
     ),
   ]);
   return c.json({

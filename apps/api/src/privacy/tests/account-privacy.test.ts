@@ -35,7 +35,7 @@ it('enforces per-account preferences and keeps retryable deletion requests after
   try {
     const { DB, app, env } = privacyTestApp(directory);
     await DB.prepare(
-      "INSERT INTO users VALUES ('owner','subject','now','now',0),('other','other','now','now',0)",
+      "INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending,auth_provider) VALUES ('owner','subject','now','now',0,'none'),('other','other','now','now',0,'none')",
     ).run();
     const initial = await app.request('/account/privacy', {}, env);
     expect(await initial.json()).toEqual({

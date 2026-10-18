@@ -1,4 +1,3 @@
-import { ClerkProvider, SignInButton, SignUpButton, UserButton, useAuth } from '@clerk/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import type { AppConfig } from '@walden/contracts';
@@ -7,10 +6,14 @@ import { createRoot } from 'react-dom/client';
 import 'katex/dist/katex.min.css';
 // Keyframes for Streamdown's streaming word animation (`animated` in AnnotatedText).
 import 'streamdown/styles.css';
-import { LegalLinks, LegalPage } from './features/legal/LegalPage';
+import { Authentication } from './features/auth/Authentication';
+import { LegalPage } from './features/legal/LegalPage';
+import { AccountPolicyGate } from './features/policy/AccountPolicyGate';
+import { beginIdentitySession } from './lib/account-identity';
 import { setTokenProvider } from './lib/api';
+import { setRuntimeConfig } from './lib/runtime-config';
 import { isIdentityScopedDraftKey, storageKeys } from './lib/storage-keys';
-import { identifyTelemetry, initializeTelemetry, track } from './lib/telemetry';
+import { initializeTelemetry, track } from './lib/telemetry';
 import { router } from './router';
 import './styles/tokens.css';
 
@@ -53,44 +56,12 @@ function Workspace({
   return (
     <>
       <QueryClientProvider client={client}>
-        <RouterProvider router={router} context={{ authControls: controls, identity }} />
+        <AccountPolicyGate identity={identity}>
+          <RouterProvider router={router} context={{ authControls: controls, identity }} />
+        </AccountPolicyGate>
       </QueryClientProvider>
     </>
   );
-}
-function ClerkWorkspace() {
-  const { isLoaded, isSignedIn, userId, getToken } = useAuth();
-  useEffect(() => {
-    if (isLoaded) identifyTelemetry(isSignedIn ? userId : null);
-  }, [isLoaded, isSignedIn, userId]);
-  if (!isLoaded)
-    return (
-      <main className="empty-state">
-        <p>Loading sign-in…</p>
-      </main>
-    );
-  const controls = isSignedIn ? (
-    <UserButton />
-  ) : (
-    <div className="button-row">
-      <SignInButton mode="modal">
-        <button>Sign in</button>
-      </SignInButton>
-      <SignUpButton mode="modal">
-        <button className="primary">Sign up</button>
-      </SignUpButton>
-    </div>
-  );
-  if (!isSignedIn)
-    return (
-      <main className="empty-state">
-        <h1>Walden</h1>
-        <p>Sign in to continue.</p>
-        {controls}
-        <LegalLinks />
-      </main>
-    );
-  return <Workspace key={userId} identity={userId} getToken={getToken} controls={controls} />;
 }
 async function boot() {
   if (location.pathname === '/privacy' || location.pathname === '/terms') {
@@ -101,23 +72,16 @@ async function boot() {
     const response = await fetch('/api/config');
     if (!response.ok) throw new Error(`Configuration request failed (${response.status})`);
     const config = (await response.json()) as AppConfig;
+    beginIdentitySession();
+    setRuntimeConfig(config);
     void initializeTelemetry(config.telemetry).then(() => {
       track('page_viewed', { route: location.pathname });
     });
-    if (!config.authConfigured || !config.clerkPublishableKey) {
-      root.render(
-        <main className="empty-state">
-          <h1>Walden is being set up</h1>
-          <p>Sign-in is not available yet. Please check back soon.</p>
-        </main>,
-      );
-      return;
-    }
     root.render(
       <StrictMode>
-        <ClerkProvider publishableKey={config.clerkPublishableKey} afterSignOutUrl="/">
-          <ClerkWorkspace />
-        </ClerkProvider>
+        <Authentication config={config}>
+          {(access) => <Workspace key={access.identity} {...access} />}
+        </Authentication>
       </StrictMode>,
     );
   } catch (cause) {

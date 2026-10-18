@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { PERSONA_MODELS, type Persona, type PersonaModel } from '@walden/contracts';
+import { type InferenceModel, type Persona, type PublicInferenceConfig } from '@walden/contracts';
 import { ChevronDown, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../components/ui/select';
+import { useInferenceConfig } from '../../lib/runtime-config';
 import { PERSONA_ICONS, personaIconKey } from './PersonaIcon';
 
 type Props = {
@@ -20,6 +21,9 @@ type Props = {
 
 export function PersonaEditor({ persona, onSave, onDelete, onClose }: Props) {
   const [draft, setDraft] = useState(persona);
+  const catalog = useInferenceConfig();
+  const models = catalog.models.filter(chatModel);
+  const unavailable = Boolean(draft.model && !models.some(({ id }) => id === draft.model));
   const [returnFocus] = useState(() => document.activeElement as HTMLElement | null);
   const [pending, setPending] = useState<'save' | 'delete' | null>(null);
   const [error, setError] = useState('');
@@ -29,7 +33,7 @@ export function PersonaEditor({ persona, onSave, onDelete, onClose }: Props) {
     setError('');
   }, [persona]);
   const busy = pending !== null;
-  const valid = Boolean(draft.name.trim() && draft.prompt.trim());
+  const valid = Boolean(draft.name.trim() && draft.prompt.trim() && !unavailable);
   return (
     <PersonaDialog
       title={persona.id ? 'Edit persona' : 'New persona'}
@@ -37,7 +41,17 @@ export function PersonaEditor({ persona, onSave, onDelete, onClose }: Props) {
       onClose={onClose}
       returnFocus={returnFocus}
     >
-      <PersonaFields draft={draft} busy={busy} onChange={setDraft} />
+      <PersonaFields
+        draft={draft}
+        busy={busy}
+        onChange={setDraft}
+        catalog={{ ...catalog, models }}
+      />
+      {unavailable && (
+        <p className="inline-error" role="alert">
+          The saved model is unavailable on this instance. Select an available model before saving.
+        </p>
+      )}
       {error && (
         <p className="inline-error" role="alert">
           {error}
@@ -99,10 +113,12 @@ function PersonaDialog({
 }
 
 function PersonaFields({
+  catalog,
   draft,
   busy,
   onChange,
 }: {
+  catalog: PublicInferenceConfig;
   draft: Persona;
   busy: boolean;
   onChange(value: Persona): void;
@@ -114,7 +130,8 @@ function PersonaFields({
       <label htmlFor="persona-model">
         Model
         <ModelSelect
-          value={draft.model ?? PERSONA_MODELS[0].id}
+          value={draft.model}
+          catalog={catalog}
           disabled={busy}
           onChange={(model) => onChange({ ...draft, model })}
         />
@@ -213,29 +230,52 @@ function TextFields({
   );
 }
 
+function chatModel(model: InferenceModel) {
+  return (
+    model.inputModalities.includes('text') &&
+    model.outputModalities.includes('text') &&
+    model.supportsTools !== false
+  );
+}
+const DEFAULT_MODEL_CHOICE = '__instance_default__';
 function ModelSelect({
+  catalog,
   value,
   disabled,
   onChange,
 }: {
-  value: PersonaModel;
+  catalog: PublicInferenceConfig;
+  value?: string;
   disabled: boolean;
-  onChange(model: PersonaModel): void;
+  onChange(model: string | undefined): void;
 }) {
   return (
     <Select
-      value={value}
-      disabled={disabled}
-      onValueChange={(model) => onChange(model as PersonaModel)}
+      value={value ?? DEFAULT_MODEL_CHOICE}
+      disabled={disabled || !catalog.models.length}
+      onValueChange={(model) => onChange(model === DEFAULT_MODEL_CHOICE ? undefined : model)}
     >
       <SelectTrigger id="persona-model" aria-label="Model">
         <SelectValue />
         <ChevronDown size={14} aria-hidden />
       </SelectTrigger>
       <SelectContent>
-        {PERSONA_MODELS.map((model) => (
+        <SelectItem
+          value={DEFAULT_MODEL_CHOICE}
+          disabled={!catalog.models.some(({ id }) => id === catalog.defaultModel)}
+        >
+          Default (
+          {catalog.models.find(({ id }) => id === catalog.defaultModel)?.name ?? 'unavailable'})
+        </SelectItem>
+        {value && !catalog.models.some(({ id }) => id === value) && (
+          <SelectItem value={value} disabled>
+            {value} (unavailable)
+          </SelectItem>
+        )}
+        {catalog.models.map((model) => (
           <SelectItem key={model.id} value={model.id}>
-            {model.label}
+            {model.name}
+            {model.weight > 1 ? ` (${model.weight} messages)` : ''}
           </SelectItem>
         ))}
       </SelectContent>

@@ -1,0 +1,4 @@
+Core 1.78.0; focused stream and valid PNG compatibility checks; exits 0
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)

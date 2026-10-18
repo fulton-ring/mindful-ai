@@ -6,6 +6,7 @@ import type {
   WaldenUIMessage,
 } from '@walden/contracts';
 import { resolveEdit } from '@walden/domain';
+import type { AppDatabase } from '../../db/database';
 import { HttpError, newId, nowIso } from '../../http';
 import { selectNote, toNote } from '../../notes/repository';
 import { persistNoteSuggestion } from '../../notes/suggestions/suggestions';
@@ -15,7 +16,7 @@ import { isInterrupted } from '../messages';
 import { createBackgroundSseStream } from '../sse';
 
 type NoteProposalGeneration = {
-  db: D1Database;
+  db: AppDatabase;
   ownerId: string;
   conversation: Conversation;
   assistantMessage: WaldenUIMessage;
@@ -38,7 +39,7 @@ type PendingSuggestion = {
 type EmitProposal = (event: NoteProposalEvent) => boolean;
 
 export async function loadNote(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   id: string | null,
 ): Promise<Note | null> {
@@ -48,7 +49,7 @@ export async function loadNote(
   return toNote(row);
 }
 
-async function removeCancelledPendingSuggestion(db: D1Database, input: PendingSuggestion) {
+async function removeCancelledPendingSuggestion(db: AppDatabase, input: PendingSuggestion) {
   await db
     .prepare(
       `DELETE FROM note_suggestions
@@ -114,7 +115,11 @@ async function latestProposalNote(
     (message) =>
       message.id === assistantMessage.id && message.role === 'assistant' && !isInterrupted(message),
   );
-  if (!sourceStillExists || latest.expiresAt <= nowIso() || latest.noteId !== conversation.noteId) {
+  if (
+    !sourceStillExists ||
+    (latest.expiresAt !== null && latest.expiresAt <= nowIso()) ||
+    latest.noteId !== conversation.noteId
+  ) {
     emit({ type: 'done', proposal: null });
     return null;
   }

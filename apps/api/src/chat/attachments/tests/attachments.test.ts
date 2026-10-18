@@ -96,6 +96,100 @@ describe('attachment cleanup', () => {
   });
 });
 
+describe('attachment buffer safety', () => {
+  it('loads accepted text/document metadata without buffering their object bodies', async () => {
+    const cancel = vi.fn();
+    const body = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array(1));
+        controller.close();
+      },
+      cancel,
+    });
+    const read = vi.spyOn(body, 'getReader');
+    const bucket = {
+      get: async () => ({
+        size: 100_000_000,
+        body,
+        customMetadata: { name: 'large.pdf' },
+        httpMetadata: { contentType: 'application/pdf' },
+      }),
+    };
+    expect((await loadAttachments(bucket as never, 'owner', 'thread', ['accepted']))[0]?.size).toBe(
+      100_000_000,
+    );
+    expect(read).not.toHaveBeenCalled();
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it('rejects oversized inline images before allocating their bytes independently of quota', async () => {
+    const arrayBuffer = vi.fn(async () => new Uint8Array(1).buffer);
+    const bucket = {
+      get: async () => ({
+        size: 32_000_001,
+        httpMetadata: { contentType: 'image/png' },
+        customMetadata: { name: 'large.png' },
+        arrayBuffer,
+      }),
+    };
+    await expect(loadAttachments(bucket as never, 'owner', 'thread', ['accepted'])).rejects.toThrow(
+      'image',
+    );
+    expect(arrayBuffer).not.toHaveBeenCalled();
+  });
+});
+
+describe('attachment account limits', () => {
+  it('uses finite, zero and unlimited account limits for new uploads', () => {
+    const file = new File(['hello'], 'notes.txt', { type: 'text/plain' });
+    expect(() => validateAttachmentFile(file, { maxBytes: 3, maxFiles: 1 })).toThrow();
+    expect(() => validateAttachmentFile(file, { maxBytes: null, maxFiles: 0 })).toThrow();
+    expect(
+      validateAttachmentFile(
+        new File([new Uint8Array(1_000_001)], 'large.txt', { type: 'text/plain' }),
+        { maxBytes: null, maxFiles: null },
+      ),
+    ).toBe('text');
+  });
+
+  it('reads previously accepted larger files after downgrade but enforces new reference counts', async () => {
+    const bytes = new Uint8Array(1_000_001).fill(120);
+    const get = async () => ({
+      size: bytes.length,
+      httpMetadata: { contentType: 'text/plain' },
+      customMetadata: { name: 'large.txt' },
+      arrayBuffer: async () => bytes.buffer,
+    });
+    const bucket = { get } as never;
+    const limits = { maxBytes: 3, maxFiles: 1 };
+    expect((await loadAttachments(bucket, 'owner', 'thread', ['one'], limits))[0]?.size).toBe(
+      bytes.length,
+    );
+    await expect(
+      loadAttachments(bucket, 'owner', 'thread', ['one', 'two'], limits),
+    ).rejects.toThrow();
+    expect(
+      await loadAttachments(
+        bucket,
+        'owner',
+        'thread',
+        ['one', 'two', 'three', 'four', 'five', 'six'],
+        { maxBytes: null, maxFiles: null },
+      ),
+    ).toHaveLength(6);
+    expect(
+      await loadAttachments(bucket, 'owner', 'thread', [
+        'one',
+        'two',
+        'three',
+        'four',
+        'five',
+        'six',
+      ]),
+    ).toHaveLength(6);
+  });
+});
+
 describe('chat attachments', () => {
   it('rejects files above the free limit and unsupported media', () => {
     expect(() =>

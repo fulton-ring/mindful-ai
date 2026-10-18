@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 
 import { api } from '../../../../../lib/api';
+import type { ActiveTurn } from '../../../../../lib/durable-turn-transport';
 import type { TurnArgs } from '../session/turn-args';
 import { adoptResumedTurn } from '../session/use-chat-session';
 import type { AbortReason, ChatRuntimeState } from '../state/use-chat-runtime-state';
@@ -34,6 +35,39 @@ function resetDisplay(args: TurnArgs) {
     window.clearTimeout(display.recentAnimationTimeout.current);
 }
 
+async function historyForResumedTurn(args: TurnArgs, turn: ActiveTurn) {
+  const conversation = args.runtime.latestConversation.current;
+  // Refresh committed history; adoption also merges the active turn's canonical user,
+  // which can remain beyond the branch head until its assistant reply commits.
+  if (!conversation?.messages.some(({ id }) => id === turn.userMessageId))
+    return api.conversation(turn.conversationId, turn.branchId);
+  return conversation;
+}
+
+async function hydrateIdleConversation(
+  args: TurnArgs,
+  scope: Pick<ActiveTurn, 'conversationId' | 'branchId'>,
+  obsolete: () => boolean,
+) {
+  const conversation = await api.conversation(scope.conversationId, scope.branchId);
+  if (obsolete()) return;
+  args.runtime.latestConversation.current = conversation;
+  args.chat.setMessages(conversation.messages);
+  void args.props.onConversation(conversation);
+}
+
+async function attachResumedTurn(args: TurnArgs, turn: ActiveTurn, obsolete: () => boolean) {
+  const conversation = await historyForResumedTurn(args, turn);
+  if (obsolete()) return;
+  const messages = conversation.messages;
+  const canonicalUser =
+    turn.userMessage?.role === 'user' && turn.userMessage.id === turn.userMessageId;
+  if (!messages.some(({ id }) => id === turn.userMessageId) && !canonicalUser) return;
+  args.runtime.latestConversation.current = conversation;
+  adoptResumedTurn(args, turn, messages);
+  void args.chat.resumeStream({ body: { turnId: turn.id } });
+}
+
 /** Another thread or branch opened: detach, show its messages, and resume its running turn. */
 function switchConversation(args: TurnArgs) {
   const { runtime, props, chat } = args;
@@ -57,14 +91,38 @@ function useResumeEffect(args: TurnArgs) {
   useEffect(() => {
     if (!conversationId || !branchId) return;
     let cancelled = false;
+    let retry: number | undefined;
+    let reservation: ActiveTurn | null = null;
+    let generation = 0;
     const resume = () => {
       if (args.runtime.live.current) return;
+      const request = ++generation;
+      const initial = args.runtime.latestConversation.current;
+      const obsolete = () =>
+        cancelled ||
+        request !== generation ||
+        Boolean(args.runtime.live.current) ||
+        args.runtime.latestConversation.current !== initial;
       void api
         .activeTurn(conversationId, branchId)
-        .then(({ turn }) => {
-          if (!turn || cancelled || args.runtime.live.current) return;
-          adoptResumedTurn(args, turn);
-          void args.chat.resumeStream({ body: { turnId: turn.id } });
+        .then(async ({ turn }) => {
+          if (obsolete()) return;
+          if (!turn) {
+            await hydrateIdleConversation(
+              args,
+              reservation ?? { conversationId, branchId },
+              obsolete,
+            );
+            return;
+          }
+          // A reserved turn is visible before its user and execution input are committed.
+          if (!turn.userMessageId) {
+            reservation = turn;
+            window.clearTimeout(retry);
+            retry = window.setTimeout(resume, 250);
+            return;
+          }
+          await attachResumedTurn(args, turn, obsolete);
         })
         .catch(() => undefined);
     };
@@ -76,6 +134,7 @@ function useResumeEffect(args: TurnArgs) {
     window.addEventListener('focus', resume);
     return () => {
       cancelled = true;
+      window.clearTimeout(retry);
       document.removeEventListener('visibilitychange', resumeWhenVisible);
       window.removeEventListener('focus', resume);
     };

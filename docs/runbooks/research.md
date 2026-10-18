@@ -6,8 +6,30 @@ The main Mastra agent uses direct tools, with no separate research-agent framewo
 
 - `OPENROUTER_API_KEY` enables `searchWeb`. The tool uses Gemma through OpenRouter's managed Exa search, independently of the main chat provider. Production chat remains on Workers AI.
 - `BROWSER`, `AI_SEARCH`, and `AI_SEARCH_INSTANCE` enable page reading and the saved-source index. Local development can use the existing Cloudflare application token and account ID for REST transport.
-- Run `pnpm dev`. Web runs on 5173; the API runs on 8787 with local D1 storage. Local config reads the root `.env` and `apps/api/.dev.vars`.
+- `pnpm dev` runs standalone development at port 3000 with the native API on 3001, root `.env`, SQLite and the local saved-source index. `pnpm dev:cloudflare` selects Vite 5173 / Wrangler 8787 with local D1; that mode reads root `.env` and `apps/api/.dev.vars`.
 - Deployment credentials remain separate from the application's Cloudflare token. Do not load the root `.env` into Wrangler deployment commands.
+
+## Dedicated Cloudflare verification
+
+The `walden-e2e` instance in the default namespace uses built-in storage and text metadata
+fields `owner_scope` and `source_url`. Its cache is disabled so indexing and deletion checks
+observe current results. The existing application token has the required AI Search Edit and
+Run access. Private `apps/api/.env.live` selects this instance through `AI_SEARCH_INSTANCE`.
+
+```sh
+pnpm --filter @walden/api test:search:live
+```
+
+The opt-in test uploads a synthetic page under a unique owner scope, waits for indexed
+retrieval, verifies another scope cannot retrieve it, deletes that scope's content and waits
+for deletion to become visible in search. The instance remains available for future runs.
+Ordinary tests skip these remote operations. Cloudflare limits item listing to 50 per page;
+cleanup collects all matching pages before deleting to avoid skipping entries.
+
+Verified on 2026-10-18 against the actual service, including indexed retrieval, owner
+isolation and eventual deletion. A failed cleanup revealed the old 100-item page size;
+the adapter now uses 50, with a regression covering 51 files across two pages. Existing
+`mindful-ai-sources` content and standalone `.data` were not used by this check.
 
 ## Tool behavior
 

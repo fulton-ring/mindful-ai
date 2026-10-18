@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Hono } from 'hono';
@@ -10,14 +10,16 @@ import { conversationRoutes } from '../conversations';
 
 it('searches owned thread titles, messages, and note text while respecting expiry', async () => {
   const file = join(mkdtempSync(join(tmpdir(), 'walden-conversation-search-')), 'test.sqlite');
-  const schema = readFileSync(
-    new URL('../../../../migrations/0000_baseline.sql', import.meta.url),
-    'utf8',
-  );
+  const directory = new URL('../../../../migrations/', import.meta.url);
+  const schema = readdirSync(directory)
+    .filter((name) => name.endsWith('.sql'))
+    .sort()
+    .map((name) => readFileSync(new URL(name, directory), 'utf8'))
+    .join('\n');
   execFileSync('sqlite3', [file], {
     input: `${schema}
-      INSERT INTO users VALUES ('owner','owner-subject','now','now',0);
-      INSERT INTO users VALUES ('other','other-subject','now','now',0);
+      INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('owner','owner-subject','now','now',0);
+      INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('other','other-subject','now','now',0);
       INSERT INTO notes (id,owner_id,markdown,revision,provenance_json,created_at,updated_at,title)
         VALUES ('note','owner','The stroma contains enzymes.',0,'[]','now','now','Botany');
       INSERT INTO conversations (id,owner_id,note_id,title,last_user_activity_at,expires_at,status,created_at) VALUES

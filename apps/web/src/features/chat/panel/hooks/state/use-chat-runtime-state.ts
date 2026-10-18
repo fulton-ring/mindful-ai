@@ -23,13 +23,13 @@ export type LiveTurn = {
   snapshot: WaldenUIMessage[];
   draft?: SentDraft;
   title?: string;
-  expiresAt?: string;
+  expiresAt?: string | null;
   failureCode?: ChatFailureCode;
   startedAt: number;
 };
 
 /** Why the next aborted finish happened; only a Stop turns into an interrupted reply. */
-export type AbortReason = 'stop' | 'switch' | 'unmount';
+export type AbortReason = 'stop' | 'switch' | 'unmount' | 'replace';
 
 export function useChatRuntimeState(conversation: Conversation | null, scopeId: string | null) {
   return {

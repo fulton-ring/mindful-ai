@@ -1,6 +1,8 @@
 import type { InferUIMessageChunk, UIMessage } from 'ai';
 import { z } from 'zod';
 
+export * from './policy';
+
 export const provenanceSpanSchema = z.object({
   from: z.number().int().nonnegative(),
   to: z.number().int().nonnegative(),
@@ -89,19 +91,15 @@ export const PERSONA_MODELS = [
   { id: '@cf/google/gemma-4-26b-a4b-it', label: 'Gemma 4', weight: 1 },
   { id: '@cf/qwen/qwen3.8-27b', label: 'Qwen 3.8', weight: 2 },
 ] as const;
-export type PersonaModel = (typeof PERSONA_MODELS)[number]['id'];
+export type PersonaModel = string;
 /** Models outside the persona list (such as a development provider override) cost 1. */
 export const modelWeight = (modelId: string): number =>
   PERSONA_MODELS.find(({ id }) => id === modelId)?.weight ?? 1;
-const personaModelIds = PERSONA_MODELS.map((model) => model.id) as [
-  PersonaModel,
-  ...PersonaModel[],
-];
 export const personaSchema = z.object({
   id: z.string(),
   name: z.string().min(1).max(80),
   prompt: z.string().max(4000),
-  model: z.enum(personaModelIds).optional(),
+  model: z.string().trim().min(1).max(500).optional(),
   icon: personaIconSchema.optional(),
   brevity: z.enum(['brief', 'balanced', 'detailed']),
   challenge: z.enum(['gentle', 'balanced', 'direct']),
@@ -193,12 +191,13 @@ export type WaldenDataParts = {
   intervention: Intervention;
   'learning-check-response': LearningCheckResponse;
   status: { text: string };
+  'turn-replace': { turnId: string; generation: number };
   turn: {
     conversationId: string;
     branchId: string;
     userMessageId?: string;
     title?: string;
-    expiresAt?: string;
+    expiresAt?: string | null;
     failureCode?: ChatFailureCode;
   };
 };
@@ -208,12 +207,13 @@ export const dataPartSchemas = {
     (value) => typeof value === 'object' && value !== null,
   ),
   status: z.object({ text: z.string() }),
+  'turn-replace': z.object({ turnId: z.string(), generation: z.number().int().nonnegative() }),
   turn: z.object({
     conversationId: z.string(),
     branchId: z.string(),
     userMessageId: z.string().optional(),
     title: z.string().optional(),
-    expiresAt: z.string().optional(),
+    expiresAt: z.string().nullable().optional(),
     failureCode: z.string().optional(),
   }),
 } satisfies { [K in keyof WaldenDataParts]: z.ZodType<unknown> };
@@ -228,14 +228,14 @@ export type ConversationBranch = {
   id: string;
   forkedFromMessageId: string | null;
   headMessageId: string | null;
-  expiresAt: string;
+  expiresAt: string | null;
 };
 export type Conversation = {
   id: string;
   title: string;
   noteId: string | null;
   messages: WaldenUIMessage[];
-  expiresAt: string;
+  expiresAt: string | null;
   /** False only when the user has turned learning checks off for this thread. */
   learningChecksEnabled: boolean;
   /** Defaults to on for existing conversations. */
@@ -250,7 +250,7 @@ export type ConversationSummary = {
   noteId: string | null;
   title: string;
   updatedAt: string;
-  expiresAt: string;
+  expiresAt: string | null;
 };
 export type ChatFailureCode =
   | 'cancelled'
@@ -283,7 +283,7 @@ export const chatRequestSchema = z
     branchId: z.string().min(1),
     noteRevision: z.number().int().nonnegative().nullable(),
     message: z.string().max(16000),
-    attachmentIds: z.array(z.string().uuid()).max(5).optional(),
+    attachmentIds: z.array(z.string().uuid()).optional(),
     learningCheckResponse: z
       .object({
         checkId: z.string().min(1).max(200),
@@ -343,16 +343,53 @@ export const messageFollowupRequestSchema = z
       });
   });
 export type MessageFollowupRequest = z.infer<typeof messageFollowupRequestSchema>;
+export type AuthMode = 'none' | 'clerk' | 'better-auth';
+export type PublicAuthConfig =
+  | { mode: 'none' }
+  | { mode: 'clerk'; publishableKey: string }
+  | { mode: 'better-auth' };
+export type InferenceModel = {
+  id: string;
+  name: string;
+  description?: string;
+  weight: number;
+  inputModalities: string[];
+  outputModalities: string[];
+  supportsTools: boolean | null;
+  supportsStructuredOutput: boolean | null;
+};
+export type PublicInferenceConfig = {
+  configured: boolean;
+  provider?: 'cloudflare' | 'openrouter' | 'openai-compatible';
+  defaultModel?: string;
+  models: InferenceModel[];
+  catalogSource: 'builtin' | 'discovered' | 'configured' | 'unavailable';
+  catalogStale: boolean;
+};
+export type RuntimeCapabilities = {
+  documentExtraction: boolean;
+  documentTypes: string[];
+  renderedPageRead: boolean;
+  pageLinks: boolean;
+  pageScreenshot: boolean;
+  savedSourceSearch: boolean;
+  webSearch: boolean;
+};
 export type AppConfig = {
+  /** Compatibility fields for tabs opened before runtime configuration was versioned. */
   authConfigured: boolean;
   modelConfigured: boolean;
   clerkPublishableKey?: string;
+  auth?: PublicAuthConfig;
+  inference?: PublicInferenceConfig;
+  capabilities?: RuntimeCapabilities;
+  turnProtocolVersion?: 2;
   telemetry?: { key: string; host: string };
 };
 /** The anchored message budget: the first message opens a window that resets in full. */
 export type MessageBudget = {
   used: number;
-  limit: number;
+  limit: number | null;
   windowHours: number;
   /** When the current window ends, or null when no window is open. */
   resetsAt: string | null;

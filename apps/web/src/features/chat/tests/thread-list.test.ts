@@ -120,3 +120,13 @@ it('separates retained notes and sorts them by edit time', () => {
   expect(groups.map(({ label }) => label)).toEqual(['Today', 'Notes']);
   expect(groups[1]?.threads.map(({ id }) => id)).toEqual(['newer', 'older']);
 });
+
+it('shows no expiry without classifying a permanent conversation as an expired retained note', () => {
+  const item = {
+    ...thread('permanent', 'Permanent', now.toISOString()),
+    expiresAt: null,
+    noteId: 'note',
+  };
+  expect(threadRetention(item, now)).toBe('No expiry');
+  expect(sidebarGroups([item], now).map((group) => group.label)).not.toContain('Notes');
+});

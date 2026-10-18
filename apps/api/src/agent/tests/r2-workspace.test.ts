@@ -74,3 +74,10 @@ it('lists and searches extension-aware R2 files and converted sidecars under pla
     'violet otter 731',
   );
 });
+
+it('reports normal missing-file probes as ENOENT without accessing another path', async () => {
+  const filesystem = new R2WorkspaceFilesystem(bucket as never, 'owner', 'thread');
+  await expect(filesystem.readFile('/.gitignore')).rejects.toMatchObject({ code: 'ENOENT' });
+  await expect(filesystem.stat('/attachments/../other')).rejects.toMatchObject({ code: 'ENOENT' });
+  expect(await filesystem.exists('/.gitignore')).toBe(false);
+});

@@ -1,4 +1,5 @@
 import type {
+  AccountPolicy,
   AnnotationEvent,
   ChatRequest,
   Conversation,
@@ -15,7 +16,10 @@ import type {
   ProvenanceSpan,
   TurnStart,
   Usage,
+  WaldenUIMessage,
 } from '@walden/contracts';
+
+import { checkIdentityFailure, identityRequestScope } from './account-identity';
 
 export class ApiError extends Error {
   constructor(
@@ -34,19 +38,40 @@ export function setTokenProvider(provider: TokenProvider | null) {
   tokenProvider = provider;
 }
 
+async function identityChecked(response: Response): Promise<Response> {
+  if (response.status === 409)
+    checkIdentityFailure(
+      await response
+        .clone()
+        .json()
+        .catch(() => undefined),
+    );
+  return response;
+}
 async function fetchWithFreshAuth(path: string, init?: RequestInit): Promise<Response> {
-  const firstToken = await tokenProvider?.();
+  // Capture before awaiting tokens: old requests must never inherit a new account.
+  const scope = identityRequestScope(init?.signal ?? undefined);
+  const provider = tokenProvider;
+  const firstToken = await provider?.();
+  scope.signal.throwIfAborted();
   const headers = new Headers(init?.headers);
   if (!(init?.body instanceof FormData) && !headers.has('content-type'))
     headers.set('content-type', 'application/json');
+  if (scope.accountId) headers.set('X-Walden-Account-Id', scope.accountId);
   if (firstToken) headers.set('authorization', `Bearer ${firstToken}`);
-  const response = await fetch(path, { ...init, headers });
-  if (response.status !== 401 || !firstToken || !tokenProvider) return response;
-  const refreshedToken = await tokenProvider({ skipCache: true });
+  const response = await identityChecked(
+    await fetch(path, { ...init, headers, signal: scope.signal }),
+  );
+  if (response.ok) scope.signal.throwIfAborted();
+  if (response.status !== 401 || !firstToken || !provider) return response;
+  const refreshedToken = await provider({ skipCache: true });
+  scope.signal.throwIfAborted();
   if (!refreshedToken || refreshedToken === firstToken) return response;
   const retryHeaders = new Headers(headers);
   retryHeaders.set('authorization', `Bearer ${refreshedToken}`);
-  return fetch(path, { ...init, headers: retryHeaders });
+  return identityChecked(
+    await fetch(path, { ...init, headers: retryHeaders, signal: scope.signal }),
+  );
 }
 
 function sendWithProgress(
@@ -125,27 +150,35 @@ async function uploadLocal(
   signal?: AbortSignal,
   onProgress?: UploadProgress,
 ): Promise<AttachmentMetadata> {
+  const scope = identityRequestScope(signal);
+  const provider = tokenProvider;
+  signal = scope.signal;
+  const accountHeaders: Record<string, string> = scope.accountId
+    ? { 'X-Walden-Account-Id': scope.accountId }
+    : {};
   const form = new FormData();
   form.set('file', file);
-  const token = await tokenProvider?.();
+  const token = await provider?.();
+  signal.throwIfAborted();
   let response = onProgress
     ? await sendWithProgress(
         base,
         form,
         'POST',
-        token ? { authorization: `Bearer ${token}` } : {},
+        { ...accountHeaders, ...(token ? { authorization: `Bearer ${token}` } : {}) },
         signal,
         onProgress,
       )
     : await fetchWithFreshAuth(base, { method: 'POST', body: form, signal });
-  if (response.status === 401 && onProgress && token && tokenProvider) {
-    const refreshed = await tokenProvider({ skipCache: true });
+  if (response.status === 401 && onProgress && token && provider) {
+    const refreshed = await provider({ skipCache: true });
+    signal.throwIfAborted();
     if (refreshed && refreshed !== token)
       response = await sendWithProgress(
         base,
         form,
         'POST',
-        { authorization: `Bearer ${refreshed}` },
+        { ...accountHeaders, authorization: `Bearer ${refreshed}` },
         signal,
         onProgress,
       );
@@ -154,6 +187,8 @@ async function uploadLocal(
     response instanceof Response
       ? await response.json().catch(() => undefined)
       : (response.body as { error?: string } | undefined);
+  checkIdentityFailure(body);
+  if (response.status >= 200 && response.status < 300) signal.throwIfAborted();
   if (response.status < 200 || response.status >= 300)
     throw new ApiError(response.status, body?.error ?? 'Could not upload file.');
   onProgress?.(100);
@@ -188,6 +223,7 @@ export async function fetchAttachment(url: string, signal?: AbortSignal) {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const scope = identityRequestScope(init?.signal ?? undefined);
   const response = await fetchWithFreshAuth(path, init);
   const body = response.status === 204 ? undefined : await response.json().catch(() => undefined);
   if (!response.ok)
@@ -198,6 +234,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         `Request failed (${response.status})`,
       body,
     );
+  scope.signal.throwIfAborted();
   return ((body as { data?: T } | undefined)?.data ?? body) as T;
 }
 
@@ -293,6 +330,7 @@ async function streamError(response: Response, fallback: string): Promise<never>
 }
 
 export const api = {
+  accountPolicy: () => request<AccountPolicy>('/api/account/policy'),
   accountPrivacy: () =>
     request<{ enabled: boolean; acknowledged: boolean; version: string }>('/api/account/privacy'),
   setAccountPrivacy: (enabled: boolean, version: string) =>
@@ -420,6 +458,7 @@ export const api = {
         conversationId: string;
         branchId: string;
         userMessageId: string | null;
+        userMessage?: WaldenUIMessage;
         regenerateMessageId?: string;
         editMessageId?: string;
       } | null;
@@ -437,7 +476,7 @@ export const api = {
   turnEvents: async (turnId: string, after: number, signal?: AbortSignal) => {
     const response = await fetchWithFreshAuth(
       path`/api/chat/turns/${turnId}/events?after=${after}`,
-      { signal, headers: { accept: 'text/event-stream' } },
+      { signal, headers: { accept: 'text/event-stream', 'X-Walden-Turn-Protocol': '2' } },
     );
     if (response.status === 204) return null;
     if (!response.ok || !response.body)
@@ -456,7 +495,7 @@ export const api = {
   updatePersona: (value: Persona) =>
     request<Persona>(path`/api/personas/${value.id}`, {
       method: 'PATCH',
-      body: JSON.stringify(value),
+      body: JSON.stringify({ ...value, model: value.model ?? null }),
     }),
   deletePersona: (id: string) => request<void>(path`/api/personas/${id}`, { method: 'DELETE' }),
   usage: () => request<Usage>('/api/usage'),

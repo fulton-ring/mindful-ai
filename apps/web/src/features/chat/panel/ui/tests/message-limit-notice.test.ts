@@ -32,3 +32,24 @@ describe('message limit notice', () => {
     expect(messageLimitNotice(null, glm, false, now)).toBeNull();
   });
 });
+
+it('never blocks an explicitly unlimited message budget', () => {
+  expect(
+    messageLimitNotice(
+      {
+        used: 1000,
+        limit: null,
+        windowHours: 4,
+        resetsAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+      undefined,
+      false,
+    ),
+  ).toBeNull();
+});
+
+it('explains an account with no message allowance before its first window exists', () => {
+  expect(
+    messageLimitNotice({ used: 0, limit: 0, windowHours: 4, resetsAt: null }, undefined, false),
+  ).toBe('Messages are disabled for this account.');
+});

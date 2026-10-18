@@ -5,6 +5,7 @@ import {
   type ReadOptions,
 } from '@mastra/core/workspace';
 import { attachmentKey, attachmentWorkspacePath } from '../chat/attachments/attachments';
+import type { ObjectStore } from '../storage/object-store';
 
 /** Read-only view of one thread's private uploads for Mastra's native file tools. */
 export class R2WorkspaceFilesystem extends MastraFilesystem {
@@ -16,7 +17,7 @@ export class R2WorkspaceFilesystem extends MastraFilesystem {
   private readonly prefix: string;
 
   constructor(
-    private readonly bucket: R2Bucket,
+    private readonly bucket: ObjectStore,
     ownerId: string,
     conversationId: string,
   ) {
@@ -28,9 +29,13 @@ export class R2WorkspaceFilesystem extends MastraFilesystem {
     return 'User attachments are in /attachments. Read or grep text files as needed. For a PDF, DOCX, or XLSX, call extractDocument first, then read or grep its returned Markdown path. Images can be viewed as media.';
   }
 
+  private notFound(): Error {
+    return Object.assign(new Error('Attachment not found'), { code: 'ENOENT' });
+  }
+
   private key(path: string): string {
     const match = /^\/?attachments\/([a-f0-9-]{36})(\.[a-z0-9]+(?:\.[a-z0-9]+)?)?$/.exec(path);
-    if (!match) throw new Error('Invalid attachment path');
+    if (!match) throw this.notFound();
     const [, id, extension] = match;
     return this.prefix + id + (/^\.(pdf|docx|xlsx)\.md$/.test(extension ?? '') ? '.md' : '');
   }
@@ -48,9 +53,9 @@ export class R2WorkspaceFilesystem extends MastraFilesystem {
 
   async readFile(path: string, options?: ReadOptions): Promise<string | Buffer> {
     const object = await this.bucket.get(this.key(path));
-    if (!object) throw new Error('Attachment not found');
+    if (!object) throw this.notFound();
     if (this.pathForObject(this.key(path), object.customMetadata?.name ?? '') !== path)
-      throw new Error('Attachment not found');
+      throw this.notFound();
     const bytes = Buffer.from(await object.arrayBuffer());
     return options?.encoding ? bytes.toString(options.encoding) : bytes;
   }
@@ -76,9 +81,9 @@ export class R2WorkspaceFilesystem extends MastraFilesystem {
         modifiedAt: new Date(0),
       };
     const object = await this.bucket.head(this.key(path));
-    if (!object) throw new Error('Attachment not found');
+    if (!object) throw this.notFound();
     if (this.pathForObject(this.key(path), object.customMetadata?.name ?? '') !== path)
-      throw new Error('Attachment not found');
+      throw this.notFound();
     return {
       name: object.customMetadata?.name ?? path.split('/').at(-1) ?? 'attachment',
       path,

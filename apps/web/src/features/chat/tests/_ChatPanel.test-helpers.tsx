@@ -383,7 +383,9 @@ beforeEach(() => {
   transport.startTurn.mockReset();
   transport.turnEvents.mockReset();
   transport.turnEvents.mockImplementation(async (turnId: string) => serveTurn(turnId));
-  transport.conversation.mockReset();
+  transport.conversation
+    .mockReset()
+    .mockRejectedValue(new Error('Conversation refresh unavailable'));
   transport.streamMessageAnnotations.mockImplementation(
     async (
       messageId: string,

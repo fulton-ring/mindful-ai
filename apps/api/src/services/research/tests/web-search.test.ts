@@ -77,3 +77,12 @@ it('retries once when the search provider fails upstream, and reports a second f
   await expect(search.execute({ query: 'another topic' })).rejects.toThrow('unavailable');
   expect(fetcher).toHaveBeenCalledTimes(4);
 });
+it('uses the server configured search model', async () => {
+  const { fetcher } = fixture([]);
+  const tool = createWebSearchTools(
+    { OPENROUTER_API_KEY: 'test', OPENROUTER_SEARCH_MODEL: 'vendor/search-model' },
+    new AbortController().signal,
+  ).searchWeb as unknown as { execute: (input: { query: string }) => Promise<unknown> };
+  await tool.execute({ query: 'public topic' });
+  expect(JSON.parse(fetcher.mock.calls[0][1].body).model).toBe('vendor/search-model');
+});

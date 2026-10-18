@@ -1,17 +1,19 @@
-import { createClerkClient } from '@clerk/backend';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { deleteAccountIdentity } from '../auth/delete-identity';
 import { deleteAttachmentPrefix } from '../chat/attachments/attachments';
 import { all, first } from '../db/client';
-import { HttpError, newId, nowIso, parseBody } from '../http';
+import { purgeOwnerExecution } from '../execution/privacy';
+import { newId, nowIso, parseBody } from '../http';
 import { NOTE_PROJECTION } from '../notes/repository';
+import { researchOwnerScope, resolveSavedSources } from '../services/research/research';
 import type { Bindings, Variables } from '../types';
 import { PRIVACY_VERSION } from './content-telemetry';
 
 const privacySchema = z.object({ enabled: z.boolean(), version: z.literal(PRIVACY_VERSION) });
 /** Conversations whose transcripts still exist, the scope of everything exported below. */
 const LIVE_CONVERSATIONS =
-  "SELECT id FROM conversations WHERE owner_id=? AND expires_at>? AND status='active'";
+  "SELECT id FROM conversations WHERE owner_id=? AND (retention_disabled=1 OR expires_at>?) AND status='active'";
 
 export const accountRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 accountRoutes.get('/account/privacy', async (c) => {
@@ -55,7 +57,7 @@ accountRoutes.get('/account/export', async (c) => {
         ownerId,
       ),
       rows(
-        "SELECT id,title,note_id,learning_checks_enabled,web_search_enabled,last_user_activity_at,expires_at,status,created_at FROM conversations WHERE owner_id=? AND expires_at>? AND status='active'",
+        "SELECT id,title,note_id,learning_checks_enabled,web_search_enabled,last_user_activity_at,CASE WHEN retention_disabled=1 THEN NULL ELSE expires_at END AS expires_at,status,created_at FROM conversations WHERE owner_id=? AND (retention_disabled=1 OR expires_at>?) AND status='active'",
         ownerId,
         now,
       ),
@@ -68,7 +70,7 @@ accountRoutes.get('/account/export', async (c) => {
       ),
       rows(
         `SELECT id,conversation_id,role,parent_message_id,origin_branch_id,created_at,ui_message FROM messages
-         WHERE owner_id=? AND conversation_id IN (${LIVE_CONVERSATIONS}) ORDER BY conversation_id,created_at,rowid`,
+         WHERE owner_id=? AND conversation_id IN (${LIVE_CONVERSATIONS}) ORDER BY conversation_id,created_at,id`,
         ownerId,
         ownerId,
         now,
@@ -78,8 +80,8 @@ accountRoutes.get('/account/export', async (c) => {
          FROM message_highlights h
          JOIN messages m ON m.id=h.message_id AND m.owner_id=h.owner_id
          JOIN conversations c ON c.id=m.conversation_id AND c.owner_id=m.owner_id
-         WHERE h.owner_id=? AND c.status='active' AND c.expires_at>?
-         ORDER BY h.message_id,h.origin,h.updated_at,h.rowid`,
+         WHERE h.owner_id=? AND c.status='active' AND (c.retention_disabled=1 OR c.expires_at>?)
+         ORDER BY h.message_id,h.origin,h.updated_at,h.start,h."end"`,
         ownerId,
         now,
       ),
@@ -120,15 +122,11 @@ accountRoutes.delete('/account', async (c) => {
       'INSERT INTO telemetry_deletions (distinct_id,requested_at) VALUES (?,?) ON CONFLICT(distinct_id) DO NOTHING',
     ).bind(c.get('authSubject'), nowIso()),
   ]);
-  if (c.env.CLERK_SECRET_KEY) {
-    try {
-      await createClerkClient({ secretKey: c.env.CLERK_SECRET_KEY }).users.deleteUser(
-        c.get('authSubject'),
-      );
-    } catch {
-      throw new HttpError(503, 'Identity deletion failed; deletion is pending and can be retried');
-    }
-  }
+  await resolveSavedSources(c.env, c.req.raw.signal)?.deleteOwner(
+    await researchOwnerScope(ownerId),
+  );
+  await purgeOwnerExecution(c.env, ownerId);
+  await deleteAccountIdentity(c.env, ownerId, c.get('authSubject'));
   await c.env.DB.prepare('DELETE FROM users WHERE id=?').bind(ownerId).run();
   return c.body(null, 204);
 });

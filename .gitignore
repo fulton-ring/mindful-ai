@@ -14,9 +14,15 @@ playwright-report/
 test-results/
 .DS_Store
 .cache/
+.data/
 .pnpm-store/
 .worktrees/
 .superpowers/
 *.tsbuildinfo
 .auth/
 .astro/
+
+# Self-host build output and local state
+apps/api/public/
+apps/api/data/
+apps/api/models/

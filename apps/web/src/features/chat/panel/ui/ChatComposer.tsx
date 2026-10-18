@@ -3,6 +3,8 @@ import { ArrowUp, Square } from 'lucide-react';
 import type { ComponentProps, DragEvent, RefObject } from 'react';
 import { useRef, useState } from 'react';
 import { Attachments } from '../../../../components/ai-elements/attachments';
+import { accountPolicy, uploadPolicyError, useAccountPolicy } from '../../../../lib/account-policy';
+import { inferenceConfig, runtimeConfig, useRuntimeConfig } from '../../../../lib/runtime-config';
 import { fileAnalytics, track } from '../../../../lib/telemetry';
 
 import { effectivePersona, PersonaPicker } from '../../../personas/PersonaPicker';
@@ -14,7 +16,21 @@ import { messageLimitNotice } from './message-limit-notice';
 const FILE_ACCEPT =
   '.md,.markdown,.txt,.csv,.json,.ts,.tsx,.js,.jsx,.py,.sql,.html,.css,.xml,.yaml,.yml,.toml,.sh,.log,.pdf,.docx,.xlsx,image/png,image/jpeg,image/webp';
 const acceptedFileTypes = FILE_ACCEPT.split(',');
+const documentExtensions = ['.pdf', '.docx', '.xlsx'];
+function documentFilesUnavailable() {
+  return (
+    !accountPolicy().value.policy.features.documentExtraction ||
+    runtimeConfig()?.capabilities?.documentExtraction === false
+  );
+}
+function fileAccept() {
+  return documentFilesUnavailable()
+    ? acceptedFileTypes.filter((type) => !documentExtensions.includes(type)).join(',')
+    : FILE_ACCEPT;
+}
 const BLOCK_HELP: Record<string, string> = {
+  inference_unavailable:
+    'AI replies are unavailable. Check the selected persona and server configuration.',
   preference_saving: 'Wait for chat settings to save.',
   upload_in_progress: 'Wait for the upload to finish.',
   message_too_long: 'Messages are limited to 2,000 characters.',
@@ -30,10 +46,17 @@ function acceptsFile(file: File) {
 }
 
 function fileError(files: File[], currentCount: number): { message: string; code: string } | null {
-  if (currentCount + files.length > 5)
-    return { message: 'Choose up to five files.', code: 'too_many_files' };
-  if (files.some((file) => file.size > 1_000_000 || file.size === 0))
-    return { message: 'Each file must be under 1 MB.', code: 'file_size' };
+  if (
+    documentFilesUnavailable() &&
+    files.some((file) => documentExtensions.some((ext) => file.name.toLowerCase().endsWith(ext)))
+  )
+    return {
+      message:
+        'Document attachments are unavailable for this account. Attach a supported text file or image.',
+      code: 'document_extraction_unavailable',
+    };
+  const limitError = uploadPolicyError(files, currentCount, accountPolicy().value.policy.uploads);
+  if (limitError) return limitError;
   if (files.some((file) => !acceptsFile(file)))
     return {
       message: 'Only supported text, document, and image files can be attached.',
@@ -224,14 +247,19 @@ export function ChatComposer({
   onPreference,
   onAutoHighlights,
 }: ComposerProps) {
+  useRuntimeConfig();
+  useAccountPolicy();
   const selectedPersona = effectivePersona(personas, personaId);
+  const inferenceNotice = modelNotice(selectedPersona?.model);
   const fileInput = useRef<HTMLInputElement>(null);
   const { error: attachmentError, addFiles } = useComposerFiles(attachments, onAttach);
   const { draggingFiles, dropHandlers } = useFileDrop(addFiles, sending);
   const limitNotice = messageLimitNotice(budget, selectedPersona, sending);
-  const blocked = limitNotice
-    ? 'message_limit'
-    : sendBlockReason(sending, savingChatPreference, input, attachments, uploadProgress);
+  const blocked = inferenceNotice
+    ? 'inference_unavailable'
+    : limitNotice
+      ? 'message_limit'
+      : sendBlockReason(sending, savingChatPreference, input, attachments, uploadProgress);
   const sendIfReady = () => attemptSend(blocked, onSend);
 
   return (
@@ -243,11 +271,7 @@ export function ChatComposer({
         sendIfReady();
       }}
     >
-      {limitNotice && (
-        <p className="composer-limit" role="status">
-          {limitNotice}
-        </p>
-      )}
+      <ComposerNotices notices={[inferenceNotice, limitNotice]} />
       <ComposerEditor
         value={input}
         disabled={sending || Boolean(limitNotice)}
@@ -261,7 +285,7 @@ export function ChatComposer({
         className="sr-only"
         type="file"
         multiple
-        accept={FILE_ACCEPT}
+        accept={fileAccept()}
         aria-label="Choose files"
         onChange={(event) => {
           addFiles([...(event.target.files ?? [])]);
@@ -301,4 +325,27 @@ export function ChatComposer({
       </div>
     </form>
   );
+}
+
+function modelNotice(modelId: string | undefined): string | null {
+  const catalog = inferenceConfig();
+  if (!catalog.configured)
+    return 'AI replies are not configured. Ask your administrator to configure an inference provider.';
+  const model = catalog.models.find(({ id }) => id === (modelId ?? catalog.defaultModel));
+  if (
+    !model ||
+    model.supportsTools === false ||
+    !model.inputModalities.includes('text') ||
+    !model.outputModalities.includes('text')
+  )
+    return 'This persona’s model is unavailable. Edit the persona to select an available model.';
+  return null;
+}
+
+function ComposerNotices({ notices }: { notices: (string | null)[] }) {
+  return notices.filter(Boolean).map((notice) => (
+    <p className="composer-limit" role="status" key={notice}>
+      {notice}
+    </p>
+  ));
 }

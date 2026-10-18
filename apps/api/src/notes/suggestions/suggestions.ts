@@ -1,5 +1,7 @@
 import type { EditProposal, NoteSuggestion } from '@walden/contracts';
+import { notInterruptedSql } from '../../chat/messages';
 import { first } from '../../db/client';
+import type { AppDatabase, AppResult, AppStatement } from '../../db/database';
 import { HttpError, newId, nowIso } from '../../http';
 import { insertNoteStatement } from '../repository';
 import { loadNoteSuggestionBySource } from './queries';
@@ -32,27 +34,29 @@ type SuggestionBaseline = {
   revision: number | null;
 };
 
-const INSERT_SUGGESTION = `INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,base_revision,old_text,new_text,reason,status,created_at,updated_at,branch_id,generation_key)
+const INSERT_SUGGESTION = (
+  db: AppDatabase,
+) => `INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,base_revision,old_text,new_text,reason,status,created_at,updated_at,branch_id,generation_key)
      SELECT ?,?,?,?,?,?,?,?,?,'pending',?,?,?,? WHERE NOT EXISTS (
        SELECT 1 FROM note_suggestion_cancellations WHERE owner_id=? AND attempt_id=?
      ) AND EXISTS (
        SELECT 1 FROM notes n JOIN conversations c ON c.note_id=n.id AND c.owner_id=n.owner_id
        JOIN conversation_branches b ON b.conversation_id=c.id AND b.owner_id=c.owner_id
        WHERE n.id=? AND n.owner_id=? AND n.revision=? AND n.markdown=? AND c.id=?
-       AND b.id=? AND b.status='active' AND c.expires_at>?
+       AND b.id=? AND b.status='active' AND (c.retention_disabled=1 OR c.expires_at>?)
        AND EXISTS (SELECT 1 FROM messages m WHERE m.id=? AND m.conversation_id=c.id
-         AND m.owner_id=c.owner_id AND m.role='assistant' AND json_extract(m.ui_message,'$.metadata.status') IS NOT 'interrupted')
+         AND m.owner_id=c.owner_id AND m.role='assistant' AND ${notInterruptedSql('m', db.dialect)})
      )`;
 
 // A proposal on a conversation without a note creates the note, titled after the conversation.
-const NEW_NOTE_GUARD = `NOT EXISTS (
+const NEW_NOTE_GUARD = (db: AppDatabase) => `NOT EXISTS (
            SELECT 1 FROM note_suggestion_cancellations WHERE owner_id=? AND attempt_id=?
          ) AND EXISTS (
            SELECT 1 FROM conversations c JOIN conversation_branches b ON b.conversation_id=c.id AND b.owner_id=c.owner_id
            WHERE c.id=? AND c.owner_id=? AND c.note_id IS NULL AND b.id=?
-           AND b.status='active' AND c.expires_at>?
+           AND b.status='active' AND (c.retention_disabled=1 OR c.expires_at>?)
            AND EXISTS (SELECT 1 FROM messages m WHERE m.id=? AND m.conversation_id=c.id
-             AND m.owner_id=c.owner_id AND m.role='assistant' AND json_extract(m.ui_message,'$.metadata.status') IS NOT 'interrupted')
+             AND m.owner_id=c.owner_id AND m.role='assistant' AND ${notInterruptedSql('m', db.dialect)})
          )`;
 
 type SuggestionInsertContext = {
@@ -63,7 +67,7 @@ type SuggestionInsertContext = {
 };
 
 async function loadSuggestionBaseline(
-  db: D1Database,
+  db: AppDatabase,
   input: PersistNoteSuggestionInput,
 ): Promise<SuggestionBaseline | null> {
   return first<SuggestionBaseline>(
@@ -72,9 +76,9 @@ async function loadSuggestionBaseline(
         `SELECT c.note_id,c.title,n.markdown,n.revision FROM conversations c
          JOIN conversation_branches b ON b.conversation_id=c.id AND b.owner_id=c.owner_id
          LEFT JOIN notes n ON n.id=c.note_id AND n.owner_id=c.owner_id
-         WHERE c.id=? AND c.owner_id=? AND b.id=? AND b.status='active' AND c.expires_at>?
+         WHERE c.id=? AND c.owner_id=? AND b.id=? AND b.status='active' AND (c.retention_disabled=1 OR c.expires_at>?)
          AND EXISTS (SELECT 1 FROM messages m WHERE m.id=? AND m.conversation_id=c.id
-           AND m.owner_id=c.owner_id AND m.role='assistant' AND json_extract(m.ui_message,'$.metadata.status') IS NOT 'interrupted')`,
+           AND m.owner_id=c.owner_id AND m.role='assistant' AND ${notInterruptedSql('m', db.dialect)})`,
       )
       .bind(input.conversationId, input.ownerId, input.branchId, nowIso(), input.sourceMessageId),
   );
@@ -92,13 +96,10 @@ function assertSuggestionBaseline(
     throw new HttpError(409, 'Conversation or note changed');
 }
 
-function prepareSuggestionInsert(
-  db: D1Database,
-  context: SuggestionInsertContext,
-): D1PreparedStatement {
+function prepareSuggestionInsert(db: AppDatabase, context: SuggestionInsertContext): AppStatement {
   const { input, baseline, noteId, now } = context;
   return db
-    .prepare(INSERT_SUGGESTION)
+    .prepare(INSERT_SUGGESTION(db))
     .bind(
       input.proposal.id,
       noteId,
@@ -128,7 +129,7 @@ function prepareSuggestionInsert(
 
 /** A failed insert is fine when a concurrent attempt already stored this proposal. */
 async function replayAfterSuggestionInsertFailure(
-  db: D1Database,
+  db: AppDatabase,
   input: PersistNoteSuggestionInput,
 ): Promise<NoteSuggestion> {
   const raced = await loadNoteSuggestionBySource(db, input);
@@ -137,19 +138,19 @@ async function replayAfterSuggestionInsertFailure(
 }
 
 async function insertSuggestionWithNote(
-  db: D1Database,
+  db: AppDatabase,
   context: SuggestionInsertContext,
-  suggestionInsert: D1PreparedStatement,
+  suggestionInsert: AppStatement,
 ): Promise<NoteSuggestion | null> {
   const { input, baseline, noteId, now } = context;
-  let results: D1Result[];
+  let results: AppResult[];
   try {
     results = await db.batch([
       insertNoteStatement(
         db,
         { id: noteId, ownerId: input.ownerId, now, title: baseline.title },
         {
-          where: NEW_NOTE_GUARD,
+          where: NEW_NOTE_GUARD(db),
           params: [
             input.ownerId,
             input.attemptId ?? input.proposal.id,
@@ -177,13 +178,15 @@ async function insertSuggestionWithNote(
 }
 
 async function insertSuggestionOnNote(
-  db: D1Database,
+  db: AppDatabase,
   input: PersistNoteSuggestionInput,
-  suggestionInsert: D1PreparedStatement,
+  suggestionInsert: AppStatement,
 ): Promise<NoteSuggestion | null> {
-  let inserted: D1Result;
+  let inserted: AppResult;
   try {
-    inserted = await suggestionInsert.run();
+    inserted = db.transaction
+      ? await db.transaction(() => suggestionInsert.run())
+      : await suggestionInsert.run();
   } catch {
     return replayAfterSuggestionInsertFailure(db, input);
   }
@@ -192,7 +195,7 @@ async function insertSuggestionOnNote(
 }
 
 async function invalidateReplacedSuggestion(
-  db: D1Database,
+  db: AppDatabase,
   input: PersistNoteSuggestionInput,
   noteId: string,
   now: string,
@@ -206,8 +209,8 @@ async function invalidateReplacedSuggestion(
     .run();
 }
 
-export async function persistNoteSuggestion(
-  db: D1Database,
+async function persistNoteSuggestionInTransaction(
+  db: AppDatabase,
   input: PersistNoteSuggestionInput,
 ): Promise<{ noteId: string; suggestion: NoteSuggestion; created: boolean }> {
   const replay = await loadNoteSuggestionBySource(db, input);
@@ -237,4 +240,13 @@ export async function persistNoteSuggestion(
       updatedAt: now,
     },
   };
+}
+
+export async function persistNoteSuggestion(db: AppDatabase, input: PersistNoteSuggestionInput) {
+  return db.transaction
+    ? db.transaction(
+        (connection) => persistNoteSuggestionInTransaction(connection, input),
+        [`owner:${input.ownerId}`],
+      )
+    : persistNoteSuggestionInTransaction(db, input);
 }

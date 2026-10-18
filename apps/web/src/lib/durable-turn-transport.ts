@@ -21,7 +21,9 @@ export type TurnContext = Pick<
 /** `body` extras a caller may pass to `sendMessage`/`regenerate`; they win over the context. */
 export type TurnBody = Partial<Omit<ChatRequest, 'message' | 'learningCheckResponse'>>;
 
+export type TurnReplacement = { turnId: string; generation: number; after: number };
 type Options = {
+  onReplace?(replacement: TurnReplacement): void;
   /** Runs before each send (note flush, conversation creation); may throw to refuse the send. */
   prepare(input: { editing: boolean; abortSignal?: AbortSignal }): Promise<TurnContext>;
   /** The conversation and branch whose running turn a reconnect should find. */
@@ -115,6 +117,7 @@ async function* readTurnResponse(
   response: Response,
   cursor: { after: number },
   signal: AbortSignal,
+  replace?: (chunk: WaldenUIMessageChunk, after: number) => boolean,
 ): AsyncGenerator<WaldenUIMessageChunk, boolean> {
   for await (const frame of readSseFrames(response, signal)) {
     const sequence = frame.id && /^\d+$/.test(frame.id) ? Number(frame.id) : undefined;
@@ -122,6 +125,10 @@ async function* readTurnResponse(
     if (frame.data === '[DONE]') return true;
     const chunk = JSON.parse(frame.data) as WaldenUIMessageChunk;
     if (sequence !== undefined) cursor.after = sequence;
+    if (replace && chunk.type === 'data-turn-replace') {
+      if (replace(chunk, cursor.after)) return true;
+      continue;
+    }
     yield chunk;
   }
   return false;
@@ -134,8 +141,10 @@ async function* readTurnResponse(
 async function* followTurn(
   turnId: string,
   signal: AbortSignal,
+  after: number,
+  replace?: (chunk: WaldenUIMessageChunk, after: number) => boolean,
 ): AsyncGenerator<WaldenUIMessageChunk> {
-  const cursor = { after: 0 };
+  const cursor = { after };
   let attempt = 0;
   while (true) {
     const response = await api.turnEvents(turnId, cursor.after, signal).catch((error: unknown) => {
@@ -146,15 +155,20 @@ async function* followTurn(
     if (response === null) return;
     if (response) {
       const seen = cursor.after;
-      if (yield* readTurnResponse(response, cursor, signal)) return;
+      if (yield* readTurnResponse(response, cursor, signal, replace)) return;
       if (cursor.after > seen) attempt = 0;
     }
     await retryDelay(attempt++, signal);
   }
 }
 
-function chunkStream(turnId: string, signal = new AbortController().signal) {
-  const chunks = followTurn(turnId, signal);
+function chunkStream(
+  turnId: string,
+  signal = new AbortController().signal,
+  after = 0,
+  replace?: (chunk: WaldenUIMessageChunk, after: number) => boolean,
+) {
+  const chunks = followTurn(turnId, signal, after, replace);
   return new ReadableStream<WaldenUIMessageChunk>({
     async pull(controller) {
       const next = await chunks.next();
@@ -173,7 +187,28 @@ function chunkStream(turnId: string, signal = new AbortController().signal) {
  * only detaches; Stop cancels explicitly.
  */
 export class DurableTurnTransport implements ChatTransport<WaldenUIMessage> {
+  private readonly generations = new Map<string, { generation: number; after: number }>();
   constructor(private readonly options: Options) {}
+
+  private chunks(turnId: string, signal?: AbortSignal, after = 0) {
+    return chunkStream(
+      turnId,
+      signal,
+      Math.max(after, this.generations.get(turnId)?.after ?? 0),
+      this.options.onReplace
+        ? (chunk, sequence) => {
+            if (chunk.type !== 'data-turn-replace') return false;
+            const { generation, turnId: replacedId } = chunk.data;
+            if (replacedId !== turnId || !Number.isSafeInteger(generation) || generation < 0)
+              throw new Error('Invalid recovery event. Reload Walden to reconnect.');
+            if (generation <= (this.generations.get(turnId)?.generation ?? 0)) return false;
+            this.generations.set(turnId, { generation, after: sequence });
+            this.options.onReplace!({ turnId, generation, after: sequence });
+            return true;
+          }
+        : undefined,
+    );
+  }
 
   async sendMessages(options: SendOptions) {
     const signal = options.abortSignal ?? new AbortController().signal;
@@ -183,18 +218,19 @@ export class DurableTurnTransport implements ChatTransport<WaldenUIMessage> {
     const request = buildTurnRequest(options, context);
     const { turnId, userMessageId, budget } = await startTurn(request, signal);
     this.options.onTurn?.({ id: turnId, requestId: request.requestId, userMessageId, budget });
-    return chunkStream(turnId, signal);
+    return this.chunks(turnId, signal);
   }
 
   /** `body.turnId` replays a known turn from its start; otherwise the scope's running turn. */
   async reconnectToStream({ abortSignal, body }: ReconnectOptions) {
-    const known = (body as { turnId?: string } | undefined)?.turnId;
-    if (known) return chunkStream(known, abortSignal);
+    const { turnId: known, after = 0 } = (body ?? {}) as { turnId?: string; after?: number };
+    if (known)
+      return this.chunks(known, abortSignal, Number.isSafeInteger(after) && after >= 0 ? after : 0);
     const scope = this.options.locate();
     if (!scope) return null;
     const { turn } = await api.activeTurn(scope.conversationId, scope.branchId);
     if (!turn || abortSignal?.aborted) return null;
     this.options.onTurn?.({ id: turn.id, requestId: turn.requestId, resumed: turn });
-    return chunkStream(turn.id, abortSignal);
+    return this.chunks(turn.id, abortSignal);
   }
 }

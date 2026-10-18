@@ -2,6 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "walden-local-test",
   "main": "src/worker.ts",
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "compatibility_date": "2025-09-17",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {

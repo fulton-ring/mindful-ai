@@ -1,0 +1,15 @@
+{{- range $role := list "http" "worker" }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "walden.name" $ }}-{{ $role }}
+  labels:
+    {{- include "walden.labels" $ | nindent 4 }}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: {{ $role }}
+---
+{{ end -}}

@@ -13,6 +13,7 @@ import type {
   UpdateBufferedReflectionInput,
   UpdateObservationalMemoryConfigInput,
 } from '@mastra/core/storage';
+import { applicationMemoryWriteGuard } from '../../execution/write-guard';
 
 type BindingConfig = Extract<D1DomainConfig, { binding: D1Database }>;
 type Row = Record<string, unknown>;
@@ -371,9 +372,10 @@ export class D1ObservationalMemory extends MemoryStorageD1 {
   }
 
   async clearObservationalMemory(threadId: string | null, resourceId: string): Promise<void> {
+    const guard = applicationMemoryWriteGuard();
     await this.#binding
-      .prepare(`DELETE FROM "${this.#table}" WHERE lookupKey = ?`)
-      .bind(this.#key(threadId, resourceId))
+      .prepare(`DELETE FROM "${this.#table}" WHERE lookupKey = ?${guard.sql}`)
+      .bind(this.#key(threadId, resourceId), ...guard.values)
       .run();
   }
 
@@ -432,15 +434,22 @@ export class D1ObservationalMemory extends MemoryStorageD1 {
       'updatedAt',
     ];
     const verb = ignoreConflict ? 'INSERT OR IGNORE' : 'INSERT';
+    const guard = applicationMemoryWriteGuard();
     const result = await this.#binding
       .prepare(
         `${verb} INTO "${this.#table}" (${columns.join(',')})
          SELECT ${columns.map(() => '?').join(',')}
-         WHERE ? IS NULL OR EXISTS (
+         WHERE (? IS NULL OR EXISTS (
            SELECT 1 FROM "${this.#threadsTable}" WHERE id = ? AND resourceId = ?
-         )`,
+         ))${guard.sql}`,
       )
-      .bind(...this.#insertValues(record), record.threadId, record.threadId, record.resourceId)
+      .bind(
+        ...this.#insertValues(record),
+        record.threadId,
+        record.threadId,
+        record.resourceId,
+        ...guard.values,
+      )
       .run();
     return Boolean(result.meta.changes);
   }
@@ -490,6 +499,7 @@ export class D1ObservationalMemory extends MemoryStorageD1 {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     const generation = Number(source.generationCount) + 1;
+    const guard = applicationMemoryWriteGuard();
     const insert = this.#binding
       .prepare(
         `INSERT OR IGNORE INTO "${this.#table}" (
@@ -500,7 +510,7 @@ export class D1ObservationalMemory extends MemoryStorageD1 {
         ) SELECT ?,lookupKey,scope,resourceId,threadId,?,'reflection',config,?,lastObservedAt,?,0,
           totalTokensObserved,?,0,0,0,0,0,NULL,observedTimezone,metadata,?,?
           FROM "${this.#table}" source WHERE source.id = ? AND source.revision = ?
-          AND NOT EXISTS (SELECT 1 FROM "${this.#table}" newer WHERE newer.lookupKey = source.lookupKey AND newer.generationCount >= ?)`,
+          AND NOT EXISTS (SELECT 1 FROM "${this.#table}" newer WHERE newer.lookupKey = source.lookupKey AND newer.generationCount >= ?)${guard.sql}`,
       )
       .bind(
         id,
@@ -513,6 +523,7 @@ export class D1ObservationalMemory extends MemoryStorageD1 {
         current.id,
         revision,
         generation,
+        ...guard.values,
       );
     if (options?.clearBuffered) {
       const clear = this.#binding
@@ -520,9 +531,9 @@ export class D1ObservationalMemory extends MemoryStorageD1 {
           `UPDATE "${this.#table}" SET bufferedReflection = NULL, bufferedReflectionTokens = NULL,
            bufferedReflectionInputTokens = NULL, reflectedObservationLineCount = NULL,
            updatedAt = ?, revision = revision + 1 WHERE id = ? AND revision = ?
-           AND EXISTS (SELECT 1 FROM "${this.#table}" created WHERE created.id = ?)`,
+           AND EXISTS (SELECT 1 FROM "${this.#table}" created WHERE created.id = ?)${guard.sql}`,
         )
-        .bind(now, current.id, revision, id);
+        .bind(now, current.id, revision, id, ...guard.values);
       const [inserted, cleared] = await this.#binding.batch([insert, clear]);
       if (!inserted.meta.changes || !cleared.meta.changes)
         throw new Error('Observational memory changed concurrently');
@@ -543,9 +554,10 @@ export class D1ObservationalMemory extends MemoryStorageD1 {
   }
 
   async #change(sql: string, ...values: unknown[]): Promise<void> {
+    const guard = applicationMemoryWriteGuard();
     const result = await this.#binding
-      .prepare(sql)
-      .bind(...values)
+      .prepare(sql + guard.sql)
+      .bind(...values, ...guard.values)
       .run();
     if (!result.meta.changes)
       throw new Error(`Observational memory record not found: ${String(values.at(-1))}`);
@@ -559,9 +571,10 @@ export class D1ObservationalMemory extends MemoryStorageD1 {
       const row = await this.#row(id);
       const change = update(row);
       if (!change) return;
+      const guard = applicationMemoryWriteGuard();
       const result = await this.#binding
-        .prepare(change.sql)
-        .bind(...change.values, id, Number(row.revision))
+        .prepare(change.sql + guard.sql)
+        .bind(...change.values, id, Number(row.revision), ...guard.values)
         .run();
       if (result.meta.changes) return;
     }

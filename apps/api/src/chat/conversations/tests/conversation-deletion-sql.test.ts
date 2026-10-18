@@ -70,7 +70,7 @@ describe('conversation aggregate deletion', () => {
     const db = join(mkdtempSync(join(tmpdir(), 'walden-thread-archive-')), 'fixture.sqlite');
     execFileSync('sqlite3', [db], {
       input: `${schema()}
-        INSERT INTO users VALUES ('owner','subject','now','now',0);
+        INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('owner','subject','now','now',0);
         INSERT INTO notes (id,owner_id,markdown,revision,provenance_json,created_at,updated_at,title) VALUES ('note','owner','Body',1,'[]','now','now','Learning journal');
         INSERT INTO conversations (id,owner_id,note_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('thread','owner','note','Thread','now','2999','active','now');
         INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,status,created_at) VALUES ('default','thread','owner',1,'active','now');
@@ -92,7 +92,7 @@ describe('conversation aggregate deletion', () => {
     const db = join(mkdtempSync(join(tmpdir(), 'walden-thread-delete-')), 'fixture.sqlite');
     execFileSync('sqlite3', [db], {
       input: `${schema()}
-        INSERT INTO users VALUES ('owner','subject','now','now',0);
+        INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('owner','subject','now','now',0);
         INSERT INTO notes (id,owner_id,markdown,revision,provenance_json,created_at,updated_at) VALUES ('note','owner','Body',1,'[]','now','now');
         INSERT INTO conversations (id,owner_id,note_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('thread','owner','note','Thread','now','2999','active','now');
         INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,status,created_at) VALUES ('default','thread','owner',1,'active','now');
@@ -101,7 +101,7 @@ describe('conversation aggregate deletion', () => {
         INSERT INTO note_suggestions (id,note_id,owner_id,conversation_id,source_message_id,branch_id,generation_key,base_revision,old_text,new_text,reason,status,created_at,updated_at) VALUES ('suggestion','note','owner','thread','message','default','message',1,'Body','Better','Reason','pending','now','now');
         INSERT INTO note_edits (id,note_id,owner_id,operation_id,base_revision,result_revision,before_markdown,before_provenance_json,after_markdown,after_provenance_json,created_at) VALUES ('edit','note','owner','edit-op',0,1,'','[]','Body','[]','now');
         INSERT INTO note_history_requests VALUES ('owner','note','undo-op','undo',1,'edit','now');
-        INSERT INTO users VALUES ('other','other-subject','now','now',0);
+        INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('other','other-subject','now','now',0);
         INSERT INTO notes (id,owner_id,markdown,revision,provenance_json,created_at,updated_at) VALUES ('other-note','other','Private',0,'[]','now','now');
         INSERT INTO conversations (id,owner_id,note_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('other-thread','other','other-note','Private','now','2999','active','now');
         BEGIN;
@@ -130,7 +130,7 @@ describe('conversation aggregate deletion', () => {
     const db = join(mkdtempSync(join(tmpdir(), 'walden-thread-expiry-')), 'fixture.sqlite');
     execFileSync('sqlite3', [db], {
       input: `${schema()}
-        INSERT INTO users VALUES ('owner','subject','now','now',0);
+        INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('owner','subject','now','now',0);
         INSERT INTO notes (id,owner_id,markdown,revision,provenance_json,created_at,updated_at) VALUES ('note','owner','Body',0,'[]','now','now');
         INSERT INTO conversations (id,owner_id,note_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('thread','owner','note','Thread','old','2020','active','old');
         INSERT INTO conversation_branches (id,conversation_id,owner_id,is_default,status,created_at) VALUES ('default','thread','owner',1,'active','old');
@@ -156,7 +156,7 @@ describe('conversation aggregate deletion', () => {
     const db = join(mkdtempSync(join(tmpdir(), 'walden-shared-note-')), 'fixture.sqlite');
     execFileSync('sqlite3', [db], {
       input: `${migration('0000_baseline.sql')}
-      INSERT INTO users VALUES ('owner','subject','now','now',0);
+      INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('owner','subject','now','now',0);
       INSERT INTO notes (id,owner_id,markdown,revision,provenance_json,created_at,updated_at) VALUES ('note','owner','',0,'[]','now','now');
       INSERT INTO conversations (id,owner_id,note_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('one','owner','note','One','now','2999','active','now');`,
     });

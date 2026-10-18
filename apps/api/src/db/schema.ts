@@ -79,6 +79,9 @@ export const conversations = sqliteTable(
     personaId: text('persona_id'),
     lastUserActivityAt: text('last_user_activity_at').notNull(),
     expiresAt: text('expires_at').notNull(),
+    retentionDisabled: integer('retention_disabled').notNull().default(0),
+    purgeStartedAt: text('purge_started_at'),
+    purgeToken: text('purge_token'),
     status: text('status').notNull().default(sql.raw("'active'")),
     createdAt: text('created_at').notNull(),
     title: text('title').notNull().default(sql.raw("'New conversation'")),
@@ -435,6 +438,9 @@ export const turns = sqliteTable(
     /** Model the turn was admitted with and its message-budget weight. */
     model: text('model'),
     weight: integer('weight').notNull().default(sql.raw('1')),
+    executionGeneration: integer('execution_generation').notNull().default(0),
+    descriptorVersion: integer('descriptor_version').notNull().default(1),
+    descriptorJson: text('descriptor_json'),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
@@ -477,13 +483,114 @@ export const users = sqliteTable(
   {
     id: text('id'),
     authSubject: text('auth_subject').notNull(),
+    authProvider: text('auth_provider').notNull().default('clerk'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
     deletionPending: integer('deletion_pending').notNull().default(sql.raw('0')),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
-    uniqueIndex('users_auth_subject_unique').on(table.authSubject),
+    uniqueIndex('users_auth_identity_unique').on(table.authProvider, table.authSubject),
     check('users_check_1', sql.raw('deletion_pending IN (0,1)')),
   ],
+);
+
+export const appSettings = sqliteTable('app_settings', {
+  key: text('key').primaryKey().notNull(),
+  value: text('value').notNull(),
+});
+
+export const turnEvents = sqliteTable(
+  'turn_events',
+  {
+    turnId: text('turn_id')
+      .notNull()
+      .references(() => turns.id, { onDelete: 'cascade' }),
+    generation: integer('generation').notNull(),
+    sequence: integer('sequence').notNull(),
+    eventJson: text('event_json').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.turnId, table.sequence] }),
+    index('turn_events_created_at').on(table.createdAt),
+    check('turn_events_generation_check', sql`${table.generation}>=0`),
+    check('turn_events_sequence_check', sql`${table.sequence}>=0`),
+  ],
+);
+
+export const researchSources = sqliteTable(
+  'research_sources',
+  {
+    id: text('id').primaryKey().notNull(),
+    ownerScope: text('owner_scope').notNull(),
+    sourceUrl: text('source_url').notNull(),
+    blobKey: text('blob_key').notNull(),
+    contentHash: text('content_hash').notNull(),
+    modelRevision: text('model_revision').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('research_sources_owner_url').on(table.ownerScope, table.sourceUrl),
+    index('research_sources_owner_scope').on(table.ownerScope),
+  ],
+);
+
+export const researchChunks = sqliteTable(
+  'research_chunks',
+  {
+    id: text('id').primaryKey().notNull(),
+    sourceId: text('source_id')
+      .notNull()
+      .references(() => researchSources.id, { onDelete: 'cascade' }),
+    ownerScope: text('owner_scope').notNull(),
+    ordinal: integer('ordinal').notNull(),
+    text: text('text').notNull(),
+    embedding: text('embedding').notNull(),
+    modelRevision: text('model_revision').notNull(),
+  },
+  (table) => [
+    uniqueIndex('research_chunks_source_ordinal').on(table.sourceId, table.ordinal),
+    index('research_chunks_owner_scope').on(table.ownerScope),
+  ],
+);
+
+export const researchIndexingJobs = sqliteTable(
+  'research_indexing_jobs',
+  {
+    id: text('id').primaryKey().notNull(),
+    ownerScope: text('owner_scope').notNull(),
+    sourceUrl: text('source_url').notNull(),
+    blobKey: text('blob_key').notNull(),
+    contentHash: text('content_hash').notNull(),
+    status: text('status').notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    error: text('error'),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('research_indexing_jobs_owner_url').on(table.ownerScope, table.sourceUrl),
+    index('research_indexing_jobs_owner_scope').on(table.ownerScope),
+    check(
+      'research_indexing_jobs_status_check',
+      sql`${table.status} IN ('pending','running','complete','failed')`,
+    ),
+  ],
+);
+// research_chunks_fts is managed in SQL: Drizzle cannot describe virtual tables.
+
+export { authAccount, authSession, authUser, authVerification } from './auth-schema';
+
+export const turnExecutionState = sqliteTable(
+  'turn_execution_state',
+  {
+    turnId: text('turn_id')
+      .primaryKey()
+      .notNull()
+      .references(() => turns.id, { onDelete: 'cascade' }),
+    stateJson: text('state_json').notNull(),
+    alarmAt: integer('alarm_at'),
+    endedAt: integer('ended_at'),
+  },
+  (table) => [index('turn_execution_state_alarm_at').on(table.alarmAt)],
 );

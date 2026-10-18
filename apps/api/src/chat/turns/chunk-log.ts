@@ -20,21 +20,34 @@ export class ChunkLog {
   private readonly readers = new Map<Reader, ReturnType<typeof setInterval>>();
 
   constructor(
-    readonly chunks: Chunk[] = [],
+    private history: Chunk[] = [],
     private ended = false,
-    private readonly persist?: (seq: number, chunk: Chunk) => void,
+    private readonly persist?: (seq: number, chunk: Chunk) => unknown | Promise<unknown>,
   ) {}
 
   get isEnded() {
     return this.ended;
   }
 
-  append(...chunks: Chunk[]) {
+  /** Chunks representing the current generation, suitable for the final message commit. */
+  get chunks(): Chunk[] {
+    let reset = this.history.length - 1;
+    while (reset >= 0 && this.history[reset]?.type !== 'data-turn-replace') reset--;
+    if (reset < 0) return this.history;
+    return this.history.slice(reset + 1);
+  }
+
+  /** Refresh the cursor only after ownership fences every previous writer. */
+  reload(chunks: Chunk[]) {
+    this.history = [...chunks];
+  }
+
+  async append(...chunks: Chunk[]) {
     if (this.ended) throw new Error('The turn has already ended.');
     for (const chunk of chunks) {
-      this.chunks.push(chunk);
-      const seq = this.chunks.length;
-      this.persist?.(seq, chunk);
+      const seq = this.history.length + 1;
+      await this.persist?.(seq, chunk);
+      this.history.push(chunk);
       for (const reader of this.readers.keys()) this.send(reader, frame(chunk, seq));
     }
   }
@@ -59,13 +72,13 @@ export class ChunkLog {
    * nothing after the cursor answers 204.
    */
   response(after: number): Response {
-    if (this.ended && after >= this.chunks.length) return new Response(null, { status: 204 });
+    if (this.ended && after >= this.history.length) return new Response(null, { status: 204 });
     let self: Reader;
     const stream = new ReadableStream<Uint8Array>({
       start: (reader) => {
         self = reader;
-        for (let seq = after + 1; seq <= this.chunks.length; seq++)
-          reader.enqueue(frame(this.chunks[seq - 1]!, seq));
+        for (let seq = after + 1; seq <= this.history.length; seq++)
+          reader.enqueue(frame(this.history[seq - 1]!, seq));
         if (this.ended) {
           reader.enqueue(DONE);
           reader.close();

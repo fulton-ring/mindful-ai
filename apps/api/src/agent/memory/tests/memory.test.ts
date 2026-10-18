@@ -20,7 +20,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@mastra/cloudflare-d1', () => ({
   D1Store: class {
     init = mocks.init;
-    stores = {};
+    stores: Record<string, unknown> = {};
+    async getStore(name: string) {
+      return this.stores[name];
+    }
     constructor(config: unknown) {
       mocks.stores.push(config);
     }
@@ -289,5 +292,5 @@ it('deletes every branch-scoped thread for a conversation when no branch is give
     'conversation:owner:thread:branch:main',
     'conversation:owner:thread:branch:alternate',
   ]);
-  expect(mocks.settled).toHaveBeenCalledOnce();
+  expect(mocks.settled).toHaveBeenCalledTimes(2);
 });

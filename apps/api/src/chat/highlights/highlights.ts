@@ -18,8 +18,8 @@ highlightRoutes.put('/messages/:messageId/highlights', async (c) => {
       `SELECT m.ui_message FROM messages m
          JOIN conversations c ON c.id=m.conversation_id AND c.owner_id=m.owner_id
          JOIN conversation_branches b ON b.id=m.origin_branch_id AND b.conversation_id=c.id AND b.owner_id=c.owner_id
-         WHERE m.id=? AND m.owner_id=? AND m.role='assistant' AND ${notInterruptedSql('m')}
-         AND c.status='active' AND c.expires_at>? AND b.status='active'`,
+         WHERE m.id=? AND m.owner_id=? AND m.role='assistant' AND ${notInterruptedSql('m', c.env.DB.dialect)}
+         AND c.status='active' AND (c.retention_disabled=1 OR c.expires_at>?) AND b.status='active'`,
     ).bind(messageId, ownerId, now),
   );
   if (!message) throw new HttpError(404, 'Completed response not found');
@@ -31,13 +31,13 @@ highlightRoutes.put('/messages/:messageId/highlights', async (c) => {
   )
     throw new HttpError(400, 'Highlight range does not match the response');
   const saved = await c.env.DB.prepare(
-    `INSERT INTO message_highlights (message_id,owner_id,origin,start,end,quote,color,updated_at)
+    `INSERT INTO message_highlights (message_id,owner_id,origin,start,"end",quote,color,updated_at)
        SELECT m.id,m.owner_id,'user',?,?,?,?,? FROM messages m
        JOIN conversations c ON c.id=m.conversation_id AND c.owner_id=m.owner_id
        JOIN conversation_branches b ON b.id=m.origin_branch_id AND b.conversation_id=c.id AND b.owner_id=c.owner_id
-       WHERE m.id=? AND m.owner_id=? AND m.role='assistant' AND ${notInterruptedSql('m')} AND m.ui_message=?
-       AND c.status='active' AND c.expires_at>? AND b.status='active'
-       ON CONFLICT(message_id,origin,start,end) DO UPDATE SET
+       WHERE m.id=? AND m.owner_id=? AND m.role='assistant' AND ${notInterruptedSql('m', c.env.DB.dialect)} AND m.ui_message=?
+       AND c.status='active' AND (c.retention_disabled=1 OR c.expires_at>?) AND b.status='active'
+       ON CONFLICT(message_id,origin,start,"end") DO UPDATE SET
          quote=excluded.quote,color=excluded.color,updated_at=excluded.updated_at
        WHERE message_highlights.owner_id=excluded.owner_id`,
   )

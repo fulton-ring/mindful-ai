@@ -15,6 +15,7 @@ it.skipIf(!token || !accountId)(
       CLOUDFLARE_API_TOKEN: token,
     });
     const events = await service.streamTurn({
+      ownerId: 'live-smoke-owner',
       turnId: 'live-smoke-turn',
       requestId: 'live-smoke-request',
       conversation: {

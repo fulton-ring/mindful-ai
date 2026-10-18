@@ -34,7 +34,11 @@ async function setupTest() {
       .join('\n'),
   });
   db = sqliteD1Binding(file);
-  await db.prepare("INSERT INTO users VALUES ('owner','subject','now','now',0)").run();
+  await db
+    .prepare(
+      "INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('owner','subject','now','now',0)",
+    )
+    .run();
   await db
     .prepare(
       "INSERT INTO notes (id,owner_id,markdown,revision,provenance_json,created_at,updated_at) VALUES ('note','owner','Base',0,'[]','now','now')",

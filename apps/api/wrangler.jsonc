@@ -3,6 +3,7 @@
   "name": "walden",
   "preview_urls": false,
   "main": "src/worker.ts",
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "compatibility_date": "2026-09-18",
   "compatibility_flags": ["nodejs_compat"],
   // Cloudflare creates the DNS records and certificates for custom domains.
@@ -56,6 +57,7 @@
     "crons": ["* * * * *", "17 * * * *"]
   },
   "vars": {
+    "AUTH_MODE": "clerk",
     "AI_PROVIDER": "cloudflare",
     "AI_MODEL": "@cf/zai-org/glm-5.3-flash",
     "R2_ACCOUNT_ID": "e9be35217a75f5d2148e572d8853b3bf",

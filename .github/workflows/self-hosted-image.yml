@@ -1,0 +1,68 @@
+name: Self-hosted image
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+permissions:
+  contents: read
+jobs:
+  build-and-smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-24.04, platform: linux/amd64 }
+          - { runner: ubuntu-24.04-arm, platform: linux/arm64 }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          load: true
+          push: false
+          tags: walden:ci
+          cache-from: type=gha,scope=${{ matrix.runner }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.runner }}
+      - name: Verify Chromium's non-root sandbox
+        run: >-
+          docker run --rm --security-opt no-new-privileges:true
+          --security-opt seccomp=deploy/docker/chromium-seccomp.json
+          --cap-drop ALL --shm-size 512m --entrypoint node walden:ci
+          --input-type=module -e
+          "import {chromium} from 'playwright';
+          if(process.getuid()===0) throw new Error('Image runs as root');
+          const browser=await chromium.launch({headless:true,chromiumSandbox:true});
+          const page=await browser.newPage();
+          await page.setContent('<title>sandbox smoke</title>');
+          if(await page.title()!=='sandbox smoke') throw new Error('Browser failed');
+          await browser.close();"
+      - name: Start standalone image
+        run: >-
+          docker run --detach --name walden-ci --security-opt no-new-privileges:true
+          --security-opt seccomp=deploy/docker/chromium-seccomp.json
+          --cap-drop ALL --shm-size 512m --publish 127.0.0.1:3000:3000
+          --env AUTH_MODE=none --env APP_URL=http://localhost:3000
+          --volume walden-ci-data:/data walden:ci
+      - name: Verify startup, bundled UI and configuration
+        run: |
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent http://localhost:3000/health/ready; then break; fi
+            sleep 2
+          done
+          curl --fail http://localhost:3000/health/live
+          curl --fail http://localhost:3000/health/ready
+          curl --fail --output /tmp/walden-index.html http://localhost:3000/
+          test -s /tmp/walden-index.html
+          grep -q '<html' /tmp/walden-index.html
+          curl --fail http://localhost:3000/api/config
+          docker inspect --format '{{.Config.User}}' walden-ci
+      - name: Logs and cleanup
+        if: always()
+        run: |
+          docker logs walden-ci || true
+          docker rm --force walden-ci || true
+          docker volume rm walden-ci-data || true

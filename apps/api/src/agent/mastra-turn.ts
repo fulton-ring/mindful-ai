@@ -4,6 +4,7 @@ import { createTool } from '@mastra/core/tools';
 import type { Workspace } from '@mastra/core/workspace';
 import type { Intervention, WaldenUIMessageChunk } from '@walden/contracts';
 import { metadataPatch } from '../chat/messages';
+import { type NativeExecutionContext, nativeAgentStream } from '../execution/native-agent';
 import type { McpTools } from '../services/mcp';
 import type { AgentTurnInput } from '../services/types';
 import { buildTurnContext, contextBudgetProcessor } from './context';
@@ -30,6 +31,7 @@ import { learningCheckInputSchema } from './tool-schemas';
 import { agentUIChunks, newUIStreamState, type UIStreamState } from './ui-stream';
 
 export type AgentRuntime = {
+  execution?: NativeExecutionContext;
   memory?: PreparedMemory;
   workspace?: Workspace;
   onToolResult?: (name: string, result: unknown) => void;
@@ -40,7 +42,7 @@ type ExecutableTool = { execute?: (...args: never[]) => Promise<unknown> };
 /** Reports each successful tool result, e.g. so search results become readable URLs. */
 function observeToolResults<T extends Record<string, ExecutableTool>>(
   tools: T,
-  onResult: (name: string, result: unknown) => void,
+  onResult: (name: string, result: unknown) => void | Promise<void>,
 ): T {
   return Object.fromEntries(
     Object.entries(tools).map(([name, tool]) => [
@@ -50,7 +52,7 @@ function observeToolResults<T extends Record<string, ExecutableTool>>(
             ...tool,
             execute: async (...args: never[]) => {
               const result = await tool.execute!(...args);
-              onResult(name, result);
+              await onResult(name, result);
               return result;
             },
           }
@@ -232,22 +234,60 @@ export async function* streamMastraTurn({
     delete tools.searchWeb;
   }
   if (runtime.onToolResult) tools = observeToolResults(tools, runtime.onToolResult);
+  const persistedKey = runtime.execution ? `walden:turn:${input.turnId}:closures:v1` : undefined;
+  const persisted = persistedKey
+    ? ((await runtime.execution!.host.cache.get(persistedKey)) as
+        | { intervention?: Intervention; toolResults?: Array<{ name: string; result: unknown }> }
+        | undefined)
+    : undefined;
   const proposals = new TurnProposals();
-  const agentTools = createMastraTools(input, tools, proposals);
-  const { agent, turnContext } = createMastraAgent(input, model, tools, runtime, trace, agentTools);
-  const response = await agent.stream(
-    turnContext.messages,
-    responseOptions(input, signal, trace, runtime, turnContext, proposals),
+  if (persisted?.intervention) proposals.propose(persisted.intervention);
+  const toolResults = persisted?.toolResults ?? [];
+  for (const result of toolResults) runtime.onToolResult?.(result.name, result.result);
+  const saveClosures = async () => {
+    if (persistedKey)
+      await runtime.execution!.host.cache.set(
+        persistedKey,
+        {
+          intervention: proposals.drain().intervention,
+          toolResults,
+        },
+        60 * 60_000,
+      );
+  };
+  const agentTools = observeToolResults(
+    createMastraTools(input, tools, proposals),
+    async (name, result) => {
+      if (name === 'searchWeb' || name === 'searchSources') toolResults.push({ name, result });
+      await saveClosures();
+    },
   );
+  const { agent, turnContext } = createMastraAgent(input, model, tools, runtime, trace, agentTools);
+  if (runtime.execution) runtime.execution.beforeStart = runtime.memory?.activate;
+  const options = responseOptions(input, signal, trace, runtime, turnContext, proposals);
+  const response = runtime.execution
+    ? await nativeAgentStream(agent, turnContext.messages, options, runtime.execution)
+    : await agent.stream(turnContext.messages, options);
   const state = newUIStreamState();
-  yield* agentUIChunks(response.fullStream, input.turnId, state, (call) => {
-    const intervention = recoveredFrontendIntervention(
-      call,
+  try {
+    yield* agentUIChunks(
+      response.fullStream as Parameters<typeof agentUIChunks>[0],
       input.turnId,
-      input.conversation.learningChecksEnabled,
+      state,
+      (call) => {
+        const intervention = recoveredFrontendIntervention(
+          call,
+          input.turnId,
+          input.conversation.learningChecksEnabled,
+        );
+        if (intervention) proposals.propose(intervention);
+      },
+      signal,
     );
-    if (intervention) proposals.propose(intervention);
-  });
+  } finally {
+    if ('release' in response) await response.release();
+  }
+  await saveClosures();
   const intervention = finalIntervention(input, state, proposals);
   assertCompleted(state, intervention);
   if (intervention) yield { type: 'data-intervention', id: intervention.id, data: intervention };

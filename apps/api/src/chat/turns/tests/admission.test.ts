@@ -2,12 +2,13 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { TurnStart } from '@walden/contracts';
+import type { Conversation, TurnStart, WaldenUIMessage } from '@walden/contracts';
 import { Hono } from 'hono';
 import { expect, it, vi } from 'vitest';
 import { sqliteD1Binding } from '../../../agent/memory/tests/d1-test-binding';
 import { HttpError } from '../../../http';
 import type { Bindings, Variables } from '../../../types';
+import { conversationRoutes } from '../../conversations/conversations';
 import { chatRoutes } from '../routes';
 import { turnObjects } from './turn-fixture';
 
@@ -22,8 +23,12 @@ async function fixture() {
       .join('\n'),
   });
   const DB = sqliteD1Binding(file);
-  await DB.prepare("INSERT INTO users VALUES ('owner','subject','now','now',0)").run();
-  await DB.prepare("INSERT INTO users VALUES ('other','other','now','now',0)").run();
+  await DB.prepare(
+    "INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('owner','subject','now','now',0)",
+  ).run();
+  await DB.prepare(
+    "INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('other','other','now','now',0)",
+  ).run();
   await DB.prepare(
     "INSERT INTO conversations (id,owner_id,title,last_user_activity_at,expires_at,status,created_at) VALUES ('chat','owner','Title','now','2999-01-01','active','now')",
   ).run();
@@ -34,6 +39,7 @@ async function fixture() {
   const objects = turnObjects(() => env);
   const env = {
     DB,
+    AI: {} as Ai,
     CHAT_TURN: {
       idFromName: (name: string) => name,
       get: (turnId: string) => ({
@@ -50,6 +56,7 @@ async function fixture() {
     await next();
   });
   app.route('/api/chat', chatRoutes);
+  app.route('/api', conversationRoutes);
   app.onError((error, c) =>
     error instanceof HttpError
       ? c.json({ error: error.message }, error.status)
@@ -75,6 +82,63 @@ async function fixture() {
     );
   return { DB, env, app, start };
 }
+
+it('returns the admitted canonical user message while committed conversation history still excludes it', async () => {
+  const { DB, env, app, start } = await fixture();
+  const admitted = await start('recover', 'Question still being answered');
+  expect(admitted.status).toBe(200);
+  const { turnId, userMessageId } = (await admitted.json()) as TurnStart;
+  const stored = await DB.prepare('SELECT ui_message FROM messages WHERE id=?')
+    .bind(userMessageId)
+    .first<{ ui_message: string }>();
+  const conversation = await app.request('/api/conversations/chat?branch=branch', {}, env);
+  expect(conversation.status).toBe(200);
+  expect(((await conversation.json()) as Conversation).messages).toEqual([]);
+  const active = await app.request('/api/chat/turns?conversationId=chat&branchId=branch', {}, env);
+  expect(active.status).toBe(200);
+  expect(await active.json()).toMatchObject({
+    turn: { id: turnId, userMessageId, userMessage: JSON.parse(stored!.ui_message) },
+  });
+  expect(
+    await DB.prepare('SELECT head_message_id FROM conversation_branches WHERE id=?')
+      .bind('branch')
+      .first(),
+  ).toEqual({ head_message_id: null });
+});
+
+it('scopes recovered user messages to the admitted owner and conversation while allowing regeneration reuse', async () => {
+  const { DB, env, app, start } = await fixture();
+  const { turnId, userMessageId } = (await (await start('original')).json()) as TurnStart;
+  await DB.prepare("UPDATE turns SET status='completed' WHERE id=?").bind(turnId).run();
+  await DB.prepare(
+    "INSERT INTO turns(id,request_id,conversation_id,owner_id,status,created_at,branch_id,source_branch_id,user_message_id) VALUES('regenerated','regenerate','chat','owner','streaming','later','branch','branch',?)",
+  )
+    .bind(userMessageId)
+    .run();
+  const active = () => app.request('/api/chat/turns?conversationId=chat&branchId=branch', {}, env);
+  const payload = (await (await active()).json()) as { turn: { userMessage?: WaldenUIMessage } };
+  expect(payload.turn.userMessage?.id).toBe(userMessageId);
+  // A corrupted cross-owner reference must never disclose the other owner's message.
+  await DB.prepare('UPDATE messages SET owner_id=? WHERE id=?').bind('other', userMessageId).run();
+  const foreignOwner = (await (await active()).json()) as { turn: object };
+  expect(foreignOwner).toMatchObject({ turn: { id: 'regenerated' } });
+  expect(foreignOwner.turn).not.toHaveProperty('userMessage');
+  await DB.prepare(
+    "INSERT INTO conversations(id,owner_id,title,last_user_activity_at,expires_at,status,created_at) VALUES('another','owner','Other','now','2999-01-01','active','now')",
+  ).run();
+  await DB.prepare('UPDATE messages SET owner_id=?,conversation_id=? WHERE id=?')
+    .bind('owner', 'another', userMessageId)
+    .run();
+  expect(((await (await active()).json()) as { turn: object }).turn).not.toHaveProperty(
+    'userMessage',
+  );
+  await DB.prepare("UPDATE turns SET user_message_id=NULL WHERE id='regenerated'").run();
+  const reserved = (await (await active()).json()) as { turn: object };
+  expect(reserved).toMatchObject({
+    turn: { userMessageId: null },
+  });
+  expect(reserved.turn).not.toHaveProperty('userMessage');
+});
 
 it('admits one immutable turn, protects replay, and persists Stop', async () => {
   const { DB, env, app, start } = await fixture();
@@ -111,7 +175,7 @@ it('admits one immutable turn, protects replay, and persists Stop', async () => 
     (
       await app.request(
         `/api/chat/turns/${turnId}/events`,
-        { headers: { 'x-owner': 'other' } },
+        { headers: { 'x-owner': 'other', 'X-Walden-Turn-Protocol': '2' } },
         env,
       )
     ).status,
@@ -127,7 +191,13 @@ it('admits one immutable turn, protects replay, and persists Stop', async () => 
       ?.request_id,
   ).toBe('same');
   // Stop leaves an interrupted reply, and its stream replays to a terminal [DONE].
-  const events = await (await app.request(`/api/chat/turns/${turnId}/events`, {}, env)).text();
+  const events = await (
+    await app.request(
+      `/api/chat/turns/${turnId}/events`,
+      { headers: { 'X-Walden-Turn-Protocol': '2' } },
+      env,
+    )
+  ).text();
   expect(events).toContain('"type":"error"');
   expect(events.trimEnd().endsWith('data: [DONE]')).toBe(true);
 });
@@ -166,4 +236,60 @@ it('reports the send that used up the budget and each send refused at the limit'
     weight: 1,
   });
   expect(events[1]?.properties).toMatchObject({ used: 1, ms_until_reset: expect.any(Number) });
+});
+it('rejects an unsupported default model before storing or charging a turn', async () => {
+  const { DB, env, start } = await fixture();
+  Object.assign(env, {
+    AI_PROVIDER: 'openai-compatible',
+    AI_BASE_URL: 'http://localhost:1234/v1',
+    AI_MODEL: 'embedding-only',
+    AI_MODELS_JSON: JSON.stringify([
+      {
+        id: 'embedding-only',
+        inputModalities: ['text'],
+        outputModalities: ['embeddings'],
+        supportsTools: false,
+      },
+    ]),
+  });
+  const response = await start('unsupported-model');
+  expect(response.status).toBe(422);
+  expect(await response.json()).toMatchObject({
+    error: expect.stringMatching(/text conversations with tools/),
+  });
+  expect(await DB.prepare('SELECT COUNT(*) AS count FROM message_windows').first()).toEqual({
+    count: 0,
+  });
+  expect(await DB.prepare('SELECT COUNT(*) AS count FROM turns').first()).toEqual({ count: 0 });
+  expect(await DB.prepare('SELECT COUNT(*) AS count FROM messages').first()).toEqual({ count: 0 });
+});
+
+it('uses trusted account plans for admission and keeps usage when switching to and from unlimited', async () => {
+  const { DB, env, start } = await fixture();
+  let plan = 'small';
+  const getPlan = vi.fn(async () => plan);
+  env.APP_PLANS_JSON = JSON.stringify({
+    small: { messages: { limit: 1 } },
+    unlimited: { messages: { limit: null } },
+    larger: { messages: { limit: 3 } },
+  });
+  env.ENTITLEMENTS = { getPlan };
+  const first = await start('first-plan-send');
+  expect(first.status).toBe(200);
+  expect(((await first.json()) as TurnStart).budget).toMatchObject({ used: 1, limit: 1 });
+  expect(getPlan.mock.calls).toEqual([['owner']]);
+  await DB.prepare("UPDATE turns SET status='completed'").run();
+  expect((await start('blocked-plan-send')).status).toBe(429);
+  plan = 'unlimited';
+  const unlimited = await start('unlimited-plan-send');
+  expect(unlimited.status).toBe(200);
+  expect(((await unlimited.json()) as TurnStart).budget).toMatchObject({ used: 2, limit: null });
+  await DB.prepare("UPDATE turns SET status='completed'").run();
+  plan = 'small';
+  expect((await start('downgraded-plan-send')).status).toBe(429);
+  expect(await DB.prepare('SELECT used FROM message_windows').first()).toEqual({ used: 2 });
+  plan = 'larger';
+  const upgraded = await start('upgraded-plan-send');
+  expect(upgraded.status).toBe(200);
+  expect(((await upgraded.json()) as TurnStart).budget).toMatchObject({ used: 3, limit: 3 });
 });

@@ -1,0 +1,33 @@
+Core 1.67.0; libSQL 1.23.0; Valkey; acceptance command exits 1
+
+✔ durable: disconnect detaches; another observer replays and follows the same run (773.185084ms)
+✔ durable: Stop aborts the model and preserves partial output (489.648583ms)
+✔ durable: Stop during a tool prevents a later write (822.616375ms)
+✖ durable: SIGKILL leaves a discoverable snapshot; recovery reissues the interrupted model call (1086.238708ms)
+✖ durable: crash after a tool write can repeat an external effect (1389.555917ms)
+✖ durable: crash after a tool write requires an idempotency key to avoid duplication (1221.161958ms)
+✖ durable: recovery must not rerun a completed tool (1222.494209ms)
+✔ evented: disconnect detaches; another observer replays and follows the same run (882.154709ms)
+✔ evented: Stop aborts the model and preserves partial output (762.462ms)
+✔ evented: Stop during a tool prevents a later write (783.922833ms)
+✖ evented: SIGKILL leaves a discoverable snapshot; recovery reissues the interrupted model call (3556.597541ms)
+✖ evented: crash after a tool write can repeat an external effect (3606.286834ms)
+✖ evented: crash after a tool write requires an idempotency key to avoid duplication (3833.279209ms)
+✖ evented: recovery must not rerun a completed tool (2784.969833ms)
+✔ durable distributed: a separate process replays, follows, and stops the owner through Valkey (3058.378708ms)
+✔ durable distributed: persistent stream history survives owner SIGKILL (1459.314792ms)
+✖ durable distributed: recovery must not take over a healthy owner (1754.502875ms)
+✖ durable distributed: recovered output must not append a replayed partial answer twice (1186.012166ms)
+✔ evented distributed: a separate process replays, follows, and stops the owner through Valkey (1538.893875ms)
+✔ evented distributed: persistent stream history survives owner SIGKILL (3436.759375ms)
+✖ evented distributed: recovery must not take over a healthy owner (3292.182833ms)
+✖ evented distributed: recovered output must not append a replayed partial answer twice (4163.828458ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 10
+ℹ fail 12
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 43151.323917
+✖ failing tests:

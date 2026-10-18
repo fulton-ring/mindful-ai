@@ -16,6 +16,7 @@ export const storageKeys = {
   noteWidth: `${STORAGE_PREFIX}note-width`,
   sidebarWidth: `${STORAGE_PREFIX}sidebar-width`,
   theme: `${STORAGE_PREFIX}theme`,
+  authSession: `${STORAGE_PREFIX}auth-session`,
   browserAnalytics: `${STORAGE_PREFIX}browser-analytics`,
   persona: (identity: string) => `${STORAGE_PREFIX}persona:${identity}`,
   /** sessionStorage */

@@ -13,16 +13,77 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24.15.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:ci
+      - run: pnpm test:dev
       - run: pnpm verify
 
-  # Which deployables a push to main touched, so each Worker deploys only when it
-  # changed. Redeploying the app Worker ends any chat reply in progress.
+  self-hosted-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ONNXRUNTIME_NODE_INSTALL: skip
+      WALDEN_TEST_POSTGRES: '1'
+      WALDEN_TEST_BROWSER: '1'
+      WALDEN_TEST_WORKER_BUNDLE: '1'
+      WALDEN_TEST_NATIVE_PURGE_BROKER: '1'
+      EMBEDDING_MODEL_DIR: /tmp/walden-minilm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.15.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @walden/contracts build && pnpm --filter @walden/domain build
+      - run: node apps/api/scripts/download-embedding-model.mjs /tmp/walden-minilm
+      - run: pnpm --filter @walden/api exec playwright install --with-deps chromium
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Allow sandboxed Playwright Chromium on Ubuntu
+        run: |
+          # Ubuntu restricts user namespaces for downloaded Chromium binaries.
+          # Allow only the CI browser cache; retain Chromium's own sandbox.
+          sudo tee /etc/apparmor.d/walden-ci-playwright > /dev/null <<'PROFILE'
+          abi <abi/4.0>,
+          include <tunables/global>
+          profile walden-ci-playwright /home/runner/.cache/ms-playwright/**/chrome{,-headless-shell} flags=(unconfined) {
+            userns,
+          }
+          PROFILE
+          sudo apparmor_parser -r /etc/apparmor.d/walden-ci-playwright
+      - run: pnpm build:self-hosted
+      - run: pnpm --filter @walden/api build
+      - run: pnpm --filter @walden/api exec vitest run src/platform/node src/execution/production-worker.workerd.test.ts src/execution/purge.test.ts --maxWorkers=2
+      - name: Start disposable object storage for provider tests
+        env:
+          SEAWEEDFS_PORT: '18334'
+          APP_URL: '*'
+        run: docker compose --env-file /dev/null -p walden-ci-provider-matrix --profile postgres up -d --wait seaweedfs
+      - name: Browser and API provider matrix
+        env:
+          WALDEN_TEST_S3_ENDPOINT: http://127.0.0.1:18334
+        run: pnpm test:providers --skip-build
+      - name: Standalone development hot reload and shutdown
+        run: pnpm test:dev:smoke
+      - name: Provider test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: provider-matrix
+          path: |
+            playwright-report/provider-matrix
+            test-results/provider-matrix
+          if-no-files-found: ignore
+      - name: Remove disposable provider storage
+        if: always()
+        run: docker compose --env-file /dev/null -p walden-ci-provider-matrix --profile postgres down --volumes
+
+  # Manual deployment selects the changed deployables. Main pushes only run checks.
   changes:
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     outputs:
       app: ${{ steps.filter.outputs.app }}
@@ -42,11 +103,11 @@ jobs:
               - 'apps/landing/**'
               - 'pnpm-lock.yaml'
 
-  # D1 migrations are not applied here: run `pnpm --filter @walden/api
-  # db:migrate:remote` by hand before pushing code that needs them.
+  # The Worker applies bundled D1 migrations during initialization before
+  # serving requests or scheduled work. No separate migration job is needed.
   deploy-app:
-    needs: [verify, changes]
-    if: needs.changes.outputs.app == 'true' || github.event_name == 'workflow_dispatch'
+    needs: [verify, self-hosted-integration, changes]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-app
@@ -57,14 +118,16 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     steps:
-      - name: Skip without a deploy token
+      - name: Require a deploy token
         if: env.CLOUDFLARE_API_TOKEN == ''
-        run: echo "::notice::CLOUDFLARE_API_TOKEN is not set; skipping the deploy."
+        run: |
+          echo "::error::CLOUDFLARE_API_TOKEN is not set; deployment cannot proceed."
+          exit 1
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24.15.0
           cache: pnpm
       - if: env.CLOUDFLARE_API_TOKEN != ''
         run: pnpm install --frozen-lockfile
@@ -76,8 +139,8 @@ jobs:
         run: pnpm exec wrangler deploy
 
   deploy-landing:
-    needs: [verify, changes]
-    if: needs.changes.outputs.landing == 'true' || github.event_name == 'workflow_dispatch'
+    needs: [verify, self-hosted-integration, changes]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-landing
@@ -88,14 +151,16 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     steps:
-      - name: Skip without a deploy token
+      - name: Require a deploy token
         if: env.CLOUDFLARE_API_TOKEN == ''
-        run: echo "::notice::CLOUDFLARE_API_TOKEN is not set; skipping the deploy."
+        run: |
+          echo "::error::CLOUDFLARE_API_TOKEN is not set; deployment cannot proceed."
+          exit 1
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24.15.0
           cache: pnpm
       - if: env.CLOUDFLARE_API_TOKEN != ''
         run: pnpm install --frozen-lockfile

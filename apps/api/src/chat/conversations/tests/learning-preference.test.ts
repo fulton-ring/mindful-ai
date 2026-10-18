@@ -26,7 +26,7 @@ it.each([
     });
     const DB = sqliteD1Binding(file);
     await DB.prepare(
-      "INSERT INTO users VALUES ('owner','subject','now','now',0),('other','other','now','now',0)",
+      "INSERT INTO users(id,auth_subject,created_at,updated_at,deletion_pending) VALUES ('owner','subject','now','now',0),('other','other','now','now',0)",
     ).run();
     const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
     app.use('*', async (c, next) => {

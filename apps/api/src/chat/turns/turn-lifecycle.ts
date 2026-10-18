@@ -11,9 +11,12 @@ import {
 } from '@walden/contracts';
 import { conversationTitle } from '@walden/domain';
 import { first, parseJson } from '../../db/client';
+import type { AppDatabase, AppStatement } from '../../db/database';
+import { prepareQuery } from '../../db/database';
 import { HttpError, newId, nowIso } from '../../http';
 import type { LoadedAttachment } from '../attachments/attachments';
-import { loadConversation, RETENTION_MS } from '../conversations/repository';
+import { loadConversation } from '../conversations/repository';
+import { retentionExpiry } from '../conversations/retention';
 import { attachmentPart, isInterrupted, storedMessageJson } from '../messages';
 import { chargeMessage, type MessageLimit, refundMessage } from './message-limit';
 import {
@@ -27,12 +30,15 @@ import {
 } from './turn-support';
 
 export type TurnRuntime = {
-  db: D1Database;
+  db: AppDatabase;
   ownerId: string;
+  retentionIdleDays?: number | null;
   /** Omitted only by tests that exercise admission without a message budget. */
   messageLimit?: MessageLimit;
   /** Resolves the model a persona will run on; defaults to the persona's own model. */
   modelFor?: (persona: Persona) => string;
+  /** Uses the active provider catalog, including operator-configured model weights. */
+  modelWeightFor?: (modelId: string) => number;
 };
 
 type TurnModel = { model: string | null; weight: number };
@@ -86,6 +92,7 @@ async function loadTurnRecords(runtime: TurnRuntime, request: ChatRequest): Prom
     loadConversation(db, ownerId, request.conversationId, {
       renewExpired: !request.regenerateMessageId,
       branchId: request.branchId,
+      retentionIdleDays: runtime.retentionIdleDays,
     }),
     first<PreviousTurn>(
       db
@@ -109,7 +116,7 @@ async function loadTurnRecords(runtime: TurnRuntime, request: ChatRequest): Prom
 }
 
 async function loadNoteRow(
-  db: D1Database,
+  db: AppDatabase,
   ownerId: string,
   noteId: string | null,
 ): Promise<NoteRow | null> {
@@ -179,26 +186,30 @@ async function reserveTurn(
   const branchId = branchFork ? newId() : input.conversation.branchId;
   const turnId = newId();
   const createdAt = nowIso();
-  const expiresAt = new Date(Date.now() + RETENTION_MS).toISOString();
+  const expiry = retentionExpiry(runtime.retentionIdleDays, createdAt);
+  const expiresAt = expiry.expiresAt;
   if (branchFork) await createBranch(db, input, branchId, ownerId, createdAt);
   try {
-    await db
-      .prepare(
-        "INSERT INTO turns (id,request_id,conversation_id,owner_id,status,created_at,branch_id,source_branch_id,request_json,model,weight) VALUES (?,?,?,?, 'streaming',?,?,?,?,?,?)",
-      )
-      .bind(
-        turnId,
-        input.request.requestId,
-        input.conversation.id,
-        ownerId,
-        createdAt,
-        branchId,
-        input.conversation.branchId,
-        JSON.stringify(input.request),
-        turnModel.model,
-        turnModel.weight,
-      )
-      .run();
+    const insert = (db: AppDatabase) =>
+      db
+        .prepare(
+          "INSERT INTO turns (id,request_id,conversation_id,owner_id,status,created_at,branch_id,source_branch_id,request_json,model,weight) VALUES (?,?,?,?, 'streaming',?,?,?,?,?,?)",
+        )
+        .bind(
+          turnId,
+          input.request.requestId,
+          input.conversation.id,
+          ownerId,
+          createdAt,
+          branchId,
+          input.conversation.branchId,
+          JSON.stringify(input.request),
+          turnModel.model,
+          turnModel.weight,
+        )
+        .run();
+    if (db.transaction) await db.transaction(insert);
+    else await insert(db);
   } catch {
     if (branchFork)
       await db
@@ -207,11 +218,21 @@ async function reserveTurn(
         .run();
     throw new HttpError(409, 'A turn is already in progress for this conversation');
   }
-  return { branchId, branchFork, turnId, createdAt, expiresAt, editInPlace, persona };
+  return {
+    branchId,
+    branchFork,
+    turnId,
+    createdAt,
+    expiresAt,
+    storedExpiresAt: expiry.storedExpiresAt,
+    retentionDisabled: expiry.retentionDisabled,
+    editInPlace,
+    persona,
+  };
 }
 
 async function createBranch(
-  db: D1Database,
+  db: AppDatabase,
   input: TurnInput,
   branchId: string,
   ownerId: string,
@@ -307,18 +328,19 @@ function turnSetupStatements(
   input: TurnInput,
   reservation: Awaited<ReturnType<typeof reserveTurn>>,
   persona: Persona,
-  userMessageStatementValue: D1PreparedStatement | null,
+  userMessageStatementValue: AppStatement | null,
 ) {
   const { db, ownerId } = runtime;
   const advances = !input.regeneration && !reservation.editInPlace;
   return [
     ...(reservation.editInPlace && input.edit?.replacedAssistant
       ? [
-          db
-            .prepare(
+          prepareQuery(db, {
+            sqlite:
               "DELETE FROM messages WHERE id=? AND owner_id=? AND role='assistant' AND json_extract(ui_message,'$.metadata.status')='interrupted'",
-            )
-            .bind(input.edit.replacedAssistant.id, ownerId),
+            postgres:
+              "DELETE FROM messages WHERE id=? AND owner_id=? AND role='assistant' AND (ui_message::jsonb #>> '{metadata,status}')='interrupted'",
+          }).bind(input.edit.replacedAssistant.id, ownerId),
         ]
       : []),
     ...(advances
@@ -342,12 +364,13 @@ function turnSetupStatements(
     ...(userMessageStatementValue ? [userMessageStatementValue] : []),
     db
       .prepare(
-        "UPDATE conversations SET persona_id=?,last_user_activity_at=?,expires_at=?,learning_checks_enabled=?,title=CASE WHEN title IN ('New conversation','New thread') THEN ? ELSE title END WHERE id=? AND owner_id=?",
+        "UPDATE conversations SET persona_id=?,last_user_activity_at=?,expires_at=?,retention_disabled=?,learning_checks_enabled=?,title=CASE WHEN title IN ('New conversation','New thread') THEN ? ELSE title END WHERE id=? AND owner_id=?",
       )
       .bind(
         persona.id,
         reservation.createdAt,
-        reservation.expiresAt,
+        reservation.storedExpiresAt,
+        reservation.retentionDisabled,
         input.request.action === 'stop_checks'
           ? 0
           : input.conversation.learningChecksEnabled
@@ -422,7 +445,14 @@ async function prepareStreamTurn(
   };
 }
 
-export async function prepareTurn(
+function turnModelFor(runtime: TurnRuntime, model: string | null): TurnModel {
+  const weight = runtime.modelWeightFor?.(model ?? '') ?? modelWeight(model ?? '');
+  if (!Number.isSafeInteger(weight) || weight < 1)
+    throw new HttpError(503, 'The selected model has an invalid message weight.');
+  return { model, weight };
+}
+
+async function prepareTurnInTransaction(
   runtime: TurnRuntime,
   request: ChatRequest,
   attachments: LoadedAttachment[] = [],
@@ -461,7 +491,7 @@ export async function prepareTurn(
     : undefined;
   validateLearningCheck(request, pendingIntervention);
   const model = runtime.modelFor?.(persona) ?? persona.model ?? null;
-  const turnModel = { model, weight: modelWeight(model ?? '') };
+  const turnModel = turnModelFor(runtime, model);
   const input: TurnInput = {
     request,
     attachments,
@@ -489,4 +519,18 @@ export async function prepareTurn(
     if (window) await refundMessage(runtime.db, runtime.ownerId, window, turnModel.weight);
     throw error;
   }
+}
+
+/** Charge, branch reservation, and setup share one owner lock and transaction on PostgreSQL. */
+export async function prepareTurn(
+  runtime: TurnRuntime,
+  request: ChatRequest,
+  attachments: LoadedAttachment[] = [],
+): Promise<PreparedTurnResult> {
+  if (runtime.db.transaction)
+    return runtime.db.transaction(
+      (db) => prepareTurnInTransaction({ ...runtime, db }, request, attachments),
+      [`owner:${runtime.ownerId}`],
+    );
+  return prepareTurnInTransaction(runtime, request, attachments);
 }

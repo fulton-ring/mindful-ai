@@ -1,5 +1,6 @@
 import type { Note, ProvenanceSpan } from '@walden/contracts';
 import { first, parseJson } from '../db/client';
+import type { AppDatabase } from '../db/database';
 
 export type NoteRow = {
   id: string;
@@ -31,7 +32,7 @@ export const NOTE_PROJECTION = `n.id,COALESCE(NULLIF(TRIM(n.title),''),
    ORDER BY c.last_user_activity_at DESC LIMIT 1),
   '${DEFAULT_NOTE_TITLE}') AS title,n.markdown,n.revision,n.provenance_json,n.created_at,n.updated_at`;
 
-export const selectNote = (db: D1Database, ownerId: string, id: string) =>
+export const selectNote = (db: AppDatabase, ownerId: string, id: string) =>
   first<NoteRow>(
     db
       .prepare(`SELECT ${NOTE_PROJECTION} FROM notes n WHERE n.id=? AND n.owner_id=?`)
@@ -46,7 +47,7 @@ type NewNote = { id: string; ownerId: string; title: string; now: string; markdo
  * so callers can make creation conditional inside a batch.
  */
 export const insertNoteStatement = (
-  db: D1Database,
+  db: AppDatabase,
   note: NewNote,
   guard?: { where: string; params: unknown[] },
 ) =>

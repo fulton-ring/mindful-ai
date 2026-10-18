@@ -10,7 +10,10 @@ const runtime = vi.hoisted(() => ({
   stop: vi.fn(() => true),
   alarm: vi.fn(),
   sessions: vi.fn(),
+  migrate: vi.fn(async () => {}),
 }));
+
+vi.mock('../db/d1-startup', () => ({ ensureD1Schema: runtime.migrate }));
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class {
@@ -55,7 +58,7 @@ it('loads application runtimes on events, outside Worker startup, and shares eac
   expect(runtime.scheduled).toHaveBeenCalledWith(controller, env, ctx);
   expect(runtime.loaded).toEqual(['http']);
 
-  const state = { storage: { sql: { exec: vi.fn() } } } as unknown as DurableObjectState;
+  const state = { storage: { sql: { exec: vi.fn(() => []) } } } as unknown as DurableObjectState;
   const turn = new ChatTurn(state, env);
   await Promise.all([turn.start('turn-id'), turn.stream('turn-id', 5)]);
   expect(await turn.stop('turn-id')).toBe(true);
@@ -66,4 +69,43 @@ it('loads application runtimes on events, outside Worker startup, and shares eac
   expect(runtime.stream).toHaveBeenCalledWith('turn-id', 5);
   expect(runtime.stop).toHaveBeenCalledWith('turn-id');
   expect(runtime.alarm).toHaveBeenCalledOnce();
+});
+
+it('waits for schema readiness and retries HTTP and scheduled startup failures', async () => {
+  const { default: worker } = await import('../worker');
+  const env = {} as Bindings,
+    ctx = {} as ExecutionContext;
+  const request = new Request('https://example.com/api/config') as Parameters<
+    typeof worker.fetch
+  >[0];
+  runtime.migrate.mockRejectedValueOnce(new Error('temporary database failure'));
+  expect((await worker.fetch(request, env, ctx)).status).toBe(503);
+  let ready = false;
+  runtime.migrate.mockImplementationOnce(async () => {
+    await Promise.resolve();
+    ready = true;
+  });
+  runtime.fetch.mockImplementationOnce(() => {
+    expect(ready).toBe(true);
+    return new Response('ready');
+  });
+  expect((await worker.fetch(request, env, ctx)).status).toBe(200);
+  const controller = { cron: '* * * * *' } as ScheduledController;
+  runtime.migrate.mockRejectedValueOnce(new Error('temporary database failure'));
+  await expect(worker.scheduled(controller, env, ctx)).rejects.toThrow(
+    'temporary database failure',
+  );
+  await worker.scheduled(controller, env, ctx);
+});
+
+it('retries a failed Durable Object bootstrap without constructing a session too early', async () => {
+  const { ChatTurn } = await import('../worker');
+  const state = { storage: { sql: { exec: vi.fn(() => []) } } } as unknown as DurableObjectState;
+  const before = runtime.sessions.mock.calls.length;
+  const turn = new ChatTurn(state, {} as Bindings);
+  runtime.migrate.mockRejectedValueOnce(new Error('temporary database failure'));
+  await expect(turn.start('retry-turn')).rejects.toThrow('temporary database failure');
+  expect(runtime.sessions.mock.calls.length).toBe(before);
+  await turn.start('retry-turn');
+  expect(runtime.sessions.mock.calls.length).toBe(before + 1);
 });
