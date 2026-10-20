@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -153,6 +153,47 @@ function declaredLicense(pkg) {
   return 'Unknown';
 }
 
+export async function installedProductionInventory(trees) {
+  const inventory = {};
+  const packages = new Map();
+  const listed = new Set();
+  async function visit(node, parent, name) {
+    let path;
+    try {
+      path = await realpath(node.path);
+    } catch (error) {
+      // pnpm lists foreign-platform optional packages even when they are not installed.
+      const optional =
+        Object.hasOwn(parent?.optionalDependencies ?? {}, name) ||
+        (parent?.peerDependenciesMeta?.[name]?.optional &&
+          !Object.hasOwn(parent?.dependencies ?? {}, name));
+      if (error.code === 'ENOENT' && optional) return;
+      if (error.code === 'ENOENT')
+        throw new Error(`Missing required production dependency: ${name} (${node.path})`, {
+          cause: error,
+        });
+      throw error;
+    }
+    if (!packages.has(path))
+      packages.set(path, JSON.parse(await readFile(join(path, 'package.json'), 'utf8')));
+    const pkg = packages.get(path);
+    if (parent && !listed.has(path)) {
+      const license = declaredLicense(pkg);
+      inventory[license] ??= [];
+      inventory[license].push({ name: pkg.name, versions: [pkg.version], paths: [path] });
+      listed.add(path);
+    }
+    // A deduplicated occurrence can precede the occurrence with its full dependency tree.
+    for (const [name, child] of Object.entries({
+      ...node.dependencies,
+      ...node.optionalDependencies,
+    }))
+      await visit(child, pkg, name);
+  }
+  for (const tree of trees) await visit(tree);
+  return inventory;
+}
+
 export async function addDeployedPackages(inventory, nodeModules) {
   const listed = new Set(
     Object.values(inventory)
@@ -205,20 +246,22 @@ const pnpmJson = (args) =>
 
 async function main() {
   const { filters, outputs, deployed } = parseNoticeArguments(process.argv.slice(2));
-  const inventory = pnpmJson([
-    ...filters.flatMap((filter) => ['--filter', filter]),
-    'licenses',
-    'list',
-    '--prod',
-    '--json',
-  ]);
+  const inventory = await installedProductionInventory(
+    pnpmJson([
+      '--fail-if-no-match',
+      ...filters.flatMap((filter) => ['--filter', filter]),
+      'list',
+      '--recursive',
+      '--prod',
+      '--depth=Infinity',
+      '--json',
+    ]),
+  );
   if (deployed) await addDeployedPackages(inventory, resolve(deployed));
   const workspacePackages = new Set(
-    deployed
-      ? pnpmJson(['ls', '--recursive', '--depth=-1', '--json']).map(
-          (pkg) => `${pkg.name}@${pkg.version}`,
-        )
-      : [],
+    pnpmJson(['ls', '--recursive', '--depth=-1', '--json']).map(
+      (pkg) => `${pkg.name}@${pkg.version}`,
+    ),
   );
   const content = [
     'WALDEN LICENSE AND ATTRIBUTION',

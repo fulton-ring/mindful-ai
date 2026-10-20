@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -46,6 +46,99 @@ test('notice command scopes the production inventory with explicit workspace fil
   ]) {
     assert.throws(() => parseNoticeArguments(args), /Usage:/);
   }
+});
+
+test('notice command works with an empty pnpm store and preserves the normal output', async (t) => {
+  const root = await fixture(t);
+  const store = join(root, 'empty-store');
+  await mkdir(store);
+  const command = fileURLToPath(new URL('./third-party-notices.mjs', import.meta.url));
+  const run = (output, env) => {
+    const result = spawnSync(
+      process.execPath,
+      [command, '--filter=@walden/api', '--filter=@walden/web', output],
+      { env, encoding: 'utf8', timeout: 120_000 },
+    );
+    assert.equal(result.status, 0, result.stderr || result.stdout || String(result.error));
+  };
+  const isolated = join(root, 'isolated.txt');
+  run(isolated, { ...process.env, npm_config_store_dir: store });
+  const normal = join(root, 'normal.txt');
+  run(normal, process.env);
+  const text = await readFile(isolated, 'utf8');
+  assert.equal(text, await readFile(normal, 'utf8'));
+  for (const name of ['react', '@mastra/core', '@walden/contracts', '@walden/domain'])
+    assert.ok(text.includes(`Package: ${name}@`), `Missing production package ${name}`);
+  assert.doesNotMatch(text, /^Package: @biomejs\/biome@/m);
+  assert.doesNotMatch(text, /^MISSING_LICENSE_TEXT:/m);
+  assert.deepEqual(await readdir(store), [], 'Notice generation must not populate the pnpm store');
+});
+
+test('installed inventory follows production trees, aliases and all peer contexts', async (t) => {
+  const root = await realpath(await fixture(t));
+  const pkg = async (directory, metadata) => {
+    const path = join(root, directory);
+    await mkdir(path, { recursive: true });
+    await writeFile(join(path, 'package.json'), JSON.stringify(metadata));
+    return { path };
+  };
+  const app = await pkg('app', { name: 'app' });
+  const shared = await pkg('shared', { name: 'shared', version: '1', license: { type: 'ISC' } });
+  const peer1 = await pkg('peer1', { name: 'peer', version: '1', license: 'MIT' });
+  const peer2 = await pkg('peer2', { name: 'peer', version: '1', license: 'MIT' });
+  const workspace = await pkg('workspace', { name: '@walden/workspace', license: 'Apache-2.0' });
+  const inventory = await noticeCommand.installedProductionInventory([
+    {
+      ...app,
+      dependencies: {
+        first: { ...peer1, deduped: true },
+        alias: { ...peer2, dependencies: { workspace } },
+        later: { ...peer1, dependencies: { shared } },
+      },
+    },
+  ]);
+  assert.deepEqual(inventory, {
+    MIT: [
+      { name: 'peer', versions: ['1'], paths: [peer1.path] },
+      { name: 'peer', versions: ['1'], paths: [peer2.path] },
+    ],
+    'Apache-2.0': [{ name: '@walden/workspace', versions: [undefined], paths: [workspace.path] }],
+    ISC: [{ name: 'shared', versions: ['1'], paths: [shared.path] }],
+  });
+});
+
+test('installed inventory skips absent optional packages but rejects missing required packages', async (t) => {
+  const root = await fixture(t);
+  const path = join(root, 'app');
+  await mkdir(path);
+  await writeFile(
+    join(path, 'package.json'),
+    JSON.stringify({
+      name: 'app',
+      dependencies: { required: '1' },
+      optionalDependencies: { platform: '1' },
+      peerDependenciesMeta: { optionalPeer: { optional: true }, required: { optional: true } },
+    }),
+  );
+  const missing = { path: join(root, 'missing') };
+  assert.deepEqual(
+    await noticeCommand.installedProductionInventory([
+      { path, dependencies: { platform: missing, optionalPeer: missing } },
+    ]),
+    {},
+  );
+  await assert.rejects(
+    noticeCommand.installedProductionInventory([{ path, dependencies: { required: missing } }]),
+    /Missing required production dependency: required/,
+  );
+  const broken = join(root, 'broken-optional');
+  await mkdir(broken);
+  await assert.rejects(
+    noticeCommand.installedProductionInventory([
+      { path, optionalDependencies: { platform: { path: broken } } },
+    ]),
+    /ENOENT/,
+  );
 });
 
 test('notices preserve nested attribution, deduplicate peers, and omit installed paths', async (t) => {
