@@ -86,7 +86,11 @@ test('installed inventory follows production trees, aliases and all peer context
   const shared = await pkg('shared', { name: 'shared', version: '1', license: { type: 'ISC' } });
   const peer1 = await pkg('peer1', { name: 'peer', version: '1', license: 'MIT' });
   const peer2 = await pkg('peer2', { name: 'peer', version: '1', license: 'MIT' });
-  const workspace = await pkg('workspace', { name: '@walden/workspace', license: 'Apache-2.0' });
+  const workspace = await pkg('workspace', {
+    name: '@walden/workspace',
+    version: '0.0.0',
+    license: 'Apache-2.0',
+  });
   const inventory = await noticeCommand.installedProductionInventory([
     {
       ...app,
@@ -102,7 +106,7 @@ test('installed inventory follows production trees, aliases and all peer context
       { name: 'peer', versions: ['1'], paths: [peer1.path] },
       { name: 'peer', versions: ['1'], paths: [peer2.path] },
     ],
-    'Apache-2.0': [{ name: '@walden/workspace', versions: [undefined], paths: [workspace.path] }],
+    'Apache-2.0': [{ name: '@walden/workspace', versions: ['0.0.0'], paths: [workspace.path] }],
     ISC: [{ name: 'shared', versions: ['1'], paths: [shared.path] }],
   });
 });
