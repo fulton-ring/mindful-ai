@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -124,6 +133,14 @@ test('installed inventory skips absent optional packages but rejects missing req
       peerDependenciesMeta: { optionalPeer: { optional: true }, required: { optional: true } },
     }),
   );
+  const installed = join(root, 'required');
+  await mkdir(installed);
+  await writeFile(
+    join(installed, 'package.json'),
+    JSON.stringify({ name: 'required', version: '1' }),
+  );
+  await mkdir(join(path, 'node_modules'));
+  await symlink(installed, join(path, 'node_modules/required'), 'dir');
   const missing = { path: join(root, 'missing') };
   assert.deepEqual(
     await noticeCommand.installedProductionInventory([
@@ -142,6 +159,35 @@ test('installed inventory skips absent optional packages but rejects missing req
       { path, optionalDependencies: { platform: { path: broken } } },
     ]),
     /ENOENT/,
+  );
+});
+
+test('installed inventory checks required aliases, including names shared with Node builtins', async (t) => {
+  const root = await realpath(await fixture(t));
+  const app = join(root, 'app');
+  const cached = join(root, 'store', 'actual-package');
+  await mkdir(join(app, 'node_modules'), { recursive: true });
+  await mkdir(cached, { recursive: true });
+  await writeFile(
+    join(app, 'package.json'),
+    JSON.stringify({ name: 'app', dependencies: { punycode: 'npm:actual-package@1' } }),
+  );
+  await writeFile(
+    join(cached, 'package.json'),
+    JSON.stringify({ name: 'actual-package', version: '1', license: 'MIT' }),
+  );
+  const link = join(app, 'node_modules/punycode');
+  await symlink(cached, link, 'dir');
+  assert.deepEqual(
+    await noticeCommand.installedProductionInventory([
+      { path: app, dependencies: { punycode: { path: cached } } },
+    ]),
+    { MIT: [{ name: 'actual-package', versions: ['1'], paths: [cached] }] },
+  );
+  await rm(link);
+  await assert.rejects(
+    noticeCommand.installedProductionInventory([{ path: app, dependencies: {} }]),
+    /Missing required production dependency: punycode/,
   );
 });
 

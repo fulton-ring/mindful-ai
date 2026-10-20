@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, readdir, readFile, realpath, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -153,6 +154,32 @@ function declaredLicense(pkg) {
   return 'Unknown';
 }
 
+async function hasInstalledPackage(path, name) {
+  for (const modules of createRequire(join(path, 'package.json')).resolve.paths(
+    `${name}/package.json`,
+  ) ?? []) {
+    try {
+      // Read manifests directly: a package's exports may hide package.json from require.resolve.
+      JSON.parse(await readFile(join(modules, name, 'package.json'), 'utf8'));
+      return true;
+    } catch (error) {
+      if (!['ENOENT', 'ENOTDIR'].includes(error.code)) throw error;
+    }
+  }
+  return false;
+}
+
+async function assertRequiredPackages(path, pkg) {
+  // pnpm can omit a dependency from its graph when only its link is missing.
+  for (const dependency of Object.keys(pkg.dependencies ?? {})) {
+    if (
+      !Object.hasOwn(pkg.optionalDependencies ?? {}, dependency) &&
+      !(await hasInstalledPackage(path, dependency))
+    )
+      throw new Error(`Missing required production dependency: ${dependency} (${path})`);
+  }
+}
+
 export async function installedProductionInventory(trees) {
   const inventory = {};
   const packages = new Map();
@@ -174,8 +201,11 @@ export async function installedProductionInventory(trees) {
         });
       throw error;
     }
-    if (!packages.has(path))
-      packages.set(path, JSON.parse(await readFile(join(path, 'package.json'), 'utf8')));
+    if (!packages.has(path)) {
+      const pkg = JSON.parse(await readFile(join(path, 'package.json'), 'utf8'));
+      await assertRequiredPackages(path, pkg);
+      packages.set(path, pkg);
+    }
     const pkg = packages.get(path);
     if (parent && !listed.has(path)) {
       const license = declaredLicense(pkg);
